@@ -248,6 +248,16 @@ void VulkanEngine::drawGeometry(VkCommandBuffer cmd)
     scissor.extent.height = drawExtent.height;
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
+    // Bind a texture
+    VkDescriptorSet textureSet = getCurrentFrame().frameDescriptorAllocator.allocate(device, displayTextureDescriptorSetLayout);
+    {
+        DescriptorWriter writer;
+        writer.writeImage(0, errorCheckerboardImage.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+        writer.updateSet(device, textureSet);
+    }
+
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, meshPipelineLayout, 0, 1, &textureSet, 0, nullptr);
+
     // Draw the test mesh (basic.glb has 3 meshes inside, drawing the 3rd mesh for the test)
     GPUDrawPushConstants pushConstants;
     glm::mat4 view = glm::translate(glm::vec3(0.0f, 0.0f, -5.0f));
@@ -401,17 +411,70 @@ AllocatedImage VulkanEngine::createImage(VkExtent3D imageExtent, VkFormat format
     }
 
     // Always allocate images on dedicated GPU memory
-    
+    VmaAllocationCreateInfo allocInfo{};
+    allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+    allocInfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
+    // Allocate and create the image
+    VK_CHECK(vmaCreateImage(vmaAllocator, &imgInfo, &allocInfo, &newImage.image, &newImage.allocation, nullptr));
+
+    // Defaulting to the color aspect unless depth format is given
+    VkImageAspectFlags aspectFlag = VK_IMAGE_ASPECT_COLOR_BIT; 
+    if(format == VK_FORMAT_D32_SFLOAT) // if the format is the depth format
+    {
+        aspectFlag = VK_IMAGE_ASPECT_DEPTH_BIT;
+    }
+
+    // Create the image-view for the image
+    VkImageViewCreateInfo viewInfo = vkinit::imageview_create_info(format, newImage.image, aspectFlag);
+    viewInfo.subresourceRange.levelCount = imgInfo.mipLevels;
+
+    VK_CHECK(vkCreateImageView(device, &viewInfo, nullptr, &newImage.imageView));
+
+    return newImage;
 }
 
 AllocatedImage VulkanEngine::createImage(void* data, VkExtent3D imageExtent, VkFormat format, VkImageUsageFlags usage, bool mipMapped)
 {
-    return AllocatedImage();
+    // Hardcoding the textures to be RGBA 8 bit format. This should be sufficient as most of the textures are in that format.
+    size_t dataSize = imageExtent.depth * imageExtent.width * imageExtent.height * 4;
+    AllocatedBuffer uploadBuffer = createBuffer(dataSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+    memcpy(uploadBuffer.allocInfo.pMappedData, data, dataSize);
+
+    // aside from the original usage also allow copying data into and from it.
+    AllocatedImage newImage = createImage(imageExtent, format, usage | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, mipMapped);
+
+    // Perform a buffer to image copy.
+    immediateSubmit([&](VkCommandBuffer cmd) {
+        vkutil::transitionImage(cmd, newImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+        VkBufferImageCopy copyRegion{};
+        copyRegion.bufferOffset = 0;
+        copyRegion.bufferRowLength = 0;
+        copyRegion.bufferImageHeight = 0;
+
+        copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        copyRegion.imageSubresource.mipLevel = 0;
+        copyRegion.imageSubresource.baseArrayLayer = 0;
+        copyRegion.imageSubresource.layerCount = 1;
+        copyRegion.imageExtent = imageExtent;
+
+        // copy buffer to image
+        vkCmdCopyBufferToImage(cmd, uploadBuffer.buffer, newImage.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
+
+        vkutil::transitionImage(cmd, newImage.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    });
+
+    destroyBuffer(uploadBuffer);
+
+    return newImage;
 }
 
 void VulkanEngine::destroyImage(const AllocatedImage& img)
 {
+    vkDestroyImageView(device, img.imageView, nullptr);
+    vmaDestroyImage(vmaAllocator, img.image, img.allocation);
 }
 
 GPUMeshBuffers VulkanEngine::uploadMesh(std::span<Vertex> vertices, std::span<uint32_t> indices)
@@ -692,11 +755,18 @@ void VulkanEngine::m_initDescriptors()
 
     globalDescriptorAllocator.initPool(device, 10, sizes);
     
-    // Create the descriptor set layout for the compute draw
+    // The descriptor set layout for the main draw image
     {
         DescriptorLayoutBuilder builder;
         builder.addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
         drawImageDescriptorSetLayout = builder.build(device, VK_SHADER_STAGE_COMPUTE_BIT);
+    }
+
+    // The descriptor set layout for single texture display
+    {
+        DescriptorLayoutBuilder builder;
+        builder.addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+        displayTextureDescriptorSetLayout = builder.build(device, VK_SHADER_STAGE_FRAGMENT_BIT);
     }
 
     // Descriptor set layout for the scene data
@@ -842,7 +912,7 @@ void VulkanEngine::m_initMeshPipeline()
     }
 
     VkShaderModule meshFragmentShader;
-    if(!vkutil::loadShaderModule(device, "../../shaders/colored_triangle.frag.spv", &meshFragmentShader))
+    if(!vkutil::loadShaderModule(device, "../../shaders/display_texture.frag.spv", &meshFragmentShader))
     {
         fmt::println("Error while building the mesh fragment shader module");
     }
@@ -860,6 +930,8 @@ void VulkanEngine::m_initMeshPipeline()
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = vkinit::pipeline_layout_create_info();
     pipelineLayoutInfo.pushConstantRangeCount = 1;
     pipelineLayoutInfo.pPushConstantRanges = &bufferRange;
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = &displayTextureDescriptorSetLayout;
     VK_CHECK(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &meshPipelineLayout));
 
     // Build the pipeline
@@ -961,5 +1033,51 @@ void VulkanEngine::m_initImgui()
 
 void VulkanEngine::m_initDefaultData()
 {
+    // Default meshes
     testMeshes = loadGltfMeshes(this, "../../assets/basicmesh.glb").value();
+
+    // Default textures
+    // 3 default textures 1 pixel each
+    uint32_t white = glm::packUnorm4x8(glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+    whiteImage = createImage((void*)&white, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+
+    uint32_t grey = glm::packUnorm4x8(glm::vec4(0.66f, 0.66f, 0.66f, 1.0f));
+    greyImage = createImage((void*)&grey, VkExtent3D{ 1, 1, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+
+    uint32_t black = glm::packUnorm4x8(glm::vec4(0.0f, 0.0f, 0.0f, 0.0f));
+    blackImage = createImage((void*)&black, VkExtent3D{ 1, 1, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+
+    //checkerboard image
+    uint32_t magenta = glm::packUnorm4x8(glm::vec4(1, 0, 1, 1));
+    std::array<uint32_t, 16 * 16 > pixels; //for 16x16 checkerboard texture
+    for(int y = 0; y < 16; ++y) 
+    {
+        for(int x = 0; x < 16; ++x) 
+        {
+            pixels[y * 16 + x] = ((x % 2) ^ (y % 2)) ? magenta : black;
+        }
+    }
+
+    errorCheckerboardImage = createImage(pixels.data(), VkExtent3D{ 16, 16, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+
+    // Default samplers
+    VkSamplerCreateInfo samplerInfo = { .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+
+    samplerInfo.magFilter = VK_FILTER_NEAREST;
+    samplerInfo.minFilter = VK_FILTER_NEAREST;
+    vkCreateSampler(device, &samplerInfo, nullptr, &defaultSamplerNearest);
+
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+    vkCreateSampler(device, &samplerInfo, nullptr, &defaultSamplerLinear);
+
+    mainDeletionQueue.pushFunction([=]() {
+        destroyImage(whiteImage);
+        destroyImage(greyImage);
+        destroyImage(blackImage);
+        destroyImage(errorCheckerboardImage);
+
+        vkDestroySampler(device, defaultSamplerNearest, nullptr);
+        vkDestroySampler(device, defaultSamplerLinear, nullptr);
+    });
 }

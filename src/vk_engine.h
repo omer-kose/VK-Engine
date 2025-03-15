@@ -127,6 +127,11 @@ public:
 	// Allocator
 	VmaAllocator vmaAllocator;
 
+	// Immeadiate submit structures
+	VkFence immeadiateFence;
+	VkCommandPool immediateCommandPool;
+	VkCommandBuffer immediateCommandBuffer;
+
 	// Draw Image
 	AllocatedImage drawImage;
 	AllocatedImage depthImage;
@@ -134,13 +139,26 @@ public:
 
 	// Global Descriptors
 	DescriptorAllocator globalDescriptorAllocator;
+	// Main draw image descriptor used as the primary render target
 	VkDescriptorSetLayout drawImageDescriptorSetLayout;
 	VkDescriptorSet drawImageDescriptorSet;
+	// Descriptor layout for single texture display
+	VkDescriptorSetLayout displayTextureDescriptorSetLayout;
 
 	// Background Compute Pipelines
 	VkPipelineLayout gradientPipelineLayout; // all of the effects share the same layout so we only create one
 	std::vector<ComputeEffect> backgroundEffects;
 	int currentBackgroundEffect{0};
+
+	// Default textures
+	AllocatedImage whiteImage;
+	AllocatedImage blackImage;
+	AllocatedImage greyImage;
+	AllocatedImage errorCheckerboardImage;
+	
+	// Default samplers
+	VkSampler defaultSamplerLinear;
+	VkSampler defaultSamplerNearest;
 
 	/* Graphics Pipelines */
 	// Mesh Pipeline
@@ -154,11 +172,6 @@ public:
 	GPUSceneData sceneData;
 	// Draw Resource Descriptor Layouts
 	VkDescriptorSetLayout sceneDataDescriptorLayout;
-
-	// Immeadiate submit structures
-	VkFence immeadiateFence;
-	VkCommandPool immediateCommandPool;
-	VkCommandBuffer immediateCommandBuffer;
 private:
 	// Vulkan Context
 	void m_initVulkan();
