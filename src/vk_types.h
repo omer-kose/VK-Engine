@@ -81,3 +81,25 @@ struct GPUSceneData
     glm::vec4 sunlightDirection; // w for sun power
     glm::vec4 sunlightColor;
 };
+
+// Material Data
+// Describes the type of the pass. Current 2 supported types: Opaque, Transparent
+enum class MaterialPass : uint8_t
+{
+    Opaque,
+    Transparent,
+    Other
+};
+
+struct MaterialPipeline
+{
+    VkPipeline pipeline;
+    VkPipelineLayout layout;
+};
+
+struct MaterialInstance
+{
+    MaterialPipeline* pipeline; // non-owning pointer
+    VkDescriptorSet materialSet;
+    MaterialPass passType;
+};

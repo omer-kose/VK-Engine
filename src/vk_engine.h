@@ -61,6 +61,39 @@ struct ComputeEffect
 	ComputePushConstants pushConstants;
 };
 
+struct GLTFMetallicRoughnessMaterial
+{
+	MaterialPipeline opaquePipeline;
+	MaterialPipeline transparentPipeline;
+
+	VkDescriptorSetLayout materialLayout;
+
+	struct MaterialConstants
+	{
+		glm::vec4 colorFactors;
+		glm::vec4 metalRoughnessFactors;
+		// padding to complete the uniform buffer to 256 bytes (most GPUs expect a minimum alignment of 256 bytes for uniform buffers)
+		glm::vec4 extra[14];
+	};
+
+	struct MaterialResources
+	{
+		AllocatedImage colorImage;
+		VkSampler colorSampler;
+		AllocatedImage metalRoughnessImage;
+		VkSampler metalRoughnessSampler;
+		VkBuffer dataBuffer; // The actual buffer holding MaterialConstants data
+		uint32_t dataBufferOffset;
+	};
+
+	DescriptorWriter writer;
+
+	void buildPipelines(VulkanEngine* engine);
+	void clearResources(VkDevice device);
+
+	MaterialInstance createInstance(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
+};
+
 class VulkanEngine {
 public:
 	static VulkanEngine& Get();
@@ -138,7 +171,7 @@ public:
 	VkExtent2D drawExtent;
 
 	// Global Descriptors
-	DescriptorAllocator globalDescriptorAllocator;
+	DescriptorAllocatorGrowable globalDescriptorAllocator;
 	// Main draw image descriptor used as the primary render target
 	VkDescriptorSetLayout drawImageDescriptorSetLayout;
 	VkDescriptorSet drawImageDescriptorSet;
@@ -150,6 +183,11 @@ public:
 	std::vector<ComputeEffect> backgroundEffects;
 	int currentBackgroundEffect{0};
 
+	/* Graphics Pipelines */
+	// Mesh Pipeline
+	VkPipelineLayout meshPipelineLayout;
+	VkPipeline meshPipeline;
+
 	// Default textures
 	AllocatedImage whiteImage;
 	AllocatedImage blackImage;
@@ -158,12 +196,11 @@ public:
 	
 	// Default samplers
 	VkSampler defaultSamplerLinear;
-	VkSampler defaultSamplerNearest;
+	VkSampler defaultSamplerNearest;	
 
-	/* Graphics Pipelines */
-	// Mesh Pipeline
-	VkPipelineLayout meshPipelineLayout;
-	VkPipeline meshPipeline;
+	// Default materials
+	GLTFMetallicRoughnessMaterial metallicRoughnessMaterial;
+	MaterialInstance defaultMaterial;
 
 	// Test Meshes
 	std::vector<std::shared_ptr<MeshAsset>> testMeshes;
