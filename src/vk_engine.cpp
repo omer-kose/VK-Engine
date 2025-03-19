@@ -110,6 +110,8 @@ void VulkanEngine::cleanup()
 
 void VulkanEngine::draw()
 {
+    updateScene();
+
     FrameData& currentFrame = getCurrentFrame();
     // Wait until the GPU has finished rendering the last frame of the same modularity (0->1->2->3  wait on 2 for 0 and wait on 3 for 1 and so on)
     VK_CHECK(vkWaitForFences(device, 1, &currentFrame.renderFence, true, 1000000000));
@@ -250,26 +252,36 @@ void VulkanEngine::drawGeometry(VkCommandBuffer cmd)
     scissor.extent.height = drawExtent.height;
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-    // Bind a texture
-    VkDescriptorSet textureSet = getCurrentFrame().frameDescriptorAllocator.allocate(device, displayTextureDescriptorSetLayout);
+    // Allocate a new uniform buffer for scene data (TODO: Horrible way of doing it but it is sufficient for the time being)
+    AllocatedBuffer gpuSceneDataBuffer = createBuffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    getCurrentFrame().deletionQueue.pushFunction([=](){
+        destroyBuffer(gpuSceneDataBuffer);
+    });
+
+    // Write the buffer
+    GPUSceneData* pGpuSceneDataBuffer = (GPUSceneData*)gpuSceneDataBuffer.allocation->GetMappedData();
+    *pGpuSceneDataBuffer = sceneData;
+
+    // Create a descriptor set for the uniform data
+    VkDescriptorSet sceneDescriptorSet = getCurrentFrame().frameDescriptorAllocator.allocate(device, sceneDataDescriptorLayout);
+    DescriptorWriter writer;
+    writer.writeBuffer(0, gpuSceneDataBuffer.buffer, sizeof(GPUSceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    writer.updateSet(device, sceneDescriptorSet);
+
+    for(const RenderObject& robj : mainDrawContext.opaqueSurfaces)
     {
-        DescriptorWriter writer;
-        writer.writeImage(0, errorCheckerboardImage.imageView, defaultSamplerNearest, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-        writer.updateSet(device, textureSet);
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, robj.material->materialPipeline->pipeline);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, robj.material->materialPipeline->layout, 0, 1, &sceneDescriptorSet, 0, nullptr);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, robj.material->materialPipeline->layout, 1, 1, &robj.material->materialSet, 0, nullptr);
+
+        GPUDrawPushConstants pushConstants;
+        pushConstants.vertexBufferAddress = robj.vertexBufferAddress;
+        pushConstants.worldMatrix = robj.transform;
+        vkCmdPushConstants(cmd, robj.material->materialPipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &pushConstants);
+
+        vkCmdBindIndexBuffer(cmd, robj.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdDrawIndexed(cmd, robj.indexCount, 1, robj.firstIndex, 0, 0);
     }
-
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, meshPipelineLayout, 0, 1, &textureSet, 0, nullptr);
-
-    // Draw the test mesh (basic.glb has 3 meshes inside, drawing the 3rd mesh for the test)
-    GPUDrawPushConstants pushConstants;
-    glm::mat4 view = glm::translate(glm::vec3(0.0f, 0.0f, -5.0f));
-    glm::mat4 projection = glm::perspective(glm::radians(70.0f), (float)drawExtent.width / (float)drawExtent.height, 0.1f, 10000.0f);
-    projection[1][1] *= -1.0f;
-    pushConstants.worldMatrix = projection * view;
-    pushConstants.vertexBuffer = testMeshes[2]->meshBuffers.vertexBufferAddress;
-    vkCmdPushConstants(cmd, meshPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &pushConstants);
-    vkCmdBindIndexBuffer(cmd, testMeshes[2]->meshBuffers.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);;
-    vkCmdDrawIndexed(cmd, testMeshes[2]->surfaces[0].count, 1, testMeshes[2]->surfaces[0].startIndex, 0, 0);
 
     vkCmdEndRendering(cmd);
 }
@@ -282,6 +294,28 @@ void VulkanEngine::drawImgui(VkCommandBuffer cmd, VkImageView targetImageView)
     vkCmdBeginRendering(cmd, &renderInfo);
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
     vkCmdEndRendering(cmd);
+}
+
+void VulkanEngine::updateScene()
+{
+    mainDrawContext.opaqueSurfaces.clear();
+
+    loadedNodes["Suzanne"]->registerDraw(glm::mat4(1.0f), mainDrawContext);
+
+    sceneData.view = glm::translate(glm::vec3{ 0,0,-5 });
+    // camera projection
+    sceneData.proj = glm::perspective(glm::radians(70.f), (float)windowExtent.width / (float)windowExtent.height, 0.1f, 10000.f);
+
+    // invert the Y direction on projection matrix so that we are more similar
+    // to opengl and gltf axis
+    sceneData.proj[1][1] *= -1;
+    sceneData.viewproj = sceneData.proj * sceneData.view;
+
+    //some default lighting parameters
+    sceneData.ambientColor = glm::vec4(0.1f);
+    sceneData.sunlightColor = glm::vec4(1.0f);
+    sceneData.sunlightDirection = glm::vec4(0.0f, 1.0f, 0.5f, 1.0f);
+
 }
 
 void VulkanEngine::run()
@@ -1039,9 +1073,6 @@ void VulkanEngine::m_initImgui()
 
 void VulkanEngine::m_initDefaultData()
 {
-    // Default meshes
-    testMeshes = loadGltfMeshes(this, "../../assets/basicmesh.glb").value();
-
     // Default textures
     // 3 default textures 1 pixel each
     uint32_t white = glm::packUnorm4x8(glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
@@ -1108,6 +1139,25 @@ void VulkanEngine::m_initDefaultData()
     defaultMaterialResources.dataBufferOffset = 0;
 
     defaultMaterial = metallicRoughnessMaterial.createInstance(device, MaterialPass::Opaque, defaultMaterialResources, globalDescriptorAllocator);
+
+    // Default meshes
+    testMeshes = loadGltfMeshes(this, "../../assets/basicmesh.glb").value();
+
+    for(auto& m : testMeshes)
+    {
+        std::shared_ptr<MeshNode> newNode = std::make_shared<MeshNode>();
+        newNode->mesh = m;
+
+        newNode->localTransform = glm::mat4(1.0f);
+        newNode->worldTransform = glm::mat4(1.0f);
+
+        for(auto& s : newNode->mesh->surfaces)
+        {
+            s.material = std::make_shared<GLTFMaterial>(defaultMaterial);
+        }
+
+        loadedNodes[m->name] = std::move(newNode);
+    }
 }
 
 void GLTFMetallicRoughnessMaterial::buildPipelines(VulkanEngine* engine)
@@ -1200,11 +1250,11 @@ MaterialInstance GLTFMetallicRoughnessMaterial::createInstance(VkDevice device, 
     matData.passType = pass;
     if(pass == MaterialPass::Opaque)
     {
-        matData.pipeline = &opaquePipeline;
+        matData.materialPipeline = &opaquePipeline;
     }
     else
     {
-        matData.pipeline = &transparentPipeline;
+        matData.materialPipeline = &transparentPipeline;
     }
 
     matData.materialSet = descriptorAllocator.allocate(device, materialLayout);
@@ -1216,4 +1266,28 @@ MaterialInstance GLTFMetallicRoughnessMaterial::createInstance(VkDevice device, 
     writer.updateSet(device, matData.materialSet);
 
     return matData;
+}
+
+void MeshNode::registerDraw(const glm::mat4& topMatrix, DrawContext& ctx)
+{
+    // Instead of directly using the worldTransform of the Mesh, it is multiplied with the topMatrix given. This allows drawing the same mesh multiple times with a different transform
+    // without altering its worldTransform field.
+    glm::mat4 nodeMatrix = topMatrix * worldTransform;
+
+    for(auto& s : mesh->surfaces)
+    {
+        RenderObject robj;
+        robj.indexCount = s.count;
+        robj.firstIndex = s.startIndex;
+        robj.indexBuffer = mesh->meshBuffers.indexBuffer.buffer;
+        robj.material = &s.material->data;
+
+        robj.transform = nodeMatrix;
+        robj.vertexBufferAddress = mesh->meshBuffers.vertexBufferAddress;
+
+        ctx.opaqueSurfaces.push_back(robj);
+    }
+
+    // Recurse down the scene node
+    SceneNode::registerDraw(topMatrix, ctx);
 }

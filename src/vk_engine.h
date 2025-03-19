@@ -94,21 +94,47 @@ struct GLTFMetallicRoughnessMaterial
 	MaterialInstance createInstance(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
 };
 
+struct RenderObject
+{
+	uint32_t indexCount;
+	uint32_t firstIndex;
+	VkBuffer indexBuffer;
+
+	MaterialInstance* material;
+
+	glm::mat4 transform;
+	VkDeviceAddress vertexBufferAddress;
+};
+
+struct DrawContext
+{
+	std::vector<RenderObject> opaqueSurfaces;
+};
+
+struct MeshNode : public SceneNode
+{
+	std::shared_ptr<MeshAsset> mesh;
+
+	// Creates and adds all the surfaces in the mesh into the context's opaqueSurfaces
+	virtual void registerDraw(const glm::mat4& topMatrix, DrawContext& ctx) override;
+};
+
 class VulkanEngine {
 public:
 	static VulkanEngine& Get();
 
-	//initializes everything in the engine
+	// initializes everything in the engine
 	void init();
 
-	//shuts down the engine
+	// shuts down the engine
 	void cleanup();
 
-	//draw loop
+	// draw functionality
 	void draw();
 	void drawBackground(VkCommandBuffer cmd);
 	void drawGeometry(VkCommandBuffer cmd);
 	void drawImgui(VkCommandBuffer cmd, VkImageView targetImageView);
+	void updateScene();
 
 	//run main loop
 	void run();
@@ -151,6 +177,7 @@ public:
 	FrameData frames[FRAME_OVERLAP];
 	FrameData& getCurrentFrame() { return frames[frameNumber % FRAME_OVERLAP]; }
 
+	// Queues
 	VkQueue graphicsQueue;
 	uint32_t graphicsQueueFamily;
 
@@ -202,7 +229,11 @@ public:
 	GLTFMetallicRoughnessMaterial metallicRoughnessMaterial;
 	MaterialInstance defaultMaterial;
 
-	// Test Meshes
+	// Main Draw Context and Loaded Scene Nodes
+	DrawContext mainDrawContext;
+	std::unordered_map<std::string, std::shared_ptr<SceneNode>> loadedNodes;
+
+	// Mesh assets
 	std::vector<std::shared_ptr<MeshAsset>> testMeshes;
 
 	// Draw Resources

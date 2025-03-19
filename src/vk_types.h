@@ -1,6 +1,4 @@
-﻿// vulkan_guide.h : Include file for standard system include files,
-// or project specific include files.
-#pragma once
+﻿#pragma once
 
 #include <memory>
 #include <optional>
@@ -48,6 +46,7 @@ struct AllocatedBuffer
     VmaAllocationInfo allocInfo;
 };
 
+// Layout of vertex (storage) buffer
 struct Vertex
 {
     glm::vec3 position;
@@ -69,7 +68,7 @@ struct GPUMeshBuffers
 struct GPUDrawPushConstants
 {
     glm::mat4 worldMatrix;
-    VkDeviceAddress vertexBuffer;
+    VkDeviceAddress vertexBufferAddress;
 };
 
 struct GPUSceneData
@@ -99,7 +98,48 @@ struct MaterialPipeline
 
 struct MaterialInstance
 {
-    MaterialPipeline* pipeline; // non-owning pointer
+    MaterialPipeline* materialPipeline; // non-owning pointer
     VkDescriptorSet materialSet;
     MaterialPass passType;
+};
+
+struct DrawContext;
+
+// Base class for renderable dynamic object
+class IRenderable
+{
+    virtual void registerDraw(const glm::mat4& topMatrix, DrawContext& ctx) = 0;
+};
+
+/*
+    Scene Node
+    The scene node can hold children and will also keep a transform to propagate to them
+*/
+struct SceneNode : public IRenderable
+{
+    // parent pointer must be a weak ptr to avoid the circular dependency problem
+    std::weak_ptr<SceneNode> parent;
+    std::vector<std::shared_ptr<SceneNode>> children;
+
+    glm::mat4 localTransform;
+    glm::mat4 worldTransform; // actual worldMatrix (or model matrix)
+    
+    // Must be called recursively whenever the localTransform is changed
+    void refreshTransform(const glm::mat4& parentMatrix)
+    {
+        worldTransform = parentMatrix * localTransform;
+        for(auto c : children)
+        {
+            c->refreshTransform(worldTransform);
+        }
+    }
+
+    virtual void registerDraw(const glm::mat4& topMatrix, DrawContext& ctx)
+    {
+        // draw children 
+        for(auto c : children)
+        {
+            c->registerDraw(topMatrix, ctx);
+        }
+    }
 };
