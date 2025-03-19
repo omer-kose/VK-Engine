@@ -62,6 +62,12 @@ void VulkanEngine::init()
 
     // everything went fine
     isInitialized = true;
+
+    // Set default camera params
+    mainCamera.velocity = glm::vec3(0.0f);
+    mainCamera.position = glm::vec3(0, 0, 5);
+    mainCamera.pitch = 0;
+    mainCamera.yaw = 0;
 }
 
 void VulkanEngine::cleanup()
@@ -298,11 +304,13 @@ void VulkanEngine::drawImgui(VkCommandBuffer cmd, VkImageView targetImageView)
 
 void VulkanEngine::updateScene()
 {
+    mainCamera.update();
+
     mainDrawContext.opaqueSurfaces.clear();
 
     loadedNodes["Suzanne"]->registerDraw(glm::mat4(1.0f), mainDrawContext);
 
-    sceneData.view = glm::translate(glm::vec3{ 0,0,-5 });
+    sceneData.view = mainCamera.getViewMatrix();
     // camera projection
     sceneData.proj = glm::perspective(glm::radians(70.f), (float)windowExtent.width / (float)windowExtent.height, 0.1f, 10000.f);
 
@@ -345,6 +353,7 @@ void VulkanEngine::run()
                 }
             }
 
+            mainCamera.processSDLEvent(e);
             // send SDL event to ImGui for processing
             ImGui_ImplSDL2_ProcessEvent(&e);
         }

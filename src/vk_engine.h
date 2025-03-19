@@ -4,6 +4,7 @@
 #include <vk_descriptors.h>
 #include <vk_loader.h>
 
+#include <camera.h>
 
 struct DeletionQueue
 {
@@ -134,6 +135,8 @@ public:
 	void drawBackground(VkCommandBuffer cmd);
 	void drawGeometry(VkCommandBuffer cmd);
 	void drawImgui(VkCommandBuffer cmd, VkImageView targetImageView);
+
+	// Updates
 	void updateScene();
 
 	//run main loop
@@ -173,24 +176,27 @@ public:
 	std::vector<VkImageView> swapchainImageViews;
 	VkExtent2D swapchainExtent;
 
-	// Frame Data and Queues
-	FrameData frames[FRAME_OVERLAP];
-	FrameData& getCurrentFrame() { return frames[frameNumber % FRAME_OVERLAP]; }
-
 	// Queues
 	VkQueue graphicsQueue;
 	uint32_t graphicsQueueFamily;
 
-	// Global Resource Deletion Queue
-	DeletionQueue mainDeletionQueue;
-
 	// Allocator
 	VmaAllocator vmaAllocator;
+
+	// Frame Data and Queues
+	FrameData frames[FRAME_OVERLAP];
+	FrameData& getCurrentFrame() { return frames[frameNumber % FRAME_OVERLAP]; }
+
+	// Global Resource Deletion Queue
+	DeletionQueue mainDeletionQueue;
 
 	// Immeadiate submit structures
 	VkFence immeadiateFence;
 	VkCommandPool immediateCommandPool;
 	VkCommandBuffer immediateCommandBuffer;
+
+	// Camera
+	Camera mainCamera;
 
 	// Draw Image
 	AllocatedImage drawImage;
