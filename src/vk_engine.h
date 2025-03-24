@@ -62,6 +62,7 @@ struct ComputeEffect
 	ComputePushConstants pushConstants;
 };
 
+// PBR Metallic Material follows the GLTF format
 struct GLTFMetallicRoughnessMaterial
 {
 	MaterialPipeline opaquePipeline;
@@ -69,6 +70,7 @@ struct GLTFMetallicRoughnessMaterial
 
 	VkDescriptorSetLayout materialLayout;
 
+	// CPU representation of the MaterialConstants uniform buffer
 	struct MaterialConstants
 	{
 		glm::vec4 colorFactors;
@@ -83,13 +85,14 @@ struct GLTFMetallicRoughnessMaterial
 		VkSampler colorSampler;
 		AllocatedImage metalRoughnessImage;
 		VkSampler metalRoughnessSampler;
-		VkBuffer dataBuffer; // The actual buffer holding MaterialConstants data
-		uint32_t dataBufferOffset;
+		VkBuffer dataBuffer; // Handle to the buffer holding MaterialConstants data
+		uint32_t dataBufferOffset; // Multiple materials in a GLTF files will be stored in a single buffer, so the actual data for the specific material instance is fetched with this offset
 	};
 
 	DescriptorWriter writer;
 
 	void buildPipelines(VulkanEngine* engine);
+	// This struct only stores the pipelines and the layouts. The material resources are allocated outside. Allocator must clean them properly.
 	void clearResources(VkDevice device);
 
 	MaterialInstance createInstance(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
@@ -233,14 +236,13 @@ public:
 
 	// Default materials
 	GLTFMetallicRoughnessMaterial metallicRoughnessMaterial;
-	MaterialInstance defaultMaterial;
+	MaterialInstance defaultMaterialInstance;
 
-	// Main Draw Context and Loaded Scene Nodes
+	// Main Draw Context
 	DrawContext mainDrawContext;
-	std::unordered_map<std::string, std::shared_ptr<SceneNode>> loadedNodes;
 
-	// Mesh assets
-	std::vector<std::shared_ptr<MeshAsset>> testMeshes;
+	// Loaded scenes
+	std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loadedScenes;
 
 	// Draw Resources
 	GPUSceneData sceneData;

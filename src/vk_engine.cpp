@@ -63,11 +63,18 @@ void VulkanEngine::init()
     // everything went fine
     isInitialized = true;
 
+    // TODO: Move this to its own initCamera function
     // Set default camera params
     mainCamera.velocity = glm::vec3(0.0f);
-    mainCamera.position = glm::vec3(0, 0, 5);
+    mainCamera.position = glm::vec3(30.f, -00.f, -085.f);
     mainCamera.pitch = 0;
     mainCamera.yaw = 0;
+    
+    // TODO: Move this to a proper place. 
+    std::string structurePath = "../../assets/structure.glb";
+    auto loadedStructureScene = loadGltf(this, structurePath);
+    assert(loadedStructureScene.has_value());
+    loadedScenes["structure"] = loadedStructureScene.value();
 }
 
 void VulkanEngine::cleanup()
@@ -76,6 +83,9 @@ void VulkanEngine::cleanup()
     {
         // make sure that GPU is done with the command buffers
         vkDeviceWaitIdle(device);
+
+        loadedScenes.clear();
+
         for(int i = 0; i < FRAME_OVERLAP; ++i)
         {
             // Destroy sync objects
@@ -87,13 +97,6 @@ void VulkanEngine::cleanup()
             vkDestroyCommandPool(device, frames[i].commandPool, nullptr);
 
             frames[i].deletionQueue.flush();
-        }
-
-        // Clear the loaded meshes
-        for(auto& mesh : testMeshes)
-        {
-            destroyBuffer(mesh->meshBuffers.vertexBuffer);
-            destroyBuffer(mesh->meshBuffers.indexBuffer);
         }
 
         metallicRoughnessMaterial.clearResources(device);
@@ -308,7 +311,7 @@ void VulkanEngine::updateScene()
 
     mainDrawContext.opaqueSurfaces.clear();
 
-    loadedNodes["Suzanne"]->registerDraw(glm::mat4(1.0f), mainDrawContext);
+    loadedScenes["structure"]->registerDraw(glm::mat4(1.0f), mainDrawContext);
 
     sceneData.view = mainCamera.getViewMatrix();
     // camera projection
@@ -1147,26 +1150,7 @@ void VulkanEngine::m_initDefaultData()
     defaultMaterialResources.dataBuffer = materialConstantsBuffer.buffer;
     defaultMaterialResources.dataBufferOffset = 0;
 
-    defaultMaterial = metallicRoughnessMaterial.createInstance(device, MaterialPass::Opaque, defaultMaterialResources, globalDescriptorAllocator);
-
-    // Default meshes
-    testMeshes = loadGltfMeshes(this, "../../assets/basicmesh.glb").value();
-
-    for(auto& m : testMeshes)
-    {
-        std::shared_ptr<MeshNode> newNode = std::make_shared<MeshNode>();
-        newNode->mesh = m;
-
-        newNode->localTransform = glm::mat4(1.0f);
-        newNode->worldTransform = glm::mat4(1.0f);
-
-        for(auto& s : newNode->mesh->surfaces)
-        {
-            s.material = std::make_shared<GLTFMaterial>(defaultMaterial);
-        }
-
-        loadedNodes[m->name] = std::move(newNode);
-    }
+    defaultMaterialInstance = metallicRoughnessMaterial.createInstance(device, MaterialPass::Opaque, defaultMaterialResources, globalDescriptorAllocator);
 }
 
 void GLTFMetallicRoughnessMaterial::buildPipelines(VulkanEngine* engine)
@@ -1289,7 +1273,7 @@ void MeshNode::registerDraw(const glm::mat4& topMatrix, DrawContext& ctx)
         robj.indexCount = s.count;
         robj.firstIndex = s.startIndex;
         robj.indexBuffer = mesh->meshBuffers.indexBuffer.buffer;
-        robj.material = &s.material->data;
+        robj.material = &s.materialInstance->instance;
 
         robj.transform = nodeMatrix;
         robj.vertexBufferAddress = mesh->meshBuffers.vertexBufferAddress;
