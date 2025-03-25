@@ -277,8 +277,7 @@ void VulkanEngine::drawGeometry(VkCommandBuffer cmd)
     writer.writeBuffer(0, gpuSceneDataBuffer.buffer, sizeof(GPUSceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     writer.updateSet(device, sceneDescriptorSet);
 
-    for(const RenderObject& robj : mainDrawContext.opaqueSurfaces)
-    {
+    auto draw = [&](const RenderObject& robj) {
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, robj.material->materialPipeline->pipeline);
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, robj.material->materialPipeline->layout, 0, 1, &sceneDescriptorSet, 0, nullptr);
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, robj.material->materialPipeline->layout, 1, 1, &robj.material->materialSet, 0, nullptr);
@@ -290,6 +289,16 @@ void VulkanEngine::drawGeometry(VkCommandBuffer cmd)
 
         vkCmdBindIndexBuffer(cmd, robj.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
         vkCmdDrawIndexed(cmd, robj.indexCount, 1, robj.firstIndex, 0, 0);
+    };
+
+    for(const RenderObject& robj : mainDrawContext.opaqueSurfaces)
+    {
+        draw(robj);
+    }
+
+    for(const RenderObject& robj : mainDrawContext.transparentSurfaces)
+    {
+        draw(robj);
     }
 
     vkCmdEndRendering(cmd);
@@ -310,6 +319,7 @@ void VulkanEngine::updateScene()
     mainCamera.update();
 
     mainDrawContext.opaqueSurfaces.clear();
+    mainDrawContext.transparentSurfaces.clear();
 
     loadedScenes["structure"]->registerDraw(glm::mat4(1.0f), mainDrawContext);
 
