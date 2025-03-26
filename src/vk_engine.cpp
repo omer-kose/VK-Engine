@@ -155,16 +155,13 @@ void VulkanEngine::draw()
     // Start the command buffer recording
     VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
 
-    // Transition the draw image into writeable mode before rendering
+    // Transition the draw image into shader writeable mode before rendering (TODO: Replace drawBackground with clearBackground with vkCmdClear)
     vkutil::transitionImage(cmd, drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-
-    drawBackground(cmd);
-
-    // When rendering geometry we need to use COLOR_ATTACHMENT_OPTIMAL as it is the most optimal layout for rendering with graphics pipeline
-    vkutil::transitionImage(cmd, drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    // Transition depth image to optimal depth layout
     vkutil::transitionImage(cmd, depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
     
-    drawGeometry(cmd);
+    // encode drawing commands except ImGui
+    drawMain(cmd);
 
     // Transition the draw image and the swapchain image into their correct layouts
     vkutil::transitionImage(cmd, drawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
@@ -215,6 +212,32 @@ void VulkanEngine::draw()
     ++frameNumber;
 }
 
+void VulkanEngine::drawMain(VkCommandBuffer cmd)
+{
+    drawBackground(cmd);
+
+    // When rendering geometry we need to use COLOR_ATTACHMENT_OPTIMAL as it is the most optimal layout for rendering with graphics pipeline
+    vkutil::transitionImage(cmd, drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+    // Begin a renderpass connected to the draw image
+    VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(depthImage.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+
+    VkRenderingInfo renderInfo = vkinit::rendering_info(drawExtent, &colorAttachment, &depthAttachment);
+    vkCmdBeginRendering(cmd, &renderInfo);
+
+    auto start = std::chrono::system_clock::now();
+
+    drawGeometry(cmd);
+
+    auto end = std::chrono::system_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+    stats.geometryDrawRecordTime = elapsed.count() / 1000.f;
+
+    vkCmdEndRendering(cmd);
+}
+
 void VulkanEngine::drawBackground(VkCommandBuffer cmd)
 {
     ComputeEffect& effect = backgroundEffects[currentBackgroundEffect];
@@ -255,13 +278,6 @@ void VulkanEngine::drawGeometry(VkCommandBuffer cmd)
         }
 
     });
-
-    // Begin a renderpass connected to the draw image
-    VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(depthImage.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-
-    VkRenderingInfo renderInfo = vkinit::rendering_info(drawExtent, &colorAttachment, &depthAttachment);
-    vkCmdBeginRendering(cmd, &renderInfo);
 
     // Allocate a new uniform buffer for scene data (TODO: Horrible way of doing it but it is sufficient for the time being. Later create it once at the beginning and load it every frame with buffer upload)
     AllocatedBuffer gpuSceneDataBuffer = createBuffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
@@ -347,8 +363,6 @@ void VulkanEngine::drawGeometry(VkCommandBuffer cmd)
     {
         draw(robj);
     }
-
-    vkCmdEndRendering(cmd);
 
     // Drawing is done context can be cleared
     mainDrawContext.opaqueSurfaces.clear();
@@ -450,7 +464,7 @@ void VulkanEngine::run()
         ImGui::Begin("Stats");
 
         ImGui::Text("frametime %f ms", stats.frameTime);
-        ImGui::Text("draw time %f ms", stats.meshDrawTime);
+        ImGui::Text("geometry draw recording time %f ms", stats.geometryDrawRecordTime);
         ImGui::Text("update time %f ms", stats.sceneUpdateTime);
         ImGui::Text("triangles %i", stats.triangleCount);
         ImGui::Text("draws %i", stats.drawCallCount);

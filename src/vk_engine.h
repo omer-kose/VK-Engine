@@ -48,7 +48,7 @@ struct EngineStats
 	int triangleCount;
 	int drawCallCount;
 	float sceneUpdateTime;
-	float meshDrawTime;
+	float geometryDrawRecordTime;
 };
 
 constexpr unsigned int FRAME_OVERLAP = 2;
@@ -144,10 +144,11 @@ public:
 	void cleanup();
 
 	// draw functionality
-	void draw();
+	void draw(); // core draw loop
+	void drawMain(VkCommandBuffer cmd); // function to simplify the main draw function. It handles some transitions, attachments and calls to actualy drawing functionality below
 	void drawBackground(VkCommandBuffer cmd);
 	void drawGeometry(VkCommandBuffer cmd);
-	void drawImgui(VkCommandBuffer cmd, VkImageView targetImageView);
+	void drawImgui(VkCommandBuffer cmd, VkImageView targetImageView); 
 
 	// Updates
 	void updateScene();
