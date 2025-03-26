@@ -53,24 +53,6 @@ struct EngineStats
 
 constexpr unsigned int FRAME_OVERLAP = 2;
 
-struct ComputePushConstants
-{
-	glm::vec4 data1;
-	glm::vec4 data2;
-	glm::vec4 data3;
-	glm::vec4 data4;
-};
-
-struct ComputeEffect
-{
-	const char* name;
-
-	VkPipeline pipeline;
-	VkPipelineLayout pipelineLayout;
-
-	ComputePushConstants pushConstants;
-};
-
 // PBR Metallic Material follows the GLTF format
 struct GLTFMetallicRoughnessMaterial
 {
@@ -146,7 +128,6 @@ public:
 	// draw functionality
 	void draw(); // core draw loop
 	void drawMain(VkCommandBuffer cmd); // function to simplify the main draw function. It handles some transitions, attachments and calls to actualy drawing functionality below
-	void drawBackground(VkCommandBuffer cmd);
 	void drawGeometry(VkCommandBuffer cmd);
 	void drawImgui(VkCommandBuffer cmd, VkImageView targetImageView); 
 
@@ -212,6 +193,9 @@ public:
 	VkCommandPool immediateCommandPool;
 	VkCommandBuffer immediateCommandBuffer;
 
+	// Main color attachment clear value 
+	VkClearValue colorAttachmentClearValue = { 0.0f, 0.0f, 0.0f, 1.0f };
+
 	// Camera
 	Camera mainCamera;
 
@@ -227,11 +211,6 @@ public:
 	VkDescriptorSet drawImageDescriptorSet;
 	// Descriptor layout for single texture display
 	VkDescriptorSetLayout displayTextureDescriptorSetLayout;
-
-	// Background Compute Pipelines
-	VkPipelineLayout gradientPipelineLayout; // all of the effects share the same layout so we only create one
-	std::vector<ComputeEffect> backgroundEffects;
-	int currentBackgroundEffect{0};
 
 	/* Graphics Pipelines */
 	// Mesh Pipeline
@@ -276,7 +255,6 @@ private:
 	void m_initDescriptors();
 	// Pipelines
 	void m_initPipelines();
-	void m_initBackgroundPipelines();
 	void m_initMeshPipeline();
 
 	// ImGui
