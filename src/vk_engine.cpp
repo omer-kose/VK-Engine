@@ -119,8 +119,6 @@ void VulkanEngine::cleanup()
 
 void VulkanEngine::draw()
 {
-    updateScene();
-
     FrameData& currentFrame = getCurrentFrame();
     // Wait until the GPU has finished rendering the last frame of the same modularity (0->1->2->3  wait on 2 for 0 and wait on 3 for 1 and so on)
     VK_CHECK(vkWaitForFences(device, 1, &currentFrame.renderFence, true, 1000000000));
@@ -235,33 +233,37 @@ void VulkanEngine::drawBackground(VkCommandBuffer cmd)
 
 void VulkanEngine::drawGeometry(VkCommandBuffer cmd)
 {
+    std::vector<uint32_t> opaqueDraws;
+    opaqueDraws.reserve(mainDrawContext.opaqueSurfaces.size());
+
+    for(uint32_t i = 0; i < mainDrawContext.opaqueSurfaces.size(); ++i)
+    {
+        opaqueDraws.push_back(i);
+    }
+
+    // sort the opaque surfaces by material and mesh
+    std::sort(opaqueDraws.begin(), opaqueDraws.end(), [&](const auto& iA, const auto& iB) {
+        const RenderObject& A = mainDrawContext.opaqueSurfaces[iA];
+        const RenderObject& B = mainDrawContext.opaqueSurfaces[iB];
+        if(A.materialInstance == B.materialInstance)
+        {
+            return A.indexBuffer < B.indexBuffer;
+        }
+        else
+        {
+            return A.materialInstance < B.materialInstance;
+        }
+
+    });
+
     // Begin a renderpass connected to the draw image
     VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(depthImage.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
     VkRenderingInfo renderInfo = vkinit::rendering_info(drawExtent, &colorAttachment, &depthAttachment);
     vkCmdBeginRendering(cmd, &renderInfo);
-    
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, meshPipeline);
 
-    // Set dynamic viewport and scissor (dynamic states must be set after a pipeline with dynamic states bound. After setting once, no need for setting for subsequent pipeline bindings (with dynamic states))
-    VkViewport viewport = {};
-    viewport.x = 0;
-    viewport.y = 0;
-    viewport.width = drawExtent.width;
-    viewport.height = drawExtent.height;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    vkCmdSetViewport(cmd, 0, 1, &viewport);
-
-    VkRect2D scissor = {};
-    scissor.offset.x = 0;
-    scissor.offset.y = 0;
-    scissor.extent.width = drawExtent.width;
-    scissor.extent.height = drawExtent.height;
-    vkCmdSetScissor(cmd, 0, 1, &scissor);
-
-    // Allocate a new uniform buffer for scene data (TODO: Horrible way of doing it but it is sufficient for the time being)
+    // Allocate a new uniform buffer for scene data (TODO: Horrible way of doing it but it is sufficient for the time being. Later create it once at the beginning and load it every frame with buffer upload)
     AllocatedBuffer gpuSceneDataBuffer = createBuffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
     getCurrentFrame().deletionQueue.pushFunction([=](){
         destroyBuffer(gpuSceneDataBuffer);
@@ -277,23 +279,68 @@ void VulkanEngine::drawGeometry(VkCommandBuffer cmd)
     writer.writeBuffer(0, gpuSceneDataBuffer.buffer, sizeof(GPUSceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     writer.updateSet(device, sceneDescriptorSet);
 
+    // Keep track of states to avoid unnecessary rebindings
+    MaterialPipeline* lastPipeline = nullptr;
+    MaterialInstance* lastMaterial = nullptr;
+    VkBuffer lastIndexBuffer = VK_NULL_HANDLE;
+
     auto draw = [&](const RenderObject& robj) {
-        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, robj.material->materialPipeline->pipeline);
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, robj.material->materialPipeline->layout, 0, 1, &sceneDescriptorSet, 0, nullptr);
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, robj.material->materialPipeline->layout, 1, 1, &robj.material->materialSet, 0, nullptr);
+        if(robj.materialInstance != lastMaterial)
+        {
+            lastMaterial = robj.materialInstance;
+            // if the material pipeline is changed bind the new pipeline as well as global scene descriptor set
+            if(lastPipeline != robj.materialInstance->materialPipeline)
+            {
+                lastPipeline = robj.materialInstance->materialPipeline;
+                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, robj.materialInstance->materialPipeline->pipeline);
+                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, robj.materialInstance->materialPipeline->layout, 0, 1, &sceneDescriptorSet, 0, nullptr);
+
+                // Set dynamic viewport and scissor again in case of an override (all of the material pipelines use dynamic states so setting them once after a bind is actually enough)
+                VkViewport viewport = {};
+                viewport.x = 0;
+                viewport.y = 0;
+                viewport.width = drawExtent.width;
+                viewport.height = drawExtent.height;
+                viewport.minDepth = 0.0f;
+                viewport.maxDepth = 1.0f;
+                vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+                VkRect2D scissor = {};
+                scissor.offset.x = 0;
+                scissor.offset.y = 0;
+                scissor.extent.width = drawExtent.width;
+                scissor.extent.height = drawExtent.height;
+                vkCmdSetScissor(cmd, 0, 1, &scissor);
+            }
+
+            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, robj.materialInstance->materialPipeline->layout, 1, 1, &robj.materialInstance->materialSet, 0, nullptr);
+        }
 
         GPUDrawPushConstants pushConstants;
         pushConstants.vertexBufferAddress = robj.vertexBufferAddress;
         pushConstants.worldMatrix = robj.transform;
-        vkCmdPushConstants(cmd, robj.material->materialPipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &pushConstants);
+        vkCmdPushConstants(cmd, robj.materialInstance->materialPipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &pushConstants);
 
-        vkCmdBindIndexBuffer(cmd, robj.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+        if(lastIndexBuffer != robj.indexBuffer)
+        {
+            lastIndexBuffer = robj.indexBuffer;
+            vkCmdBindIndexBuffer(cmd, robj.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+        }
+
         vkCmdDrawIndexed(cmd, robj.indexCount, 1, robj.firstIndex, 0, 0);
+
+        // Keep stats
+        ++stats.drawCallCount;
+        stats.triangleCount += robj.indexCount / 3;
     };
 
-    for(const RenderObject& robj : mainDrawContext.opaqueSurfaces)
+    // Reset counters
+    stats.drawCallCount = 0;
+    stats.triangleCount = 0;
+
+    for(uint32_t idx : opaqueDraws)
     {
-        draw(robj);
+        draw(mainDrawContext.opaqueSurfaces[idx]);
     }
 
     for(const RenderObject& robj : mainDrawContext.transparentSurfaces)
@@ -302,6 +349,10 @@ void VulkanEngine::drawGeometry(VkCommandBuffer cmd)
     }
 
     vkCmdEndRendering(cmd);
+
+    // Drawing is done context can be cleared
+    mainDrawContext.opaqueSurfaces.clear();
+    mainDrawContext.transparentSurfaces.clear();
 }
 
 void VulkanEngine::drawImgui(VkCommandBuffer cmd, VkImageView targetImageView)
@@ -316,10 +367,9 @@ void VulkanEngine::drawImgui(VkCommandBuffer cmd, VkImageView targetImageView)
 
 void VulkanEngine::updateScene()
 {
-    mainCamera.update();
+    auto start = std::chrono::system_clock::now();
 
-    mainDrawContext.opaqueSurfaces.clear();
-    mainDrawContext.transparentSurfaces.clear();
+    mainCamera.update();
 
     loadedScenes["structure"]->registerDraw(glm::mat4(1.0f), mainDrawContext);
 
@@ -337,6 +387,11 @@ void VulkanEngine::updateScene()
     sceneData.sunlightColor = glm::vec4(1.0f);
     sceneData.sunlightDirection = glm::vec4(0.0f, 1.0f, 0.5f, 1.0f);
 
+    auto end = std::chrono::system_clock::now();
+    // Convert to microseconds (integer), then come back to miliseconds
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+    stats.sceneUpdateTime = elapsed.count() / 1000.0f;
 }
 
 void VulkanEngine::run()
@@ -347,6 +402,9 @@ void VulkanEngine::run()
     // main loop
     while(!bQuit) 
     {
+        // Begin frame time clock
+        auto start = std::chrono::system_clock::now();
+
         // Handle events on queue
         while(SDL_PollEvent(&e) != 0) 
         {
@@ -389,6 +447,15 @@ void VulkanEngine::run()
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
+        ImGui::Begin("Stats");
+
+        ImGui::Text("frametime %f ms", stats.frameTime);
+        ImGui::Text("draw time %f ms", stats.meshDrawTime);
+        ImGui::Text("update time %f ms", stats.sceneUpdateTime);
+        ImGui::Text("triangles %i", stats.triangleCount);
+        ImGui::Text("draws %i", stats.drawCallCount);
+        ImGui::End();
+
         if(ImGui::Begin("background"))
         {
             ImGui::SliderFloat("Render Scale", &renderScale, 0.3f, 1.0f);
@@ -409,7 +476,15 @@ void VulkanEngine::run()
         // Make ImGui calculate internal draw structures
         ImGui::Render();
 
+        updateScene();
+
         draw();
+
+        auto end = std::chrono::system_clock::now();
+        // Convert to microseconds (integer), then come back to miliseconds
+        auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+        stats.frameTime = elapsed.count() / 1000.0f;
     }
 }
 
@@ -1283,7 +1358,7 @@ void MeshNode::registerDraw(const glm::mat4& topMatrix, DrawContext& ctx)
         robj.indexCount = s.count;
         robj.firstIndex = s.startIndex;
         robj.indexBuffer = mesh->meshBuffers.indexBuffer.buffer;
-        robj.material = &s.materialInstance->instance;
+        robj.materialInstance = &s.materialInstance->instance;
 
         robj.transform = nodeMatrix;
         robj.vertexBufferAddress = mesh->meshBuffers.vertexBufferAddress;

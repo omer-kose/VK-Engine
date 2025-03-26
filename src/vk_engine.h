@@ -42,6 +42,15 @@ struct FrameData
 	DeletionQueue deletionQueue;
 };
 
+struct EngineStats
+{
+	float frameTime;
+	int triangleCount;
+	int drawCallCount;
+	float sceneUpdateTime;
+	float meshDrawTime;
+};
+
 constexpr unsigned int FRAME_OVERLAP = 2;
 
 struct ComputePushConstants
@@ -104,7 +113,7 @@ struct RenderObject
 	uint32_t firstIndex;
 	VkBuffer indexBuffer;
 
-	MaterialInstance* material;
+	MaterialInstance* materialInstance;
 
 	glm::mat4 transform;
 	VkDeviceAddress vertexBufferAddress;
@@ -193,6 +202,9 @@ public:
 
 	// Global Resource Deletion Queue
 	DeletionQueue mainDeletionQueue;
+
+	// Engine stats
+	EngineStats stats;
 
 	// Immeadiate submit structures
 	VkFence immeadiateFence;

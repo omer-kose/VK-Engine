@@ -152,6 +152,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 		else
 		{
 			std::cerr << "Failed to load glTF: " << fastgltf::to_underlying(load.error()) << std::endl;
+			return {};
 		}
 	}
 	else if(type == fastgltf::GltfType::GLB)
@@ -164,6 +165,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 		else
 		{
 			std::cerr << "Failed to load GLB: " << fastgltf::to_underlying(load.error()) << std::endl;
+			return {};
 		}
 	}
 	else
