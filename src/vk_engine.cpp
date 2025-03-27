@@ -369,7 +369,7 @@ void VulkanEngine::updateScene()
 
     sceneData.view = mainCamera.getViewMatrix();
     // camera projection
-    sceneData.proj = glm::perspective(glm::radians(70.f), (float)windowExtent.width / (float)windowExtent.height, 0.1f, 10000.f);
+    sceneData.proj = glm::perspectiveRH_ZO(glm::radians(70.f), (float)windowExtent.width / (float)windowExtent.height, 0.1f, 10000.f);
 
     // invert the Y direction on projection matrix so that we are more similar
     // to opengl and gltf axis
@@ -573,7 +573,15 @@ AllocatedImage VulkanEngine::createImage(void* data, VkExtent3D imageExtent, VkF
         // copy buffer to image
         vkCmdCopyBufferToImage(cmd, uploadBuffer.buffer, newImage.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
 
-        vkutil::transitionImage(cmd, newImage.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        if(mipMapped)
+        {
+            vkutil::generateMipmaps(cmd, newImage.image, VkExtent2D{ newImage.imageExtent.width, newImage.imageExtent.height });
+        }
+        else
+        {
+            vkutil::transitionImage(cmd, newImage.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        }
+
     });
 
     destroyBuffer(uploadBuffer);
@@ -1243,7 +1251,7 @@ MaterialInstance GLTFMetallicRoughnessMaterial::createInstance(VkDevice device, 
     return matData;
 }
 
-void MeshNode::registerDraw(const glm::mat4& topMatrix, DrawContext& ctx)
+void GLTFMeshNode::registerDraw(const glm::mat4& topMatrix, DrawContext& ctx)
 {
     // Instead of directly using the worldTransform of the Mesh, it is multiplied with the topMatrix given. This allows drawing the same mesh multiple times with a different transform
     // without altering its worldTransform field.
@@ -1256,6 +1264,8 @@ void MeshNode::registerDraw(const glm::mat4& topMatrix, DrawContext& ctx)
         robj.firstIndex = s.startIndex;
         robj.indexBuffer = mesh->meshBuffers.indexBuffer.buffer;
         robj.materialInstance = &s.materialInstance->instance;
+
+        robj.bounds = s.bounds;
 
         robj.transform = nodeMatrix;
         robj.vertexBufferAddress = mesh->meshBuffers.vertexBufferAddress;

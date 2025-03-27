@@ -54,6 +54,7 @@ struct EngineStats
 constexpr unsigned int FRAME_OVERLAP = 2;
 
 // PBR Metallic Material follows the GLTF format
+// TODO: Consider this moving to a materials.h file
 struct GLTFMetallicRoughnessMaterial
 {
 	MaterialPipeline opaquePipeline;
@@ -97,6 +98,8 @@ struct RenderObject
 
 	MaterialInstance* materialInstance;
 
+	Bounds bounds;
+
 	glm::mat4 transform;
 	VkDeviceAddress vertexBufferAddress;
 };
@@ -107,9 +110,10 @@ struct DrawContext
 	std::vector<RenderObject> transparentSurfaces;
 };
 
-struct MeshNode : public SceneNode
+// TODO: Consider moving this to another file. vk_types.h seems like the best solution with registerDraw is defined inside.
+struct GLTFMeshNode : public SceneNode
 {
-	std::shared_ptr<MeshAsset> mesh;
+	std::shared_ptr<GLTFMeshAsset> mesh;
 
 	// Creates and adds all the surfaces in the mesh into the context's opaqueSurfaces
 	virtual void registerDraw(const glm::mat4& topMatrix, DrawContext& ctx) override;

@@ -202,7 +202,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 	}
 
 	// temporal arrays for all the objects to use while creating the GLTF data
-	std::vector<std::shared_ptr<MeshAsset>> meshes;
+	std::vector<std::shared_ptr<GLTFMeshAsset>> meshes;
 	std::vector<std::shared_ptr<SceneNode>> sceneNodes;
 	std::vector<AllocatedImage> textures;
 	std::vector<std::shared_ptr<GLTFMaterialInstance>> materialInstances;
@@ -284,7 +284,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 
 	for(fastgltf::Mesh& mesh : asset.meshes) 
 	{
-		std::shared_ptr<MeshAsset> newmesh = std::make_shared<MeshAsset>();
+		std::shared_ptr<GLTFMeshAsset> newmesh = std::make_shared<GLTFMeshAsset>();
 		meshes.push_back(newmesh);
 		scene->meshes[mesh.name.c_str()] = newmesh;
 		newmesh->name = mesh.name;
@@ -295,7 +295,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 
 		for(auto&& p : mesh.primitives) 
 		{
-			GeoSurface newSurface;
+			GLTFGeoSurface newSurface;
 			newSurface.startIndex = (uint32_t)indices.size();
 			newSurface.count = (uint32_t)asset.accessors[p.indicesAccessor.value()].count;
 
@@ -372,6 +372,20 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 				newSurface.materialInstance = materialInstances[0];
 			}
 
+			// Compute the bounds of the surface
+			glm::vec3 minPos = vertices[initial_vtx].position;
+			glm::vec3 maxPos = vertices[initial_vtx].position;
+			// find min/max bounds
+			for(int i = initial_vtx; i < vertices.size(); ++i)
+			{
+				minPos = glm::min(minPos, vertices[i].position);
+				maxPos = glm::max(minPos, vertices[i].position);
+			}
+
+			newSurface.bounds.origin = (minPos + maxPos) / 2.0f;
+			newSurface.bounds.extents = (maxPos - minPos) / 2.0f; // half lengths of the bounding box
+			newSurface.bounds.sphereRadius = glm::length(newSurface.bounds.extents);
+
 			newmesh->surfaces.push_back(newSurface);
 		}
 
@@ -385,8 +399,8 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 
 		if(gltfNode.meshIndex.has_value())
 		{
-			newSceneNode = std::make_shared<MeshNode>();
-			static_cast<MeshNode*>(newSceneNode.get())->mesh = meshes[gltfNode.meshIndex.value()];
+			newSceneNode = std::make_shared<GLTFMeshNode>();
+			static_cast<GLTFMeshNode*>(newSceneNode.get())->mesh = meshes[gltfNode.meshIndex.value()];
 		}
 		else
 		{
@@ -441,7 +455,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 	return scene;
 }
 
-std::optional<std::vector<std::shared_ptr<MeshAsset>>> loadGltfMeshes(VulkanEngine* engine, std::filesystem::path filePath)
+std::optional<std::vector<std::shared_ptr<GLTFMeshAsset>>> loadGltfMeshes(VulkanEngine* engine, std::filesystem::path filePath)
 {
 	std::cout << "Loading GLTF: " << filePath << std::endl;
 
@@ -464,14 +478,14 @@ std::optional<std::vector<std::shared_ptr<MeshAsset>>> loadGltfMeshes(VulkanEngi
 		return {};
 	}
 
-	std::vector<std::shared_ptr<MeshAsset>> meshes;
+	std::vector<std::shared_ptr<GLTFMeshAsset>> meshes;
 
 	std::vector<Vertex> vertices;
 	std::vector<uint32_t> indices;
 
 	for(fastgltf::Mesh& mesh : asset.meshes)
 	{
-		MeshAsset newMesh;
+		GLTFMeshAsset newMesh;
 		newMesh.name = mesh.name;
 		
 		vertices.clear();
@@ -479,7 +493,7 @@ std::optional<std::vector<std::shared_ptr<MeshAsset>>> loadGltfMeshes(VulkanEngi
 
 		for(auto&& p : mesh.primitives)
 		{
-			GeoSurface newSurface;
+			GLTFGeoSurface newSurface;
 			newSurface.startIndex = (uint32_t)indices.size();
 			newSurface.count = (uint32_t)asset.accessors[p.indicesAccessor.value()].count;
 
@@ -560,7 +574,7 @@ std::optional<std::vector<std::shared_ptr<MeshAsset>>> loadGltfMeshes(VulkanEngi
 
 		newMesh.meshBuffers = engine->uploadMesh(vertices, indices);
 		
-		meshes.emplace_back(std::make_shared<MeshAsset>(std::move(newMesh)));
+		meshes.emplace_back(std::make_shared<GLTFMeshAsset>(std::move(newMesh)));
 	}
 
 	return meshes;
