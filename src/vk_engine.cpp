@@ -63,18 +63,9 @@ void VulkanEngine::init()
     // everything went fine
     isInitialized = true;
 
-    // TODO: Move this to its own initCamera function
-    // Set default camera params
-    mainCamera.velocity = glm::vec3(0.0f);
-    mainCamera.position = glm::vec3(30.f, -00.f, -085.f);
-    mainCamera.pitch = 0;
-    mainCamera.yaw = 0;
+    m_initCamera(glm::vec3(30.f, -0.0f, -85.0f), 0.0f, 0.0f);
     
-    // TODO: Move this to a proper place. 
-    std::string structurePath = "../../assets/structure.glb";
-    auto loadedStructureScene = loadGltf(this, structurePath);
-    assert(loadedStructureScene.has_value());
-    loadedScenes["structure"] = loadedStructureScene.value();
+    m_loadSceneData();
 }
 
 void VulkanEngine::cleanup()
@@ -259,7 +250,7 @@ void VulkanEngine::drawGeometry(VkCommandBuffer cmd)
 
     });
 
-    // Allocate a new uniform buffer for scene data (TODO: Horrible way of doing it but it is sufficient for the time being. Later create it once at the beginning and load it every frame with buffer upload)
+    // Allocate a new uniform buffer for scene data (allocating on VRAM that CPU can write to directly. It is limited but it is perfect for allocating reasonable amounts that are dynamic)
     AllocatedBuffer gpuSceneDataBuffer = createBuffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
     getCurrentFrame().deletionQueue.pushFunction([=](){
         destroyBuffer(gpuSceneDataBuffer);
@@ -987,7 +978,7 @@ void VulkanEngine::m_initMeshPipeline()
     // Filled triangles
     pipelineBuilder.setPolygonMode(VK_POLYGON_MODE_FILL);
     // No backface culling
-    pipelineBuilder.setCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
+    pipelineBuilder.setCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
     // No multisampling
     pipelineBuilder.setMultiSamplingNone();
     // No blending
@@ -1143,6 +1134,22 @@ void VulkanEngine::m_initDefaultData()
     defaultMaterialInstance = metallicRoughnessMaterial.createInstance(device, MaterialPass::Opaque, defaultMaterialResources, globalDescriptorAllocator);
 }
 
+void VulkanEngine::m_initCamera(glm::vec3 position, float pitch, float yaw)
+{
+    mainCamera.velocity = glm::vec3(0.0f);
+    mainCamera.position = position;
+    mainCamera.pitch = pitch;
+    mainCamera.yaw = yaw;
+}
+
+void VulkanEngine::m_loadSceneData()
+{
+    std::string structurePath = "../../assets/structure.glb";
+    auto loadedStructureScene = loadGltf(this, structurePath);
+    assert(loadedStructureScene.has_value());
+    loadedScenes["structure"] = loadedStructureScene.value();
+}
+
 void GLTFMetallicRoughnessMaterial::buildPipelines(VulkanEngine* engine)
 {
     // Load the shaders
@@ -1194,7 +1201,7 @@ void GLTFMetallicRoughnessMaterial::buildPipelines(VulkanEngine* engine)
     pipelineBuilder.setShaders(meshVertexShader, meshFragmentShader);
     pipelineBuilder.setInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
     pipelineBuilder.setPolygonMode(VK_POLYGON_MODE_FILL);
-    pipelineBuilder.setCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE); // TODO: Try VK_FRONT_FACE_COUNTER_CLOCKWISE and make it compatible to that.
+    pipelineBuilder.setCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
     pipelineBuilder.setMultiSamplingNone();
     pipelineBuilder.disableBlending();
     pipelineBuilder.enableDepthTest(true, VK_COMPARE_OP_LESS_OR_EQUAL);

@@ -264,6 +264,13 @@ private:
 	// ImGui
 	void m_initImgui();
 
-	// Test Data
+	// Default Engine Data
 	void m_initDefaultData();
+
+	// Camera
+	void m_initCamera(glm::vec3 position, float pitch, float yaw);
+
+	// Loading Scene Data
+	void m_loadSceneData();
+
 };
