@@ -1,8 +1,8 @@
 ﻿#pragma once
 
-#include <vk_types.h>
-#include <vk_descriptors.h>
-#include <vk_loader.h>
+#include <Core/vk_types.h>
+#include <Core/vk_descriptors.h>
+#include <Core/vk_loader.h>
 
 #include <camera.h>
 
