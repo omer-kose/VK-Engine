@@ -6,6 +6,8 @@
 
 #include <camera.h>
 
+#include <Pass/GLTFMetallicPass.h>
+
 struct DeletionQueue
 {
 	void pushFunction(std::function<void()>&& function)
@@ -143,6 +145,7 @@ public:
 
 	void immediateSubmit(std::function<void(VkCommandBuffer cmd)>&& function);
 
+	// Engine utilities
 	AllocatedBuffer createBuffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
 	void destroyBuffer(const AllocatedBuffer& buffer);
 
@@ -152,11 +155,17 @@ public:
 
 	GPUMeshBuffers uploadMesh(std::span<Vertex> vertices, std::span<uint32_t> indices);
 
+	void updateSceneBuffer();
+	VkDescriptorSet getSceneBufferDescriptorSet();
+
+	void setViewport(VkCommandBuffer cmd);
+	void setScissor(VkCommandBuffer cmd);
+
 public:
 	struct SDL_Window* window{ nullptr };
 
 	bool isInitialized{ false };
-	int frameNumber{0};
+	uint32_t frameNumber{0};
 	bool freezeRendering{ false };
 	bool resizeRequested{ false };
 	float renderScale{ 1.0f };
@@ -216,6 +225,10 @@ public:
 	// Descriptor layout for single texture display
 	VkDescriptorSetLayout displayTextureDescriptorSetLayout;
 
+	// Per-frame Global Scene (uniform) Buffer and the descriptor set (Shared by the whole engine which uses scene data so it is persistent per-frame no need to reallocate) 
+	AllocatedBuffer gpuSceneDataBuffer[FRAME_OVERLAP];
+	VkDescriptorSet sceneDescriptorSet[FRAME_OVERLAP];
+
 	/* Graphics Pipelines */
 	// Mesh Pipeline
 	VkPipelineLayout meshPipelineLayout;
@@ -245,6 +258,11 @@ public:
 	GPUSceneData sceneData;
 	// Draw Resource Descriptor Layouts
 	VkDescriptorSetLayout sceneDataDescriptorLayout;
+
+	/* Passes */
+	// Graphics Passes
+	GLTFMetallicPass gltfMetallicPass;
+
 private:
 	// Vulkan Context
 	void m_initVulkan();
@@ -266,6 +284,9 @@ private:
 
 	// Default Engine Data
 	void m_initDefaultData();
+
+	// Init Scene Buffer
+	void m_initGlobalSceneBuffer();
 
 	// Camera
 	void m_initCamera(glm::vec3 position, float pitch, float yaw);

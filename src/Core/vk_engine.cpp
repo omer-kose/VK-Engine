@@ -60,6 +60,8 @@ void VulkanEngine::init()
 
     m_initDefaultData();
 
+    m_initGlobalSceneBuffer();
+
     // everything went fine
     isInitialized = true;
 
@@ -203,6 +205,8 @@ void VulkanEngine::draw()
 
 void VulkanEngine::drawMain(VkCommandBuffer cmd)
 {
+    updateSceneBuffer();
+
     // When rendering geometry we need to use COLOR_ATTACHMENT_OPTIMAL as it is the most optimal layout for rendering with graphics pipeline
     vkutil::transitionImage(cmd, drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
@@ -227,113 +231,8 @@ void VulkanEngine::drawMain(VkCommandBuffer cmd)
 
 void VulkanEngine::drawGeometry(VkCommandBuffer cmd)
 {
-    std::vector<uint32_t> opaqueDraws;
-    opaqueDraws.reserve(mainDrawContext.opaqueSurfaces.size());
-
-    for(uint32_t i = 0; i < mainDrawContext.opaqueSurfaces.size(); ++i)
-    {
-        opaqueDraws.push_back(i);
-    }
-
-    // sort the opaque surfaces by material and mesh
-    std::sort(opaqueDraws.begin(), opaqueDraws.end(), [&](const auto& iA, const auto& iB) {
-        const RenderObject& A = mainDrawContext.opaqueSurfaces[iA];
-        const RenderObject& B = mainDrawContext.opaqueSurfaces[iB];
-        if(A.materialInstance == B.materialInstance)
-        {
-            return A.indexBuffer < B.indexBuffer;
-        }
-        else
-        {
-            return A.materialInstance < B.materialInstance;
-        }
-
-    });
-
-    // Allocate a new uniform buffer for scene data (allocating on VRAM that CPU can write to directly. It is limited but it is perfect for allocating reasonable amounts that are dynamic)
-    AllocatedBuffer gpuSceneDataBuffer = createBuffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-    getCurrentFrame().deletionQueue.pushFunction([=](){
-        destroyBuffer(gpuSceneDataBuffer);
-    });
-
-    // Write the buffer
-    GPUSceneData* pGpuSceneDataBuffer = (GPUSceneData*)gpuSceneDataBuffer.allocation->GetMappedData();
-    *pGpuSceneDataBuffer = sceneData;
-
-    // Create a descriptor set for the uniform data
-    VkDescriptorSet sceneDescriptorSet = getCurrentFrame().frameDescriptorAllocator.allocate(device, sceneDataDescriptorLayout);
-    DescriptorWriter writer;
-    writer.writeBuffer(0, gpuSceneDataBuffer.buffer, sizeof(GPUSceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-    writer.updateSet(device, sceneDescriptorSet);
-
-    // Keep track of states to avoid unnecessary rebindings
-    MaterialPipeline* lastPipeline = nullptr;
-    MaterialInstance* lastMaterial = nullptr;
-    VkBuffer lastIndexBuffer = VK_NULL_HANDLE;
-
-    auto draw = [&](const RenderObject& robj) {
-        if(robj.materialInstance != lastMaterial)
-        {
-            lastMaterial = robj.materialInstance;
-            // if the material pipeline is changed bind the new pipeline as well as global scene descriptor set
-            if(lastPipeline != robj.materialInstance->materialPipeline)
-            {
-                lastPipeline = robj.materialInstance->materialPipeline;
-                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, robj.materialInstance->materialPipeline->pipeline);
-                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, robj.materialInstance->materialPipeline->layout, 0, 1, &sceneDescriptorSet, 0, nullptr);
-
-                // Set dynamic viewport and scissor again in case of an override (all of the material pipelines use dynamic states so setting them once after a bind is actually enough)
-                VkViewport viewport = {};
-                viewport.x = 0;
-                viewport.y = 0;
-                viewport.width = drawExtent.width;
-                viewport.height = drawExtent.height;
-                viewport.minDepth = 0.0f;
-                viewport.maxDepth = 1.0f;
-                vkCmdSetViewport(cmd, 0, 1, &viewport);
-
-                VkRect2D scissor = {};
-                scissor.offset.x = 0;
-                scissor.offset.y = 0;
-                scissor.extent.width = drawExtent.width;
-                scissor.extent.height = drawExtent.height;
-                vkCmdSetScissor(cmd, 0, 1, &scissor);
-            }
-
-            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, robj.materialInstance->materialPipeline->layout, 1, 1, &robj.materialInstance->materialSet, 0, nullptr);
-        }
-
-        GPUDrawPushConstants pushConstants;
-        pushConstants.vertexBufferAddress = robj.vertexBufferAddress;
-        pushConstants.worldMatrix = robj.transform;
-        vkCmdPushConstants(cmd, robj.materialInstance->materialPipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &pushConstants);
-
-        if(lastIndexBuffer != robj.indexBuffer)
-        {
-            lastIndexBuffer = robj.indexBuffer;
-            vkCmdBindIndexBuffer(cmd, robj.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-        }
-
-        vkCmdDrawIndexed(cmd, robj.indexCount, 1, robj.firstIndex, 0, 0);
-
-        // Keep stats
-        ++stats.drawCallCount;
-        stats.triangleCount += robj.indexCount / 3;
-    };
-
-    // Reset counters
-    stats.drawCallCount = 0;
-    stats.triangleCount = 0;
-
-    for(uint32_t idx : opaqueDraws)
-    {
-        draw(mainDrawContext.opaqueSurfaces[idx]);
-    }
-
-    for(const RenderObject& robj : mainDrawContext.transparentSurfaces)
-    {
-        draw(robj);
-    }
+    // Go through all the graphics passes and execute them
+    gltfMetallicPass.execute(this, cmd, &mainDrawContext);
 
     // Drawing is done context can be cleared
     mainDrawContext.opaqueSurfaces.clear();
@@ -628,6 +527,44 @@ GPUMeshBuffers VulkanEngine::uploadMesh(std::span<Vertex> vertices, std::span<ui
     destroyBuffer(staging);
 
     return meshBuffers;
+}
+
+/*
+    Both update and bind scene buffer functions must be called after the frame fence waits as it will be guaranteed that the frame is done being used by GPU. Otherwise, the data can be corrupted. 
+    (calling in drawMain() will suffice)
+*/
+void VulkanEngine::updateSceneBuffer()
+{
+    // Update the scene buffer
+    GPUSceneData* pGpuSceneDataBuffer = (GPUSceneData*)gpuSceneDataBuffer[frameNumber % FRAME_OVERLAP].allocation->GetMappedData();
+    *pGpuSceneDataBuffer = sceneData;
+}
+
+VkDescriptorSet VulkanEngine::getSceneBufferDescriptorSet()
+{
+    return sceneDescriptorSet[frameNumber % FRAME_OVERLAP];
+}
+
+void VulkanEngine::setViewport(VkCommandBuffer cmd)
+{
+    VkViewport viewport = {};
+    viewport.x = 0;
+    viewport.y = 0;
+    viewport.width = drawExtent.width;
+    viewport.height = drawExtent.height;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+}
+
+void VulkanEngine::setScissor(VkCommandBuffer cmd)
+{
+    VkRect2D scissor = {};
+    scissor.offset.x = 0;
+    scissor.offset.y = 0;
+    scissor.extent.width = drawExtent.width;
+    scissor.extent.height = drawExtent.height;
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
 }
 
 void VulkanEngine::m_initVulkan()
@@ -1132,6 +1069,24 @@ void VulkanEngine::m_initDefaultData()
     defaultMaterialResources.dataBufferOffset = 0;
 
     defaultMaterialInstance = metallicRoughnessMaterial.createInstance(device, MaterialPass::Opaque, defaultMaterialResources, globalDescriptorAllocator);
+}
+
+void VulkanEngine::m_initGlobalSceneBuffer()
+{
+    for(int i = 0; i < FRAME_OVERLAP; ++i)
+    {
+        // Allocate a new uniform buffer for scene data (allocating on VRAM that CPU can write to directly. It is limited but it is perfect for allocating reasonable amounts that are dynamic)
+        gpuSceneDataBuffer[i] = createBuffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+        mainDeletionQueue.pushFunction([=]() {
+            destroyBuffer(gpuSceneDataBuffer[i]);
+        });
+
+        // Create a descriptor set for the uniform data
+        sceneDescriptorSet[i] = globalDescriptorAllocator.allocate(device, sceneDataDescriptorLayout);
+        DescriptorWriter writer;
+        writer.writeBuffer(0, gpuSceneDataBuffer[i].buffer, sizeof(GPUSceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+        writer.updateSet(device, sceneDescriptorSet[i]);
+    }
 }
 
 void VulkanEngine::m_initCamera(glm::vec3 position, float pitch, float yaw)
