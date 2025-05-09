@@ -6,10 +6,10 @@
 #include <SDL.h>
 #include <SDL_vulkan.h>
 
-#include <vk_initializers.h>
-#include <vk_types.h>
-#include <vk_images.h>
-#include <vk_pipelines.h>
+#include <Core/vk_initializers.h>
+#include <Core/vk_types.h>
+#include <Core/vk_images.h>
+#include <Core/vk_pipelines.h>
 #include "VkBootstrap.h"
 
 #define VMA_IMPLEMENTATION
@@ -935,7 +935,7 @@ void VulkanEngine::m_initMeshPipeline()
 {
     // Load the shaders
     VkShaderModule meshVertexShader;
-    if(!vkutil::loadShaderModule(device, "../../shaders/colored_mesh.vert.spv", &meshVertexShader))
+    if(!vkutil::loadShaderModule(device, "../../shaders/glsl/display_texture/display_texture_vert.spv", &meshVertexShader))
     {
         fmt::println("Error while building the mesh vertex shader module");
     }
@@ -945,7 +945,7 @@ void VulkanEngine::m_initMeshPipeline()
     }
 
     VkShaderModule meshFragmentShader;
-    if(!vkutil::loadShaderModule(device, "../../shaders/display_texture.frag.spv", &meshFragmentShader))
+    if(!vkutil::loadShaderModule(device, "../../shaders/glsl/display_texture/display_texture_frag.spv", &meshFragmentShader))
     {
         fmt::println("Error while building the mesh fragment shader module");
     }
@@ -1154,13 +1154,13 @@ void GLTFMetallicRoughnessMaterial::buildPipelines(VulkanEngine* engine)
 {
     // Load the shaders
     VkShaderModule meshVertexShader;
-    if(!vkutil::loadShaderModule(engine->device, "../../shaders/mesh.vert.spv", &meshVertexShader))
+    if(!vkutil::loadShaderModule(engine->device, "../../shaders/glsl/gltf_metallic/mesh_vert.spv", &meshVertexShader))
     {
         fmt::println("Error when building the mesh vertex shader");
     }
 
     VkShaderModule meshFragmentShader;
-    if(!vkutil::loadShaderModule(engine->device, "../../shaders/mesh.frag.spv", &meshFragmentShader))
+    if(!vkutil::loadShaderModule(engine->device, "../../shaders/glsl/gltf_metallic/mesh_frag.spv", &meshFragmentShader))
     {
         fmt::println("Error when building the mesh fragment shader");
     }

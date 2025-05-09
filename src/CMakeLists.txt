@@ -1,23 +1,22 @@
-
-# Add source to this project's executable.
-add_executable (engine 
-  main.cpp
-  vk_types.h
-  vk_initializers.cpp
-  vk_initializers.h
-  vk_images.h
-  vk_images.cpp 
-  vk_descriptors.h
-  vk_descriptors.cpp
-  vk_pipelines.h
-  vk_pipelines.cpp
-  vk_engine.h
-  vk_engine.cpp
-  vk_loader.h
-  vk_loader.cpp
-  camera.cpp
-  camera.h
+# Add all the subdirectories of source files
+file(GLOB_RECURSE SRC_CORE
+	"Core/*.h"
+	"Core/*.hpp"
+	"Core/*.cpp"
 )
+
+# Add the rest of the source files in the src folder
+file(GLOB SRC 
+	"*.h"
+	"*.hpp"
+	"*.cpp"
+)
+
+# Create executable with all found sources
+add_executable(engine ${SRC} ${SRC_CORE})
+
+# Add filters for the solution
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SRC_CORE})
 
 set_property(TARGET engine PROPERTY CXX_STANDARD 20)
 target_compile_definitions(engine PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)
