@@ -4,28 +4,41 @@
 class VulkanEngine;
 
 /*
+	The term pass is an abstraction, these are not actual render passes, the engine uses dynamic rendering.
+
 	Each type of pass will have its own base class (might not be necessary but keeping it flexible for the time being. I cannot foresee what structure I will have in the future)
-	Each pass will store its own needed parameters for shaders and will define a pipeline (thus all the necessary other constructs like descriptor layouts etc.)	
+	Each pass will store its own needed variables for shaders and will define a pipeline and a pipeline layout.
+
+	Passes can:
+	1- define their pipeline and pipeline layout
+	2- define any pass-specific descriptor set they will use
+	3- Fetch the draw context from the engine pointer and read it
+	4- Call any engine utility
+
+	If a pass, need per-mesh specific descriptor set (such as material descriptor sets), they can fetch it from the MaterialInstance pointer in the RenderObject. 
+
+	TODO: Consider making these Pass classes static. All the Passes should have the same behaviour. There is no need to instantiate them and hold them as a engine member variable.
+
+	For example:
+	GLTFMaterialPass::Init(engine)
+	GLTFMaterialPass::Execute(engine, cmd)
+
+
+	Even though some passes will hold some variables like textures (like a skybox or shadow pass), the pass is done once per frame for all the objects in the DrawContext. So, the resources are used for that sole pass.
+	No need for instancing.
+
+	Start the static logic here, if it works well, consider making material types static classes as well.
 */
 
 /*
-	Base class for Graphics Passes.
-
-	Some graphics passes need the actual list of renderables (such as a standard forward pass) and some don't (such as a light pass in a deferred pipeline or a skybox pass). 
-	There are two possible simple solutions to this in my mind:
-	1- Execute just takes the engine and calls some utils such as engine->drawRenderObjects(cmd). All it has to do is to simply bind its own stuff and use engine for the basic draw call by calling it 
-	2- Pass an optional DrawContext* (which stores all the renderables of the current frame). 
-
-	First option is much simpler. However, it has no control over the order of encoding the draw instructions into the command buffer. For example, while rendering a whole scene with a material pass
-	to minimize the state changes, the draw calls are sorted. When the option 1 is used, it cannot be used as engine common draw call will just draw without any particular order.
-
-	Second option is more flexible. If the pass has no need for any objects to draw it can be passed as nullptr and the pass won't use any information. As for passes which will use objects to draw,
-	they can have their own index list to reorder draw calls to minimize state changes. So, I am going with the second option.
+	Abstract Base class for Graphics Passes. 
 */
 class GraphicsPassBase
 {
 public:
-	virtual void execute(VulkanEngine* engine, VkCommandBuffer& cmd, DrawContext* ctx) = 0;
+	virtual void init(VulkanEngine* engine) = 0;
+	virtual void execute(VulkanEngine* engine, VkCommandBuffer& cmd) = 0;
 	virtual void update() = 0;
+	virtual void clearResources(VulkanEngine* engine) = 0; // This instead of destructor because passes contains VkPipelines where the order of destruction matters. So, when to call clearResources should be decided by me.
 	virtual ~GraphicsPassBase() = default;
 };

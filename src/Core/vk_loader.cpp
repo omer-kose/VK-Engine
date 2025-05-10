@@ -610,7 +610,7 @@ void LoadedGLTF::clearAll()
 			continue;
 		}
 
-		engine->destroyImage (v);
+		engine->destroyImage(v);
 	}
 
 	for(auto& sampler : samplers)

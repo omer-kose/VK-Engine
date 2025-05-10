@@ -90,15 +90,8 @@ enum class MaterialPass : uint8_t
     Other
 };
 
-struct MaterialPipeline
-{
-    VkPipeline pipeline;
-    VkPipelineLayout layout;
-};
-
 struct MaterialInstance
 {
-    MaterialPipeline* materialPipeline; // non-owning pointer
     VkDescriptorSet materialSet;
     MaterialPass passType;
 };

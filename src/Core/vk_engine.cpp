@@ -54,7 +54,11 @@ void VulkanEngine::init()
     m_initSyncStructures();
 
     m_initDescriptors();
-    m_initPipelines();
+    m_initPipelines(); // TODO: TO BE REMOVED
+
+    m_initGLTFMaterialLayout(); // TODO: To be moved to a static logic. No need to store a constant descriptor set layout inside the engine as a member variable
+
+    m_initPasses();
 
     m_initImgui();
 
@@ -93,7 +97,9 @@ void VulkanEngine::cleanup()
         }
 
         metallicRoughnessMaterial.clearResources(device);
-        
+
+        m_clearPassResources();
+
         mainDeletionQueue.flush();
 
         m_destroySwapchain();
@@ -232,7 +238,7 @@ void VulkanEngine::drawMain(VkCommandBuffer cmd)
 void VulkanEngine::drawGeometry(VkCommandBuffer cmd)
 {
     // Go through all the graphics passes and execute them
-    gltfMetallicPass.execute(this, cmd, &mainDrawContext);
+    gltfMetallicPass.execute(this, cmd);
 
     // Drawing is done context can be cleared
     mainDrawContext.opaqueSurfaces.clear();
@@ -540,7 +546,12 @@ void VulkanEngine::updateSceneBuffer()
     *pGpuSceneDataBuffer = sceneData;
 }
 
-VkDescriptorSet VulkanEngine::getSceneBufferDescriptorSet()
+VkDescriptorSetLayout VulkanEngine::getSceneDescriptorLayout() const
+{
+    return sceneDataDescriptorLayout;
+}
+
+VkDescriptorSet VulkanEngine::getSceneBufferDescriptorSet() const
 {
     return sceneDescriptorSet[frameNumber % FRAME_OVERLAP];
 }
@@ -565,6 +576,11 @@ void VulkanEngine::setScissor(VkCommandBuffer cmd)
     scissor.extent.width = drawExtent.width;
     scissor.extent.height = drawExtent.height;
     vkCmdSetScissor(cmd, 0, 1, &scissor);
+}
+
+const DrawContext* VulkanEngine::getDrawContext() const
+{
+    return &mainDrawContext;
 }
 
 void VulkanEngine::m_initVulkan()
@@ -865,7 +881,6 @@ void VulkanEngine::m_initPipelines()
 {
     // Graphics Pipelines
     m_initMeshPipeline();
-    metallicRoughnessMaterial.buildPipelines(this);
 }
 
 void VulkanEngine::m_initMeshPipeline()
@@ -938,6 +953,21 @@ void VulkanEngine::m_initMeshPipeline()
         vkDestroyPipelineLayout(device, meshPipelineLayout, nullptr);
         vkDestroyPipeline(device, meshPipeline, nullptr);
     });
+}
+
+void VulkanEngine::m_initPasses()
+{
+    gltfMetallicPass.init(this);
+}
+
+void VulkanEngine::m_clearPassResources()
+{
+    gltfMetallicPass.clearResources(this);
+}
+
+void VulkanEngine::m_initGLTFMaterialLayout()
+{
+    metallicRoughnessMaterial.buildMaterialLayout(this);
 }
 
 void VulkanEngine::m_initImgui()
@@ -1105,103 +1135,24 @@ void VulkanEngine::m_loadSceneData()
     loadedScenes["structure"] = loadedStructureScene.value();
 }
 
-void GLTFMetallicRoughnessMaterial::buildPipelines(VulkanEngine* engine)
+void GLTFMetallicRoughnessMaterial::buildMaterialLayout(VulkanEngine* engine)
 {
-    // Load the shaders
-    VkShaderModule meshVertexShader;
-    if(!vkutil::loadShaderModule(engine->device, "../../shaders/glsl/gltf_metallic/mesh_vert.spv", &meshVertexShader))
-    {
-        fmt::println("Error when building the mesh vertex shader");
-    }
-
-    VkShaderModule meshFragmentShader;
-    if(!vkutil::loadShaderModule(engine->device, "../../shaders/glsl/gltf_metallic/mesh_frag.spv", &meshFragmentShader))
-    {
-        fmt::println("Error when building the mesh fragment shader");
-    }
-
-    // Set push constant range
-    VkPushConstantRange pushConstantRange{};
-    pushConstantRange.offset = 0;
-    pushConstantRange.size = sizeof(GPUDrawPushConstants);
-    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-    // Set descriptor sets
-    // Material set (set 1)
+    // Material set 
     DescriptorLayoutBuilder layoutBuilder;
     layoutBuilder.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     layoutBuilder.addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
     layoutBuilder.addBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
     materialLayout = layoutBuilder.build(engine->device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-
-    // 2 sets: 0 -> Scene Descriptor Set, 1 -> Material Descriptor Set
-    VkDescriptorSetLayout layouts [] = { engine->sceneDataDescriptorLayout, materialLayout };
-
-    // Mesh pipeline layout
-    VkPipelineLayoutCreateInfo meshLayoutInfo = vkinit::pipeline_layout_create_info();
-    meshLayoutInfo.pushConstantRangeCount = 1;
-    meshLayoutInfo.pPushConstantRanges = &pushConstantRange;
-    meshLayoutInfo.setLayoutCount = 2;
-    meshLayoutInfo.pSetLayouts = layouts;
-    
-    VkPipelineLayout meshPipelineLayout;
-    VK_CHECK(vkCreatePipelineLayout(engine->device, &meshLayoutInfo, nullptr, &meshPipelineLayout));
-    
-    // Both pipelines have the same layout
-    opaquePipeline.layout = meshPipelineLayout;
-    transparentPipeline.layout = meshPipelineLayout;
-
-    // Build the pipelines
-    PipelineBuilder pipelineBuilder;
-    pipelineBuilder.setShaders(meshVertexShader, meshFragmentShader);
-    pipelineBuilder.setInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-    pipelineBuilder.setPolygonMode(VK_POLYGON_MODE_FILL);
-    pipelineBuilder.setCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
-    pipelineBuilder.setMultiSamplingNone();
-    pipelineBuilder.disableBlending();
-    pipelineBuilder.enableDepthTest(true, VK_COMPARE_OP_LESS_OR_EQUAL);
-
-    // Render format
-    pipelineBuilder.setColorAttachmentFormat(engine->drawImage.imageFormat);
-    pipelineBuilder.setDepthFormat(engine->depthImage.imageFormat);
-    
-    pipelineBuilder.pipelineLayout = meshPipelineLayout;
-    // Opaque Pipeline
-    opaquePipeline.pipeline = pipelineBuilder.buildPipeline(engine->device);
-    
-    // Transparent variant
-    pipelineBuilder.enableBlendingAdditive();
-    pipelineBuilder.enableDepthTest(false, VK_COMPARE_OP_LESS_OR_EQUAL);
-    transparentPipeline.pipeline = pipelineBuilder.buildPipeline(engine->device);
-
-    // ShaderModules are not needed anymore
-    vkDestroyShaderModule(engine->device, meshVertexShader, nullptr);
-    vkDestroyShaderModule(engine->device, meshFragmentShader, nullptr);
 }
 
 void GLTFMetallicRoughnessMaterial::clearResources(VkDevice device)
 {
     vkDestroyDescriptorSetLayout(device, materialLayout, nullptr);
-    // both opaque and transparent pipelines has the same layout vulkan handle so destroying one is enough
-    vkDestroyPipelineLayout(device, opaquePipeline.layout, nullptr);
-
-    vkDestroyPipeline(device, transparentPipeline.pipeline, nullptr);
-    vkDestroyPipeline(device, opaquePipeline.pipeline, nullptr);
 }
 
 MaterialInstance GLTFMetallicRoughnessMaterial::createInstance(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator)
 {
     MaterialInstance matData;
-    matData.passType = pass;
-    if(pass == MaterialPass::Opaque)
-    {
-        matData.materialPipeline = &opaquePipeline;
-    }
-    else
-    {
-        matData.materialPipeline = &transparentPipeline;
-    }
-
     matData.materialSet = descriptorAllocator.allocate(device, materialLayout);
 
     writer.clear();

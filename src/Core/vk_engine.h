@@ -59,9 +59,6 @@ constexpr unsigned int FRAME_OVERLAP = 2;
 // TODO: Consider this moving to a materials.h file
 struct GLTFMetallicRoughnessMaterial
 {
-	MaterialPipeline opaquePipeline;
-	MaterialPipeline transparentPipeline;
-
 	VkDescriptorSetLayout materialLayout;
 
 	// CPU representation of the MaterialConstants uniform buffer
@@ -85,7 +82,8 @@ struct GLTFMetallicRoughnessMaterial
 
 	DescriptorWriter writer;
 
-	void buildPipelines(VulkanEngine* engine);
+	void buildMaterialLayout(VulkanEngine* engine);
+
 	// This struct only stores the pipelines and the layouts. The material resources are allocated outside. Allocator must clean them properly.
 	void clearResources(VkDevice device);
 
@@ -145,7 +143,7 @@ public:
 
 	void immediateSubmit(std::function<void(VkCommandBuffer cmd)>&& function);
 
-	// Engine utilities
+	// Engine utilities (TODO: For the time being most of the stuff are directly open to outside but I will be slowly hiding them)
 	AllocatedBuffer createBuffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
 	void destroyBuffer(const AllocatedBuffer& buffer);
 
@@ -156,10 +154,13 @@ public:
 	GPUMeshBuffers uploadMesh(std::span<Vertex> vertices, std::span<uint32_t> indices);
 
 	void updateSceneBuffer();
-	VkDescriptorSet getSceneBufferDescriptorSet();
+	VkDescriptorSetLayout getSceneDescriptorLayout() const;
+	VkDescriptorSet getSceneBufferDescriptorSet() const;
 
 	void setViewport(VkCommandBuffer cmd);
 	void setScissor(VkCommandBuffer cmd);
+
+	const DrawContext* getDrawContext() const;
 
 public:
 	struct SDL_Window* window{ nullptr };
@@ -275,9 +276,17 @@ private:
 	void m_resizeSwapchain();
 	// Descriptors
 	void m_initDescriptors();
-	// Pipelines
+	// Pipelines (TOOD: TO BE REMOVED)
 	void m_initPipelines();
 	void m_initMeshPipeline();
+
+	// Passes
+	void m_initPasses();
+	void m_clearPassResources();
+
+	// Material Layouts
+	// TODO: Material Layouts should be contained within a static class I think. In the Material rework, create a static class per material type. Whenever that layout is needed just fetch it from Material::GetDescriptorLayout().
+	void m_initGLTFMaterialLayout(); 
 
 	// ImGui
 	void m_initImgui();
