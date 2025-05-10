@@ -238,7 +238,7 @@ void VulkanEngine::drawMain(VkCommandBuffer cmd)
 void VulkanEngine::drawGeometry(VkCommandBuffer cmd)
 {
     // Go through all the graphics passes and execute them
-    gltfMetallicPass.execute(this, cmd);
+    GLTFMetallicPass::Execute(this, cmd);
 
     // Drawing is done context can be cleared
     mainDrawContext.opaqueSurfaces.clear();
@@ -957,12 +957,12 @@ void VulkanEngine::m_initMeshPipeline()
 
 void VulkanEngine::m_initPasses()
 {
-    gltfMetallicPass.init(this);
+    GLTFMetallicPass::Init(this);
 }
 
 void VulkanEngine::m_clearPassResources()
 {
-    gltfMetallicPass.clearResources(this);
+    GLTFMetallicPass::ClearResources(this);
 }
 
 void VulkanEngine::m_initGLTFMaterialLayout()

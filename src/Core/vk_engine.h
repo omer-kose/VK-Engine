@@ -259,11 +259,6 @@ public:
 	GPUSceneData sceneData;
 	// Draw Resource Descriptor Layouts
 	VkDescriptorSetLayout sceneDataDescriptorLayout;
-
-	/* Passes */
-	// Graphics Passes
-	GLTFMetallicPass gltfMetallicPass;
-
 private:
 	// Vulkan Context
 	void m_initVulkan();

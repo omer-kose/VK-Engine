@@ -4,7 +4,12 @@
 #include <Core/vk_pipelines.h>
 #include <Core/vk_initializers.h>
 
-void GLTFMetallicPass::init(VulkanEngine* engine)
+// Define the static members
+VkPipeline GLTFMetallicPass::opaquePipeline = VK_NULL_HANDLE;
+VkPipeline GLTFMetallicPass::transparentPipeline = VK_NULL_HANDLE;
+VkPipelineLayout GLTFMetallicPass::pipelineLayout = VK_NULL_HANDLE;
+
+void GLTFMetallicPass::Init(VulkanEngine* engine)
 {
     // Load the shaders
     VkShaderModule meshVertexShader;
@@ -75,7 +80,7 @@ void GLTFMetallicPass::init(VulkanEngine* engine)
     vkDestroyDescriptorSetLayout(engine->device, materialLayout, nullptr);
 }
 
-void GLTFMetallicPass::execute(VulkanEngine* engine, VkCommandBuffer& cmd)
+void GLTFMetallicPass::Execute(VulkanEngine* engine, VkCommandBuffer& cmd)
 {
     const DrawContext* ctx = engine->getDrawContext();
     std::vector<uint32_t> opaqueDraws;
@@ -144,11 +149,11 @@ void GLTFMetallicPass::execute(VulkanEngine* engine, VkCommandBuffer& cmd)
     }
 }
 
-void GLTFMetallicPass::update()
+void GLTFMetallicPass::Update()
 {
 }
 
-void GLTFMetallicPass::clearResources(VulkanEngine* engine)
+void GLTFMetallicPass::ClearResources(VulkanEngine* engine)
 {
     vkDestroyPipelineLayout(engine->device, pipelineLayout, nullptr);
 

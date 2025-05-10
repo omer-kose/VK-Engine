@@ -1,17 +1,18 @@
 #pragma once
-#include "PassBase.h"
+#include <Core/vk_types.h>
 
+class VulkanEngine;
 struct RenderObject;
 
-class GLTFMetallicPass : public GraphicsPassBase
+class GLTFMetallicPass
 {
 public:
-	virtual void init(VulkanEngine* engine) override;
-	virtual void execute(VulkanEngine* engine, VkCommandBuffer& cmd) override;
-	virtual void update() override;
-	virtual void clearResources(VulkanEngine* engine) override;
+	static void Init(VulkanEngine* engine);
+	static void Execute(VulkanEngine* engine, VkCommandBuffer& cmd);
+	static void Update();
+	static void ClearResources(VulkanEngine* engine);
 private:
-	VkPipeline opaquePipeline;
-	VkPipeline transparentPipeline;
-	VkPipelineLayout pipelineLayout; // both transparent and opaque objects use the same pipeline layout
+	static VkPipeline opaquePipeline;
+	static VkPipeline transparentPipeline;
+	static VkPipelineLayout pipelineLayout; // both transparent and opaque objects use the same pipeline layout
 };
