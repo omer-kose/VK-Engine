@@ -17,3 +17,12 @@ I develop the engine continuously.
 - Add Deferred Rendering Support (Adding G and Light Passes more accurately)
 - Add OBJ file loading
 - and many more (implementing Graphics techniques inside the engine)
+
+## Screenshots
+
+Structure Scene (PBR Shading is not yet implemented)
+![image](https://github.com/user-attachments/assets/88583114-87c6-4939-9380-0d9246d9ecc8)
+
+## References
+Mainly built upon the final version of: https://vkguide.dev/
+
