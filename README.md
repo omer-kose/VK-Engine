@@ -12,7 +12,8 @@
 I develop the engine continuously.
 
 - A proper scene structure to store scene related resources such as loaded scenes, meshes, camera, lights and more
-- Even though passes are abstracted out, drawing geometry is still done by calling them in drawGeometry function inside vk_engine. Add an abstraction over VulkanEngine to be able to write samples without touching anything in the engine. 
+- Even though passes are abstracted out, drawing geometry is still done by calling them in drawGeometry function inside vk_engine. Add an abstraction over VulkanEngine to be able to write samples without touching anything in the engine.
+- Add actual PBR shading. Currently, I have a placeholder 
 - Add Deferred Rendering Support (Adding G and Light Passes more accurately)
 - Add OBJ file loading
 - and many more (implementing Graphics techniques inside the engine)
