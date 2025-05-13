@@ -84,17 +84,17 @@ void GLTFMetallicPass::Execute(VulkanEngine* engine, VkCommandBuffer& cmd)
 {
     const DrawContext* ctx = engine->getDrawContext();
     std::vector<uint32_t> opaqueDraws;
-    opaqueDraws.reserve(ctx->opaqueSurfaces.size());
+    opaqueDraws.reserve(ctx->opaqueGLTFSurfaces.size());
 
-    for(uint32_t i = 0; i < ctx->opaqueSurfaces.size(); ++i)
+    for(uint32_t i = 0; i < ctx->opaqueGLTFSurfaces.size(); ++i)
     {
         opaqueDraws.push_back(i);
     }
 
     // sort the opaque surfaces by material and mesh
     std::sort(opaqueDraws.begin(), opaqueDraws.end(), [&](const auto& iA, const auto& iB) {
-        const RenderObject& A = ctx->opaqueSurfaces[iA];
-        const RenderObject& B = ctx->opaqueSurfaces[iB];
+        const RenderObject& A = ctx->opaqueGLTFSurfaces[iA];
+        const RenderObject& B = ctx->opaqueGLTFSurfaces[iB];
         if(A.materialInstance == B.materialInstance)
         {
             return A.indexBuffer < B.indexBuffer;
@@ -140,10 +140,10 @@ void GLTFMetallicPass::Execute(VulkanEngine* engine, VkCommandBuffer& cmd)
 
     for(uint32_t idx : opaqueDraws)
     {
-        draw(ctx->opaqueSurfaces[idx], opaquePipeline);
+        draw(ctx->opaqueGLTFSurfaces[idx], opaquePipeline);
     }
 
-    for(const RenderObject& robj : ctx->transparentSurfaces)
+    for(const RenderObject& robj : ctx->transparentGLTFSurfaces)
     {
         draw(robj, transparentPipeline);
     }

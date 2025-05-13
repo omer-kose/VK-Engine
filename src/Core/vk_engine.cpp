@@ -241,8 +241,8 @@ void VulkanEngine::drawGeometry(VkCommandBuffer cmd)
     GLTFMetallicPass::Execute(this, cmd);
 
     // Drawing is done context can be cleared
-    mainDrawContext.opaqueSurfaces.clear();
-    mainDrawContext.transparentSurfaces.clear();
+    mainDrawContext.opaqueGLTFSurfaces.clear();
+    mainDrawContext.transparentGLTFSurfaces.clear();
 }
 
 void VulkanEngine::drawImgui(VkCommandBuffer cmd, VkImageView targetImageView)
@@ -1162,30 +1162,4 @@ MaterialInstance GLTFMetallicRoughnessMaterial::createInstance(VkDevice device, 
     writer.updateSet(device, matData.materialSet);
 
     return matData;
-}
-
-void GLTFMeshNode::registerDraw(const glm::mat4& topMatrix, DrawContext& ctx)
-{
-    // Instead of directly using the worldTransform of the Mesh, it is multiplied with the topMatrix given. This allows drawing the same mesh multiple times with a different transform
-    // without altering its worldTransform field.
-    glm::mat4 nodeMatrix = topMatrix * worldTransform;
-
-    for(auto& s : mesh->surfaces)
-    {
-        RenderObject robj;
-        robj.indexCount = s.count;
-        robj.firstIndex = s.startIndex;
-        robj.indexBuffer = mesh->meshBuffers.indexBuffer.buffer;
-        robj.materialInstance = &s.materialInstance->instance;
-
-        robj.bounds = s.bounds;
-
-        robj.transform = nodeMatrix;
-        robj.vertexBufferAddress = mesh->meshBuffers.vertexBufferAddress;
-
-        ctx.opaqueSurfaces.push_back(robj);
-    }
-
-    // Recurse down the scene node
-    SceneNode::registerDraw(topMatrix, ctx);
 }

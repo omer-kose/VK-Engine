@@ -55,48 +55,18 @@ struct EngineStats
 
 constexpr unsigned int FRAME_OVERLAP = 2;
 
-// PBR Metallic Material follows the GLTF format
-// TODO: Consider this moving to a materials.h file
-struct GLTFMetallicRoughnessMaterial
-{
-	VkDescriptorSetLayout materialLayout;
+/*
+	Represents the geometry (and a possible material instance) of an object to be drawn in that frame. Created and destroyed per-frame. 
 
-	// CPU representation of the MaterialConstants uniform buffer
-	struct MaterialConstants
-	{
-		glm::vec4 colorFactors;
-		glm::vec4 metalRoughnessFactors;
-		// padding to complete the uniform buffer to 256 bytes (most GPUs expect a minimum alignment of 256 bytes for uniform buffers)
-		glm::vec4 extra[14];
-	};
-
-	struct MaterialResources
-	{
-		AllocatedImage colorImage;
-		VkSampler colorSampler;
-		AllocatedImage metalRoughnessImage;
-		VkSampler metalRoughnessSampler;
-		VkBuffer dataBuffer; // Handle to the buffer holding MaterialConstants data
-		uint32_t dataBufferOffset; // Multiple materials in a GLTF files will be stored in a single buffer, so the actual data for the specific material instance is fetched with this offset
-	};
-
-	DescriptorWriter writer;
-
-	void buildMaterialLayout(VulkanEngine* engine);
-
-	// This struct only stores the pipelines and the layouts. The material resources are allocated outside. Allocator must clean them properly.
-	void clearResources(VkDevice device);
-
-	MaterialInstance createInstance(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
-};
-
+	It can represent geometry from all kinds of formats.
+*/
 struct RenderObject
 {
 	uint32_t indexCount;
 	uint32_t firstIndex;
 	VkBuffer indexBuffer;
 
-	MaterialInstance* materialInstance;
+	MaterialInstance* materialInstance; // a non-owning pointer
 
 	Bounds bounds;
 
@@ -104,19 +74,15 @@ struct RenderObject
 	VkDeviceAddress vertexBufferAddress;
 };
 
+/*
+	Holds a flat list objects to be drawn that frame. The list is filled and reset every frame.
+
+	For the time being, meshes coming from different formats are held in different lists so that the related passes can only fetch the required meshes and work with them.
+*/
 struct DrawContext
 {
-	std::vector<RenderObject> opaqueSurfaces;
-	std::vector<RenderObject> transparentSurfaces;
-};
-
-// TODO: Consider moving this to another file. vk_types.h seems like the best solution with registerDraw is defined inside.
-struct GLTFMeshNode : public SceneNode
-{
-	std::shared_ptr<GLTFMeshAsset> mesh;
-
-	// Creates and adds all the surfaces in the mesh into the context's opaqueSurfaces
-	virtual void registerDraw(const glm::mat4& topMatrix, DrawContext& ctx) override;
+	std::vector<RenderObject> opaqueGLTFSurfaces;
+	std::vector<RenderObject> transparentGLTFSurfaces;
 };
 
 class VulkanEngine {
