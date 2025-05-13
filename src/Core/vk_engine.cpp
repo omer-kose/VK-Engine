@@ -54,11 +54,16 @@ void VulkanEngine::init()
     m_initSyncStructures();
 
     m_initDescriptors();
-    m_initPipelines();
+
+    m_initMaterialLayouts();
+
+    m_initPasses();
 
     m_initImgui();
 
     m_initDefaultData();
+
+    m_initGlobalSceneBuffer();
 
     // everything went fine
     isInitialized = true;
@@ -75,8 +80,6 @@ void VulkanEngine::cleanup()
         // make sure that GPU is done with the command buffers
         vkDeviceWaitIdle(device);
 
-        loadedScenes.clear();
-
         for(int i = 0; i < FRAME_OVERLAP; ++i)
         {
             // Destroy sync objects
@@ -90,8 +93,12 @@ void VulkanEngine::cleanup()
             frames[i].deletionQueue.flush();
         }
 
-        metallicRoughnessMaterial.clearResources(device);
-        
+        loadedScenes.clear();
+
+        m_clearMaterialLayouts();
+
+        m_clearPassResources();
+
         mainDeletionQueue.flush();
 
         m_destroySwapchain();
@@ -203,6 +210,8 @@ void VulkanEngine::draw()
 
 void VulkanEngine::drawMain(VkCommandBuffer cmd)
 {
+    updateSceneBuffer();
+
     // When rendering geometry we need to use COLOR_ATTACHMENT_OPTIMAL as it is the most optimal layout for rendering with graphics pipeline
     vkutil::transitionImage(cmd, drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
@@ -227,117 +236,12 @@ void VulkanEngine::drawMain(VkCommandBuffer cmd)
 
 void VulkanEngine::drawGeometry(VkCommandBuffer cmd)
 {
-    std::vector<uint32_t> opaqueDraws;
-    opaqueDraws.reserve(mainDrawContext.opaqueSurfaces.size());
-
-    for(uint32_t i = 0; i < mainDrawContext.opaqueSurfaces.size(); ++i)
-    {
-        opaqueDraws.push_back(i);
-    }
-
-    // sort the opaque surfaces by material and mesh
-    std::sort(opaqueDraws.begin(), opaqueDraws.end(), [&](const auto& iA, const auto& iB) {
-        const RenderObject& A = mainDrawContext.opaqueSurfaces[iA];
-        const RenderObject& B = mainDrawContext.opaqueSurfaces[iB];
-        if(A.materialInstance == B.materialInstance)
-        {
-            return A.indexBuffer < B.indexBuffer;
-        }
-        else
-        {
-            return A.materialInstance < B.materialInstance;
-        }
-
-    });
-
-    // Allocate a new uniform buffer for scene data (allocating on VRAM that CPU can write to directly. It is limited but it is perfect for allocating reasonable amounts that are dynamic)
-    AllocatedBuffer gpuSceneDataBuffer = createBuffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-    getCurrentFrame().deletionQueue.pushFunction([=](){
-        destroyBuffer(gpuSceneDataBuffer);
-    });
-
-    // Write the buffer
-    GPUSceneData* pGpuSceneDataBuffer = (GPUSceneData*)gpuSceneDataBuffer.allocation->GetMappedData();
-    *pGpuSceneDataBuffer = sceneData;
-
-    // Create a descriptor set for the uniform data
-    VkDescriptorSet sceneDescriptorSet = getCurrentFrame().frameDescriptorAllocator.allocate(device, sceneDataDescriptorLayout);
-    DescriptorWriter writer;
-    writer.writeBuffer(0, gpuSceneDataBuffer.buffer, sizeof(GPUSceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-    writer.updateSet(device, sceneDescriptorSet);
-
-    // Keep track of states to avoid unnecessary rebindings
-    MaterialPipeline* lastPipeline = nullptr;
-    MaterialInstance* lastMaterial = nullptr;
-    VkBuffer lastIndexBuffer = VK_NULL_HANDLE;
-
-    auto draw = [&](const RenderObject& robj) {
-        if(robj.materialInstance != lastMaterial)
-        {
-            lastMaterial = robj.materialInstance;
-            // if the material pipeline is changed bind the new pipeline as well as global scene descriptor set
-            if(lastPipeline != robj.materialInstance->materialPipeline)
-            {
-                lastPipeline = robj.materialInstance->materialPipeline;
-                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, robj.materialInstance->materialPipeline->pipeline);
-                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, robj.materialInstance->materialPipeline->layout, 0, 1, &sceneDescriptorSet, 0, nullptr);
-
-                // Set dynamic viewport and scissor again in case of an override (all of the material pipelines use dynamic states so setting them once after a bind is actually enough)
-                VkViewport viewport = {};
-                viewport.x = 0;
-                viewport.y = 0;
-                viewport.width = drawExtent.width;
-                viewport.height = drawExtent.height;
-                viewport.minDepth = 0.0f;
-                viewport.maxDepth = 1.0f;
-                vkCmdSetViewport(cmd, 0, 1, &viewport);
-
-                VkRect2D scissor = {};
-                scissor.offset.x = 0;
-                scissor.offset.y = 0;
-                scissor.extent.width = drawExtent.width;
-                scissor.extent.height = drawExtent.height;
-                vkCmdSetScissor(cmd, 0, 1, &scissor);
-            }
-
-            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, robj.materialInstance->materialPipeline->layout, 1, 1, &robj.materialInstance->materialSet, 0, nullptr);
-        }
-
-        GPUDrawPushConstants pushConstants;
-        pushConstants.vertexBufferAddress = robj.vertexBufferAddress;
-        pushConstants.worldMatrix = robj.transform;
-        vkCmdPushConstants(cmd, robj.materialInstance->materialPipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &pushConstants);
-
-        if(lastIndexBuffer != robj.indexBuffer)
-        {
-            lastIndexBuffer = robj.indexBuffer;
-            vkCmdBindIndexBuffer(cmd, robj.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-        }
-
-        vkCmdDrawIndexed(cmd, robj.indexCount, 1, robj.firstIndex, 0, 0);
-
-        // Keep stats
-        ++stats.drawCallCount;
-        stats.triangleCount += robj.indexCount / 3;
-    };
-
-    // Reset counters
-    stats.drawCallCount = 0;
-    stats.triangleCount = 0;
-
-    for(uint32_t idx : opaqueDraws)
-    {
-        draw(mainDrawContext.opaqueSurfaces[idx]);
-    }
-
-    for(const RenderObject& robj : mainDrawContext.transparentSurfaces)
-    {
-        draw(robj);
-    }
+    // Go through all the graphics passes and execute them
+    GLTFMetallicPass::Execute(this, cmd);
 
     // Drawing is done context can be cleared
-    mainDrawContext.opaqueSurfaces.clear();
-    mainDrawContext.transparentSurfaces.clear();
+    mainDrawContext.opaqueGLTFSurfaces.clear();
+    mainDrawContext.transparentGLTFSurfaces.clear();
 }
 
 void VulkanEngine::drawImgui(VkCommandBuffer cmd, VkImageView targetImageView)
@@ -628,6 +532,54 @@ GPUMeshBuffers VulkanEngine::uploadMesh(std::span<Vertex> vertices, std::span<ui
     destroyBuffer(staging);
 
     return meshBuffers;
+}
+
+/*
+    Both update and bind scene buffer functions must be called after the frame fence waits as it will be guaranteed that the frame is done being used by GPU. Otherwise, the data can be corrupted. 
+    (calling in drawMain() will suffice)
+*/
+void VulkanEngine::updateSceneBuffer()
+{
+    // Update the scene buffer
+    GPUSceneData* pGpuSceneDataBuffer = (GPUSceneData*)gpuSceneDataBuffer[frameNumber % FRAME_OVERLAP].allocation->GetMappedData();
+    *pGpuSceneDataBuffer = sceneData;
+}
+
+VkDescriptorSetLayout VulkanEngine::getSceneDescriptorLayout() const
+{
+    return sceneDataDescriptorLayout;
+}
+
+VkDescriptorSet VulkanEngine::getSceneBufferDescriptorSet() const
+{
+    return sceneDescriptorSet[frameNumber % FRAME_OVERLAP];
+}
+
+void VulkanEngine::setViewport(VkCommandBuffer cmd)
+{
+    VkViewport viewport = {};
+    viewport.x = 0;
+    viewport.y = 0;
+    viewport.width = drawExtent.width;
+    viewport.height = drawExtent.height;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+}
+
+void VulkanEngine::setScissor(VkCommandBuffer cmd)
+{
+    VkRect2D scissor = {};
+    scissor.offset.x = 0;
+    scissor.offset.y = 0;
+    scissor.extent.width = drawExtent.width;
+    scissor.extent.height = drawExtent.height;
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
+}
+
+const DrawContext* VulkanEngine::getDrawContext() const
+{
+    return &mainDrawContext;
 }
 
 void VulkanEngine::m_initVulkan()
@@ -924,83 +876,24 @@ void VulkanEngine::m_initDescriptors()
     }
 }
 
-void VulkanEngine::m_initPipelines()
+void VulkanEngine::m_initPasses()
 {
-    // Graphics Pipelines
-    m_initMeshPipeline();
-    metallicRoughnessMaterial.buildPipelines(this);
+    GLTFMetallicPass::Init(this);
 }
 
-void VulkanEngine::m_initMeshPipeline()
+void VulkanEngine::m_clearPassResources()
 {
-    // Load the shaders
-    VkShaderModule meshVertexShader;
-    if(!vkutil::loadShaderModule(device, "../../shaders/glsl/display_texture/display_texture_vert.spv", &meshVertexShader))
-    {
-        fmt::println("Error while building the mesh vertex shader module");
-    }
-    else
-    {
-        fmt::println("Mesh vertex shader successfully loaded");
-    }
+    GLTFMetallicPass::ClearResources(this);
+}
 
-    VkShaderModule meshFragmentShader;
-    if(!vkutil::loadShaderModule(device, "../../shaders/glsl/display_texture/display_texture_frag.spv", &meshFragmentShader))
-    {
-        fmt::println("Error while building the mesh fragment shader module");
-    }
-    else
-    {
-        fmt::println("Mesh fragment shader successfully loaded");
-    }
+void VulkanEngine::m_initMaterialLayouts()
+{
+    GLTFMetallicRoughnessMaterial::BuildMaterialLayout(this);
+}
 
-    // Pipeline layout
-    VkPushConstantRange bufferRange{};
-    bufferRange.offset = 0;
-    bufferRange.size = sizeof(GPUDrawPushConstants);
-    bufferRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = vkinit::pipeline_layout_create_info();
-    pipelineLayoutInfo.pushConstantRangeCount = 1;
-    pipelineLayoutInfo.pPushConstantRanges = &bufferRange;
-    pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &displayTextureDescriptorSetLayout;
-    VK_CHECK(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &meshPipelineLayout));
-
-    // Build the pipeline
-    PipelineBuilder pipelineBuilder;
-    // Use the triangle pipeline layout we created
-    pipelineBuilder.pipelineLayout = meshPipelineLayout;
-    // Connect the vertex and fragment shaders to the pipeline
-    pipelineBuilder.setShaders(meshVertexShader, meshFragmentShader);
-    // It will draw triangles
-    pipelineBuilder.setInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-    // Filled triangles
-    pipelineBuilder.setPolygonMode(VK_POLYGON_MODE_FILL);
-    // No backface culling
-    pipelineBuilder.setCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
-    // No multisampling
-    pipelineBuilder.setMultiSamplingNone();
-    // No blending
-    pipelineBuilder.disableBlending();
-    // Enable depth test
-    pipelineBuilder.enableDepthTest(true, VK_COMPARE_OP_LESS_OR_EQUAL);
-
-    // Connect the image formats
-    pipelineBuilder.setColorAttachmentFormat(drawImage.imageFormat);
-    pipelineBuilder.setDepthFormat(depthImage.imageFormat);
-
-    // Finally build the pipeline
-    meshPipeline = pipelineBuilder.buildPipeline(device);
-
-    // No need for shader modules ones they are bound to the pipeline
-    vkDestroyShaderModule(device, meshVertexShader, nullptr);
-    vkDestroyShaderModule(device, meshFragmentShader, nullptr);
-
-    mainDeletionQueue.pushFunction([=]() {
-        vkDestroyPipelineLayout(device, meshPipelineLayout, nullptr);
-        vkDestroyPipeline(device, meshPipeline, nullptr);
-    });
+void VulkanEngine::m_clearMaterialLayouts()
+{
+    GLTFMetallicRoughnessMaterial::ClearMaterialLayout(device);
 }
 
 void VulkanEngine::m_initImgui()
@@ -1131,7 +1024,25 @@ void VulkanEngine::m_initDefaultData()
     defaultMaterialResources.dataBuffer = materialConstantsBuffer.buffer;
     defaultMaterialResources.dataBufferOffset = 0;
 
-    defaultMaterialInstance = metallicRoughnessMaterial.createInstance(device, MaterialPass::Opaque, defaultMaterialResources, globalDescriptorAllocator);
+    defaultMaterialInstance = GLTFMetallicRoughnessMaterial::CreateInstance(device, MaterialPass::Opaque, defaultMaterialResources, globalDescriptorAllocator);
+}
+
+void VulkanEngine::m_initGlobalSceneBuffer()
+{
+    for(int i = 0; i < FRAME_OVERLAP; ++i)
+    {
+        // Allocate a new uniform buffer for scene data (allocating on VRAM that CPU can write to directly. It is limited but it is perfect for allocating reasonable amounts that are dynamic)
+        gpuSceneDataBuffer[i] = createBuffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+        mainDeletionQueue.pushFunction([=]() {
+            destroyBuffer(gpuSceneDataBuffer[i]);
+        });
+
+        // Create a descriptor set for the uniform data
+        sceneDescriptorSet[i] = globalDescriptorAllocator.allocate(device, sceneDataDescriptorLayout);
+        DescriptorWriter writer;
+        writer.writeBuffer(0, gpuSceneDataBuffer[i].buffer, sizeof(GPUSceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+        writer.updateSet(device, sceneDescriptorSet[i]);
+    }
 }
 
 void VulkanEngine::m_initCamera(glm::vec3 position, float pitch, float yaw)
@@ -1148,138 +1059,4 @@ void VulkanEngine::m_loadSceneData()
     auto loadedStructureScene = loadGltf(this, structurePath);
     assert(loadedStructureScene.has_value());
     loadedScenes["structure"] = loadedStructureScene.value();
-}
-
-void GLTFMetallicRoughnessMaterial::buildPipelines(VulkanEngine* engine)
-{
-    // Load the shaders
-    VkShaderModule meshVertexShader;
-    if(!vkutil::loadShaderModule(engine->device, "../../shaders/glsl/gltf_metallic/mesh_vert.spv", &meshVertexShader))
-    {
-        fmt::println("Error when building the mesh vertex shader");
-    }
-
-    VkShaderModule meshFragmentShader;
-    if(!vkutil::loadShaderModule(engine->device, "../../shaders/glsl/gltf_metallic/mesh_frag.spv", &meshFragmentShader))
-    {
-        fmt::println("Error when building the mesh fragment shader");
-    }
-
-    // Set push constant range
-    VkPushConstantRange pushConstantRange{};
-    pushConstantRange.offset = 0;
-    pushConstantRange.size = sizeof(GPUDrawPushConstants);
-    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-    // Set descriptor sets
-    // Material set (set 1)
-    DescriptorLayoutBuilder layoutBuilder;
-    layoutBuilder.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-    layoutBuilder.addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    layoutBuilder.addBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    materialLayout = layoutBuilder.build(engine->device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-
-    // 2 sets: 0 -> Scene Descriptor Set, 1 -> Material Descriptor Set
-    VkDescriptorSetLayout layouts [] = { engine->sceneDataDescriptorLayout, materialLayout };
-
-    // Mesh pipeline layout
-    VkPipelineLayoutCreateInfo meshLayoutInfo = vkinit::pipeline_layout_create_info();
-    meshLayoutInfo.pushConstantRangeCount = 1;
-    meshLayoutInfo.pPushConstantRanges = &pushConstantRange;
-    meshLayoutInfo.setLayoutCount = 2;
-    meshLayoutInfo.pSetLayouts = layouts;
-    
-    VkPipelineLayout meshPipelineLayout;
-    VK_CHECK(vkCreatePipelineLayout(engine->device, &meshLayoutInfo, nullptr, &meshPipelineLayout));
-    
-    // Both pipelines have the same layout
-    opaquePipeline.layout = meshPipelineLayout;
-    transparentPipeline.layout = meshPipelineLayout;
-
-    // Build the pipelines
-    PipelineBuilder pipelineBuilder;
-    pipelineBuilder.setShaders(meshVertexShader, meshFragmentShader);
-    pipelineBuilder.setInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-    pipelineBuilder.setPolygonMode(VK_POLYGON_MODE_FILL);
-    pipelineBuilder.setCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
-    pipelineBuilder.setMultiSamplingNone();
-    pipelineBuilder.disableBlending();
-    pipelineBuilder.enableDepthTest(true, VK_COMPARE_OP_LESS_OR_EQUAL);
-
-    // Render format
-    pipelineBuilder.setColorAttachmentFormat(engine->drawImage.imageFormat);
-    pipelineBuilder.setDepthFormat(engine->depthImage.imageFormat);
-    
-    pipelineBuilder.pipelineLayout = meshPipelineLayout;
-    // Opaque Pipeline
-    opaquePipeline.pipeline = pipelineBuilder.buildPipeline(engine->device);
-    
-    // Transparent variant
-    pipelineBuilder.enableBlendingAdditive();
-    pipelineBuilder.enableDepthTest(false, VK_COMPARE_OP_LESS_OR_EQUAL);
-    transparentPipeline.pipeline = pipelineBuilder.buildPipeline(engine->device);
-
-    // ShaderModules are not needed anymore
-    vkDestroyShaderModule(engine->device, meshVertexShader, nullptr);
-    vkDestroyShaderModule(engine->device, meshFragmentShader, nullptr);
-}
-
-void GLTFMetallicRoughnessMaterial::clearResources(VkDevice device)
-{
-    vkDestroyDescriptorSetLayout(device, materialLayout, nullptr);
-    // both opaque and transparent pipelines has the same layout vulkan handle so destroying one is enough
-    vkDestroyPipelineLayout(device, opaquePipeline.layout, nullptr);
-
-    vkDestroyPipeline(device, transparentPipeline.pipeline, nullptr);
-    vkDestroyPipeline(device, opaquePipeline.pipeline, nullptr);
-}
-
-MaterialInstance GLTFMetallicRoughnessMaterial::createInstance(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator)
-{
-    MaterialInstance matData;
-    matData.passType = pass;
-    if(pass == MaterialPass::Opaque)
-    {
-        matData.materialPipeline = &opaquePipeline;
-    }
-    else
-    {
-        matData.materialPipeline = &transparentPipeline;
-    }
-
-    matData.materialSet = descriptorAllocator.allocate(device, materialLayout);
-
-    writer.clear();
-    writer.writeBuffer(0, resources.dataBuffer, sizeof(MaterialConstants), resources.dataBufferOffset, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-    writer.writeImage(1, resources.colorImage.imageView, resources.colorSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    writer.writeImage(2, resources.metalRoughnessImage.imageView, resources.metalRoughnessSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    writer.updateSet(device, matData.materialSet);
-
-    return matData;
-}
-
-void GLTFMeshNode::registerDraw(const glm::mat4& topMatrix, DrawContext& ctx)
-{
-    // Instead of directly using the worldTransform of the Mesh, it is multiplied with the topMatrix given. This allows drawing the same mesh multiple times with a different transform
-    // without altering its worldTransform field.
-    glm::mat4 nodeMatrix = topMatrix * worldTransform;
-
-    for(auto& s : mesh->surfaces)
-    {
-        RenderObject robj;
-        robj.indexCount = s.count;
-        robj.firstIndex = s.startIndex;
-        robj.indexBuffer = mesh->meshBuffers.indexBuffer.buffer;
-        robj.materialInstance = &s.materialInstance->instance;
-
-        robj.bounds = s.bounds;
-
-        robj.transform = nodeMatrix;
-        robj.vertexBufferAddress = mesh->meshBuffers.vertexBufferAddress;
-
-        ctx.opaqueSurfaces.push_back(robj);
-    }
-
-    // Recurse down the scene node
-    SceneNode::registerDraw(topMatrix, ctx);
 }

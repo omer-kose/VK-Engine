@@ -6,6 +6,8 @@
 
 #include <camera.h>
 
+#include <Pass/GLTFMetallicPass.h>
+
 struct DeletionQueue
 {
 	void pushFunction(std::function<void()>&& function)
@@ -53,50 +55,18 @@ struct EngineStats
 
 constexpr unsigned int FRAME_OVERLAP = 2;
 
-// PBR Metallic Material follows the GLTF format
-// TODO: Consider this moving to a materials.h file
-struct GLTFMetallicRoughnessMaterial
-{
-	MaterialPipeline opaquePipeline;
-	MaterialPipeline transparentPipeline;
+/*
+	Represents the geometry (and a possible material instance) of an object to be drawn in that frame. Created and destroyed per-frame. 
 
-	VkDescriptorSetLayout materialLayout;
-
-	// CPU representation of the MaterialConstants uniform buffer
-	struct MaterialConstants
-	{
-		glm::vec4 colorFactors;
-		glm::vec4 metalRoughnessFactors;
-		// padding to complete the uniform buffer to 256 bytes (most GPUs expect a minimum alignment of 256 bytes for uniform buffers)
-		glm::vec4 extra[14];
-	};
-
-	struct MaterialResources
-	{
-		AllocatedImage colorImage;
-		VkSampler colorSampler;
-		AllocatedImage metalRoughnessImage;
-		VkSampler metalRoughnessSampler;
-		VkBuffer dataBuffer; // Handle to the buffer holding MaterialConstants data
-		uint32_t dataBufferOffset; // Multiple materials in a GLTF files will be stored in a single buffer, so the actual data for the specific material instance is fetched with this offset
-	};
-
-	DescriptorWriter writer;
-
-	void buildPipelines(VulkanEngine* engine);
-	// This struct only stores the pipelines and the layouts. The material resources are allocated outside. Allocator must clean them properly.
-	void clearResources(VkDevice device);
-
-	MaterialInstance createInstance(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
-};
-
+	It can represent geometry from all kinds of formats.
+*/
 struct RenderObject
 {
 	uint32_t indexCount;
 	uint32_t firstIndex;
 	VkBuffer indexBuffer;
 
-	MaterialInstance* materialInstance;
+	MaterialInstance* materialInstance; // a non-owning pointer
 
 	Bounds bounds;
 
@@ -104,22 +74,19 @@ struct RenderObject
 	VkDeviceAddress vertexBufferAddress;
 };
 
+/*
+	Holds a flat list objects to be drawn that frame. The list is filled and reset every frame.
+
+	For the time being, meshes coming from different formats are held in different lists so that the related passes can only fetch the required meshes and work with them.
+*/
 struct DrawContext
 {
-	std::vector<RenderObject> opaqueSurfaces;
-	std::vector<RenderObject> transparentSurfaces;
+	std::vector<RenderObject> opaqueGLTFSurfaces;
+	std::vector<RenderObject> transparentGLTFSurfaces;
 };
 
-// TODO: Consider moving this to another file. vk_types.h seems like the best solution with registerDraw is defined inside.
-struct GLTFMeshNode : public SceneNode
+class VulkanEngine
 {
-	std::shared_ptr<GLTFMeshAsset> mesh;
-
-	// Creates and adds all the surfaces in the mesh into the context's opaqueSurfaces
-	virtual void registerDraw(const glm::mat4& topMatrix, DrawContext& ctx) override;
-};
-
-class VulkanEngine {
 public:
 	static VulkanEngine& Get();
 
@@ -143,6 +110,7 @@ public:
 
 	void immediateSubmit(std::function<void(VkCommandBuffer cmd)>&& function);
 
+	// Engine utilities (TODO: For the time being most of the stuff are directly open to outside but I will be slowly hiding them)
 	AllocatedBuffer createBuffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
 	void destroyBuffer(const AllocatedBuffer& buffer);
 
@@ -152,11 +120,20 @@ public:
 
 	GPUMeshBuffers uploadMesh(std::span<Vertex> vertices, std::span<uint32_t> indices);
 
+	void updateSceneBuffer();
+	VkDescriptorSetLayout getSceneDescriptorLayout() const;
+	VkDescriptorSet getSceneBufferDescriptorSet() const;
+
+	void setViewport(VkCommandBuffer cmd);
+	void setScissor(VkCommandBuffer cmd);
+
+	const DrawContext* getDrawContext() const;
+
 public:
 	struct SDL_Window* window{ nullptr };
 
 	bool isInitialized{ false };
-	int frameNumber{0};
+	uint32_t frameNumber{0};
 	bool freezeRendering{ false };
 	bool resizeRequested{ false };
 	float renderScale{ 1.0f };
@@ -216,10 +193,9 @@ public:
 	// Descriptor layout for single texture display
 	VkDescriptorSetLayout displayTextureDescriptorSetLayout;
 
-	/* Graphics Pipelines */
-	// Mesh Pipeline
-	VkPipelineLayout meshPipelineLayout;
-	VkPipeline meshPipeline;
+	// Per-frame Global Scene (uniform) Buffer and the descriptor set (Shared by the whole engine which uses scene data so it is persistent per-frame no need to reallocate) 
+	AllocatedBuffer gpuSceneDataBuffer[FRAME_OVERLAP];
+	VkDescriptorSet sceneDescriptorSet[FRAME_OVERLAP];
 
 	// Default textures
 	AllocatedImage whiteImage;
@@ -232,7 +208,6 @@ public:
 	VkSampler defaultSamplerNearest;	
 
 	// Default materials
-	GLTFMetallicRoughnessMaterial metallicRoughnessMaterial;
 	MaterialInstance defaultMaterialInstance;
 
 	// Main Draw Context
@@ -257,15 +232,23 @@ private:
 	void m_resizeSwapchain();
 	// Descriptors
 	void m_initDescriptors();
-	// Pipelines
-	void m_initPipelines();
-	void m_initMeshPipeline();
+
+	// Passes
+	void m_initPasses();
+	void m_clearPassResources();
+
+	// Material Layouts
+	void m_initMaterialLayouts(); 
+	void m_clearMaterialLayouts();
 
 	// ImGui
 	void m_initImgui();
 
 	// Default Engine Data
 	void m_initDefaultData();
+
+	// Init Scene Buffer
+	void m_initGlobalSceneBuffer();
 
 	// Camera
 	void m_initCamera(glm::vec3 position, float pitch, float yaw);

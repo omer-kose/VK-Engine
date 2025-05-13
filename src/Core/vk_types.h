@@ -81,28 +81,6 @@ struct GPUSceneData
     glm::vec4 sunlightColor;
 };
 
-// Material Data
-// Describes the type of the pass. Current 2 supported types: Opaque, Transparent
-enum class MaterialPass : uint8_t
-{
-    Opaque,
-    Transparent,
-    Other
-};
-
-struct MaterialPipeline
-{
-    VkPipeline pipeline;
-    VkPipelineLayout layout;
-};
-
-struct MaterialInstance
-{
-    MaterialPipeline* materialPipeline; // non-owning pointer
-    VkDescriptorSet materialSet;
-    MaterialPass passType;
-};
-
 struct DrawContext;
 
 // Base class for renderable dynamic object
@@ -112,14 +90,14 @@ class IRenderable
 };
 
 /*
-    Scene Node
+    GLTF Scene Node
     The scene node can hold children and will also keep a transform to propagate to them
 */
-struct SceneNode : public IRenderable
+struct GLTFSceneNode : public IRenderable
 {
     // parent pointer must be a weak ptr to avoid the circular dependency problem
-    std::weak_ptr<SceneNode> parent;
-    std::vector<std::shared_ptr<SceneNode>> children;
+    std::weak_ptr<GLTFSceneNode> parent;
+    std::vector<std::shared_ptr<GLTFSceneNode>> children;
 
     glm::mat4 localTransform;
     glm::mat4 worldTransform; // actual worldMatrix (or model matrix)

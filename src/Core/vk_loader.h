@@ -6,6 +6,9 @@
 #include <unordered_map>
 #include <filesystem>
 
+// Material types
+#include <Materials/GLTFMetallicMaterial.h>
+
 class VulkanEngine;
 
 // Bounds of a geometry. It both stores radius and extents. So, depending on the situation, a bounding box or a bounding sphere can be used
@@ -17,11 +20,6 @@ struct Bounds
 };
 
 /* GLTF START */
-// Any non-specific GLTFMaterial Instance
-struct GLTFMaterialInstance
-{
-	MaterialInstance instance;
-};
 
 // GLTF Primitive (Surface)
 struct GLTFGeoSurface
@@ -33,10 +31,9 @@ struct GLTFGeoSurface
 	Bounds bounds;
 
 	// Each surface has its own material instance (different parts of a mesh can have different materials)
-	std::shared_ptr<GLTFMaterialInstance> materialInstance; 
+	std::shared_ptr<MaterialInstance> materialInstance; 
 };
 
-// GLTF Mesh Asset
 struct GLTFMeshAsset
 {
 	std::string name;
@@ -45,16 +42,24 @@ struct GLTFMeshAsset
 	GPUMeshBuffers meshBuffers;
 };
 
+struct GLTFMeshNode : public GLTFSceneNode
+{
+	std::shared_ptr<GLTFMeshAsset> mesh;
+
+	// Creates a Render Object and adds all the surfaces in the mesh into the context's opaqueGLTFSurfaces
+	virtual void registerDraw(const glm::mat4& topMatrix, DrawContext& ctx) override;
+};
+
 struct LoadedGLTF : public IRenderable
 {
 	// Storage for all the data given in the gltf file
 	std::unordered_map<std::string, std::shared_ptr<GLTFMeshAsset>> meshes;
-	std::unordered_map<std::string, std::shared_ptr<SceneNode>> sceneNodes;
+	std::unordered_map<std::string, std::shared_ptr<GLTFSceneNode>> sceneNodes;
 	std::unordered_map<std::string, AllocatedImage> textures;
-	std::unordered_map<std::string, std::shared_ptr<GLTFMaterialInstance>> materialInstances;
+	std::unordered_map<std::string, std::shared_ptr<MaterialInstance>> materialInstances;
 
 	// Nodes that don't have a parent, for iterating through the file in tree order.
-	std::vector<std::shared_ptr<SceneNode>> topNodes;
+	std::vector<std::shared_ptr<GLTFSceneNode>> topNodes;
 
 	std::vector<VkSampler> samplers;
 

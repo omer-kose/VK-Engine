@@ -20,7 +20,7 @@ foreach(GLSL ${GLSL_SOURCE_FILES})
     get_filename_component(FILE_NAME ${GLSL} NAME_WE)
     get_filename_component(FILE_EXT ${GLSL} LAST_EXT)
     string(REPLACE "." "" FILE_TYPE ${FILE_EXT})
-    if(NOT ${FILE_TYPE} STREQUAL h)
+    if(NOT ${FILE_TYPE} STREQUAL h AND NOT ${FILE_TYPE} STREQUAL spv)
         set(SPIRV "${PROJECT_SOURCE_DIR}/shaders/glsl/${PARENT_DIR_NAME}/${FILE_NAME}_${FILE_TYPE}.spv")
         add_custom_command( OUTPUT ${SPIRV}
                             COMMAND ${GLSL_COMPILER} ${GLSL} ${GLSL_COMPILER_FLAGS} -o ${SPIRV}

@@ -203,9 +203,9 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 
 	// temporal arrays for all the objects to use while creating the GLTF data
 	std::vector<std::shared_ptr<GLTFMeshAsset>> meshes;
-	std::vector<std::shared_ptr<SceneNode>> sceneNodes;
+	std::vector<std::shared_ptr<GLTFSceneNode>> sceneNodes;
 	std::vector<AllocatedImage> textures;
-	std::vector<std::shared_ptr<GLTFMaterialInstance>> materialInstances;
+	std::vector<std::shared_ptr<MaterialInstance>> materialInstances;
 
 	// Load the textures
 	for(fastgltf::Image& image : asset.images)
@@ -232,7 +232,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 	// Load the materials
 	for(fastgltf::Material& mat : asset.materials)
 	{
-		std::shared_ptr<GLTFMaterialInstance> newMat = std::make_shared<GLTFMaterialInstance>();
+		std::shared_ptr<MaterialInstance> newMat = std::make_shared<MaterialInstance>();
 		materialInstances.push_back(newMat);
 		scene->materialInstances[mat.name.c_str()] = newMat;
 
@@ -274,7 +274,9 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 		}
 
 		// create the material instance
-		newMat->instance = engine->metallicRoughnessMaterial.createInstance(engine->device, passType, materialResources, scene->descriptorAllocator);
+		*newMat = GLTFMetallicRoughnessMaterial::CreateInstance(engine->device, passType, materialResources, scene->descriptorAllocator);
+
+		++dataIndex;
 	}
 
 	// Load the meshes
@@ -395,7 +397,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 	// Load all the nodes
 	for(fastgltf::Node& gltfNode : asset.nodes)
 	{
-		std::shared_ptr<SceneNode> newSceneNode;
+		std::shared_ptr<GLTFSceneNode> newSceneNode;
 
 		if(gltfNode.meshIndex.has_value())
 		{
@@ -404,7 +406,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 		}
 		else
 		{
-			newSceneNode = std::make_shared<SceneNode>();
+			newSceneNode = std::make_shared<GLTFSceneNode>();
 		}
 
 		sceneNodes.push_back(newSceneNode);
@@ -433,7 +435,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 	for(int i = 0; i < asset.nodes.size(); ++i)
 	{
 		fastgltf::Node& gltfNode = asset.nodes[i];
-		std::shared_ptr<SceneNode>& sceneNode = sceneNodes[i];
+		std::shared_ptr<GLTFSceneNode>& sceneNode = sceneNodes[i];
 
 		for(auto& c : gltfNode.children)
 		{
@@ -443,7 +445,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 	}
 
 	// Find the top nodes with no parents
-	for(std::shared_ptr<SceneNode>& sceneNode : sceneNodes)
+	for(std::shared_ptr<GLTFSceneNode>& sceneNode : sceneNodes)
 	{
 		if(sceneNode->parent.lock() == nullptr)
 		{
@@ -610,11 +612,37 @@ void LoadedGLTF::clearAll()
 			continue;
 		}
 
-		engine->destroyImage (v);
+		engine->destroyImage(v);
 	}
 
 	for(auto& sampler : samplers)
 	{
 		vkDestroySampler(device, sampler, nullptr);
 	}
+}
+
+void GLTFMeshNode::registerDraw(const glm::mat4& topMatrix, DrawContext& ctx)
+{
+	// Instead of directly using the worldTransform of the Mesh, it is multiplied with the topMatrix given. This allows drawing the same mesh multiple times with a different transform
+	// without altering its worldTransform field.
+	glm::mat4 nodeMatrix = topMatrix * worldTransform;
+
+	for(auto& s : mesh->surfaces)
+	{
+		RenderObject robj;
+		robj.indexCount = s.count;
+		robj.firstIndex = s.startIndex;
+		robj.indexBuffer = mesh->meshBuffers.indexBuffer.buffer;
+		robj.materialInstance = (MaterialInstance*)s.materialInstance.get();
+
+		robj.bounds = s.bounds;
+
+		robj.transform = nodeMatrix;
+		robj.vertexBufferAddress = mesh->meshBuffers.vertexBufferAddress;
+
+		ctx.opaqueGLTFSurfaces.push_back(robj);
+	}
+
+	// Recurse down the scene node
+	GLTFSceneNode::registerDraw(topMatrix, ctx);
 }
