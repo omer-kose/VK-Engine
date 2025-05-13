@@ -274,7 +274,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 		}
 
 		// create the material instance
-		*newMat = engine->metallicRoughnessMaterial.createInstance(engine->device, passType, materialResources, scene->descriptorAllocator);
+		*newMat = GLTFMetallicRoughnessMaterial::CreateInstance(engine->device, passType, materialResources, scene->descriptorAllocator);
 
 		++dataIndex;
 	}

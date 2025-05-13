@@ -8,11 +8,9 @@
 class VulkanEngine;
 
 // PBR Metallic Material follows the GLTF format
-// TODO: Consider this moving to a materials.h file
-struct GLTFMetallicRoughnessMaterial
+class GLTFMetallicRoughnessMaterial
 {
-	VkDescriptorSetLayout materialLayout;
-
+public:
 	// CPU representation of the MaterialConstants uniform buffer
 	struct MaterialConstants
 	{
@@ -29,15 +27,16 @@ struct GLTFMetallicRoughnessMaterial
 		AllocatedImage metalRoughnessImage;
 		VkSampler metalRoughnessSampler;
 		VkBuffer dataBuffer; // Handle to the buffer holding MaterialConstants data
-		uint32_t dataBufferOffset; // Multiple materials in a GLTF files will be stored in a single buffer, so the actual data for the specific material instance is fetched with this offset
+		uint32_t dataBufferOffset; // Multiple materials in a GLTF file will be stored in a single buffer, so the actual data for the specific material instance is fetched with this offset
 	};
 
-	DescriptorWriter writer;
+	static void BuildMaterialLayout(VulkanEngine* engine);
 
-	void buildMaterialLayout(VulkanEngine* engine);
+	// This static class only stores material layout. The material resources are allocated outside per material instance. Allocator-side must clean them properly.
+	static void ClearMaterialLayout(VkDevice device);
 
-	// This struct only stores the pipelines and the layouts. The material resources are allocated outside. Allocator must clean them properly.
-	void clearResources(VkDevice device);
-
-	MaterialInstance createInstance(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
+	static MaterialInstance CreateInstance(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
+private:
+	static VkDescriptorSetLayout MaterialLayout;
+	static DescriptorWriter Writer;
 };

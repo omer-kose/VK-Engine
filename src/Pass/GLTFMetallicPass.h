@@ -12,7 +12,7 @@ public:
 	static void Update();
 	static void ClearResources(VulkanEngine* engine);
 private:
-	static VkPipeline opaquePipeline;
-	static VkPipeline transparentPipeline;
-	static VkPipelineLayout pipelineLayout; // both transparent and opaque objects use the same pipeline layout
+	static VkPipeline OpaquePipeline;
+	static VkPipeline TransparentPipeline;
+	static VkPipelineLayout PipelineLayout; // both transparent and opaque objects use the same pipeline layout
 };

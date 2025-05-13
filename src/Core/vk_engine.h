@@ -85,7 +85,8 @@ struct DrawContext
 	std::vector<RenderObject> transparentGLTFSurfaces;
 };
 
-class VulkanEngine {
+class VulkanEngine
+{
 public:
 	static VulkanEngine& Get();
 
@@ -196,11 +197,6 @@ public:
 	AllocatedBuffer gpuSceneDataBuffer[FRAME_OVERLAP];
 	VkDescriptorSet sceneDescriptorSet[FRAME_OVERLAP];
 
-	/* Graphics Pipelines */
-	// Mesh Pipeline
-	VkPipelineLayout meshPipelineLayout;
-	VkPipeline meshPipeline;
-
 	// Default textures
 	AllocatedImage whiteImage;
 	AllocatedImage blackImage;
@@ -212,7 +208,6 @@ public:
 	VkSampler defaultSamplerNearest;	
 
 	// Default materials
-	GLTFMetallicRoughnessMaterial metallicRoughnessMaterial;
 	MaterialInstance defaultMaterialInstance;
 
 	// Main Draw Context
@@ -237,17 +232,14 @@ private:
 	void m_resizeSwapchain();
 	// Descriptors
 	void m_initDescriptors();
-	// Pipelines (TOOD: TO BE REMOVED)
-	void m_initPipelines();
-	void m_initMeshPipeline();
 
 	// Passes
 	void m_initPasses();
 	void m_clearPassResources();
 
 	// Material Layouts
-	// TODO: Material Layouts should be contained within a static class I think. In the Material rework, create a static class per material type. Whenever that layout is needed just fetch it from Material::GetDescriptorLayout().
-	void m_initGLTFMaterialLayout(); 
+	void m_initMaterialLayouts(); 
+	void m_clearMaterialLayouts();
 
 	// ImGui
 	void m_initImgui();

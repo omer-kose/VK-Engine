@@ -5,9 +5,9 @@
 #include <Core/vk_initializers.h>
 
 // Define the static members
-VkPipeline GLTFMetallicPass::opaquePipeline = VK_NULL_HANDLE;
-VkPipeline GLTFMetallicPass::transparentPipeline = VK_NULL_HANDLE;
-VkPipelineLayout GLTFMetallicPass::pipelineLayout = VK_NULL_HANDLE;
+VkPipeline GLTFMetallicPass::OpaquePipeline = VK_NULL_HANDLE;
+VkPipeline GLTFMetallicPass::TransparentPipeline = VK_NULL_HANDLE;
+VkPipelineLayout GLTFMetallicPass::PipelineLayout = VK_NULL_HANDLE;
 
 void GLTFMetallicPass::Init(VulkanEngine* engine)
 {
@@ -48,7 +48,7 @@ void GLTFMetallicPass::Init(VulkanEngine* engine)
     pipelineLayoutInfo.setLayoutCount = 2;
     pipelineLayoutInfo.pSetLayouts = layouts;
 
-    VK_CHECK(vkCreatePipelineLayout(engine->device, &pipelineLayoutInfo, nullptr, &pipelineLayout));
+    VK_CHECK(vkCreatePipelineLayout(engine->device, &pipelineLayoutInfo, nullptr, &PipelineLayout));
 
     // Build the pipeline
     PipelineBuilder pipelineBuilder;
@@ -64,14 +64,14 @@ void GLTFMetallicPass::Init(VulkanEngine* engine)
     pipelineBuilder.setColorAttachmentFormat(engine->drawImage.imageFormat);
     pipelineBuilder.setDepthFormat(engine->depthImage.imageFormat);
 
-    pipelineBuilder.pipelineLayout = pipelineLayout;
+    pipelineBuilder.pipelineLayout = PipelineLayout;
     // Opaque Pipeline
-    opaquePipeline = pipelineBuilder.buildPipeline(engine->device);
+    OpaquePipeline = pipelineBuilder.buildPipeline(engine->device);
 
     // Transparent variant
     pipelineBuilder.enableBlendingAdditive();
     pipelineBuilder.enableDepthTest(false, VK_COMPARE_OP_LESS_OR_EQUAL);
-    transparentPipeline = pipelineBuilder.buildPipeline(engine->device);
+    TransparentPipeline = pipelineBuilder.buildPipeline(engine->device);
 
     // ShaderModules are not needed anymore
     vkDestroyShaderModule(engine->device, meshVertexShader, nullptr);
@@ -115,19 +115,19 @@ void GLTFMetallicPass::Execute(VulkanEngine* engine, VkCommandBuffer& cmd)
             lastMaterial = robj.materialInstance;
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
             VkDescriptorSet sceneDescriptorSet = engine->getSceneBufferDescriptorSet();
-            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &sceneDescriptorSet, 0, nullptr);
+            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &sceneDescriptorSet, 0, nullptr);
 
             // Set dynamic viewport and scissor again in case of an override (all of the material pipelines use dynamic states so setting them once after a bind is actually enough)
             engine->setViewport(cmd);
             engine->setScissor(cmd);
 
-            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 1, 1, &robj.materialInstance->materialSet, 0, nullptr);
+            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 1, 1, &robj.materialInstance->materialSet, 0, nullptr);
         }
 
         GPUDrawPushConstants pushConstants;
         pushConstants.vertexBufferAddress = robj.vertexBufferAddress;
         pushConstants.worldMatrix = robj.transform;
-        vkCmdPushConstants(cmd, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &pushConstants);
+        vkCmdPushConstants(cmd, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &pushConstants);
 
         if(lastIndexBuffer != robj.indexBuffer)
         {
@@ -140,12 +140,12 @@ void GLTFMetallicPass::Execute(VulkanEngine* engine, VkCommandBuffer& cmd)
 
     for(uint32_t idx : opaqueDraws)
     {
-        draw(ctx->opaqueGLTFSurfaces[idx], opaquePipeline);
+        draw(ctx->opaqueGLTFSurfaces[idx], OpaquePipeline);
     }
 
     for(const RenderObject& robj : ctx->transparentGLTFSurfaces)
     {
-        draw(robj, transparentPipeline);
+        draw(robj, TransparentPipeline);
     }
 }
 
@@ -155,8 +155,8 @@ void GLTFMetallicPass::Update()
 
 void GLTFMetallicPass::ClearResources(VulkanEngine* engine)
 {
-    vkDestroyPipelineLayout(engine->device, pipelineLayout, nullptr);
+    vkDestroyPipelineLayout(engine->device, PipelineLayout, nullptr);
 
-    vkDestroyPipeline(engine->device, opaquePipeline, nullptr);
-    vkDestroyPipeline(engine->device, transparentPipeline, nullptr);
+    vkDestroyPipeline(engine->device, OpaquePipeline, nullptr);
+    vkDestroyPipeline(engine->device, TransparentPipeline, nullptr);
 }

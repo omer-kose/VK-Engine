@@ -54,9 +54,8 @@ void VulkanEngine::init()
     m_initSyncStructures();
 
     m_initDescriptors();
-    m_initPipelines(); // TODO: TO BE REMOVED
 
-    m_initGLTFMaterialLayout(); // TODO: To be moved to a static logic. No need to store a constant descriptor set layout inside the engine as a member variable
+    m_initMaterialLayouts();
 
     m_initPasses();
 
@@ -81,8 +80,6 @@ void VulkanEngine::cleanup()
         // make sure that GPU is done with the command buffers
         vkDeviceWaitIdle(device);
 
-        loadedScenes.clear();
-
         for(int i = 0; i < FRAME_OVERLAP; ++i)
         {
             // Destroy sync objects
@@ -96,7 +93,9 @@ void VulkanEngine::cleanup()
             frames[i].deletionQueue.flush();
         }
 
-        metallicRoughnessMaterial.clearResources(device);
+        loadedScenes.clear();
+
+        m_clearMaterialLayouts();
 
         m_clearPassResources();
 
@@ -877,84 +876,6 @@ void VulkanEngine::m_initDescriptors()
     }
 }
 
-void VulkanEngine::m_initPipelines()
-{
-    // Graphics Pipelines
-    m_initMeshPipeline();
-}
-
-void VulkanEngine::m_initMeshPipeline()
-{
-    // Load the shaders
-    VkShaderModule meshVertexShader;
-    if(!vkutil::loadShaderModule(device, "../../shaders/glsl/display_texture/display_texture_vert.spv", &meshVertexShader))
-    {
-        fmt::println("Error while building the mesh vertex shader module");
-    }
-    else
-    {
-        fmt::println("Mesh vertex shader successfully loaded");
-    }
-
-    VkShaderModule meshFragmentShader;
-    if(!vkutil::loadShaderModule(device, "../../shaders/glsl/display_texture/display_texture_frag.spv", &meshFragmentShader))
-    {
-        fmt::println("Error while building the mesh fragment shader module");
-    }
-    else
-    {
-        fmt::println("Mesh fragment shader successfully loaded");
-    }
-
-    // Pipeline layout
-    VkPushConstantRange bufferRange{};
-    bufferRange.offset = 0;
-    bufferRange.size = sizeof(GPUDrawPushConstants);
-    bufferRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = vkinit::pipeline_layout_create_info();
-    pipelineLayoutInfo.pushConstantRangeCount = 1;
-    pipelineLayoutInfo.pPushConstantRanges = &bufferRange;
-    pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &displayTextureDescriptorSetLayout;
-    VK_CHECK(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &meshPipelineLayout));
-
-    // Build the pipeline
-    PipelineBuilder pipelineBuilder;
-    // Use the triangle pipeline layout we created
-    pipelineBuilder.pipelineLayout = meshPipelineLayout;
-    // Connect the vertex and fragment shaders to the pipeline
-    pipelineBuilder.setShaders(meshVertexShader, meshFragmentShader);
-    // It will draw triangles
-    pipelineBuilder.setInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-    // Filled triangles
-    pipelineBuilder.setPolygonMode(VK_POLYGON_MODE_FILL);
-    // No backface culling
-    pipelineBuilder.setCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
-    // No multisampling
-    pipelineBuilder.setMultiSamplingNone();
-    // No blending
-    pipelineBuilder.disableBlending();
-    // Enable depth test
-    pipelineBuilder.enableDepthTest(true, VK_COMPARE_OP_LESS_OR_EQUAL);
-
-    // Connect the image formats
-    pipelineBuilder.setColorAttachmentFormat(drawImage.imageFormat);
-    pipelineBuilder.setDepthFormat(depthImage.imageFormat);
-
-    // Finally build the pipeline
-    meshPipeline = pipelineBuilder.buildPipeline(device);
-
-    // No need for shader modules ones they are bound to the pipeline
-    vkDestroyShaderModule(device, meshVertexShader, nullptr);
-    vkDestroyShaderModule(device, meshFragmentShader, nullptr);
-
-    mainDeletionQueue.pushFunction([=]() {
-        vkDestroyPipelineLayout(device, meshPipelineLayout, nullptr);
-        vkDestroyPipeline(device, meshPipeline, nullptr);
-    });
-}
-
 void VulkanEngine::m_initPasses()
 {
     GLTFMetallicPass::Init(this);
@@ -965,9 +886,14 @@ void VulkanEngine::m_clearPassResources()
     GLTFMetallicPass::ClearResources(this);
 }
 
-void VulkanEngine::m_initGLTFMaterialLayout()
+void VulkanEngine::m_initMaterialLayouts()
 {
-    metallicRoughnessMaterial.buildMaterialLayout(this);
+    GLTFMetallicRoughnessMaterial::BuildMaterialLayout(this);
+}
+
+void VulkanEngine::m_clearMaterialLayouts()
+{
+    GLTFMetallicRoughnessMaterial::ClearMaterialLayout(device);
 }
 
 void VulkanEngine::m_initImgui()
@@ -1098,7 +1024,7 @@ void VulkanEngine::m_initDefaultData()
     defaultMaterialResources.dataBuffer = materialConstantsBuffer.buffer;
     defaultMaterialResources.dataBufferOffset = 0;
 
-    defaultMaterialInstance = metallicRoughnessMaterial.createInstance(device, MaterialPass::Opaque, defaultMaterialResources, globalDescriptorAllocator);
+    defaultMaterialInstance = GLTFMetallicRoughnessMaterial::CreateInstance(device, MaterialPass::Opaque, defaultMaterialResources, globalDescriptorAllocator);
 }
 
 void VulkanEngine::m_initGlobalSceneBuffer()
@@ -1133,33 +1059,4 @@ void VulkanEngine::m_loadSceneData()
     auto loadedStructureScene = loadGltf(this, structurePath);
     assert(loadedStructureScene.has_value());
     loadedScenes["structure"] = loadedStructureScene.value();
-}
-
-void GLTFMetallicRoughnessMaterial::buildMaterialLayout(VulkanEngine* engine)
-{
-    // Material set 
-    DescriptorLayoutBuilder layoutBuilder;
-    layoutBuilder.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-    layoutBuilder.addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    layoutBuilder.addBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    materialLayout = layoutBuilder.build(engine->device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-}
-
-void GLTFMetallicRoughnessMaterial::clearResources(VkDevice device)
-{
-    vkDestroyDescriptorSetLayout(device, materialLayout, nullptr);
-}
-
-MaterialInstance GLTFMetallicRoughnessMaterial::createInstance(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator)
-{
-    MaterialInstance matData;
-    matData.materialSet = descriptorAllocator.allocate(device, materialLayout);
-
-    writer.clear();
-    writer.writeBuffer(0, resources.dataBuffer, sizeof(MaterialConstants), resources.dataBufferOffset, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-    writer.writeImage(1, resources.colorImage.imageView, resources.colorSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    writer.writeImage(2, resources.metalRoughnessImage.imageView, resources.metalRoughnessSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    writer.updateSet(device, matData.materialSet);
-
-    return matData;
 }
