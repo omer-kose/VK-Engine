@@ -9,7 +9,7 @@
 - Abstraction for Materials and Passes
 
 ## TODO List
-I develop the engine continuously.
+I develop the engine continuously. (Currently, I am working on my Master's thesis)
 
 - A proper scene structure to store scene related resources such as loaded scenes, meshes, camera, lights and more
 - Even though passes are abstracted out, drawing geometry is still done by calling them in drawGeometry function inside vk_engine. Add an abstraction over VulkanEngine to be able to write samples without touching anything in the engine.
