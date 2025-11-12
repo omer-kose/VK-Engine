@@ -9,11 +9,14 @@
 - Abstraction for Materials and Passes
 
 ## TODO List
-I develop the engine continuously. (Currently, I am working on my Master's thesis)
+I develop the engine continuously.
 
-- With the arrival of Vulkan 1.4, and me exploring more flexible stuff like Push Descriptors, I will refactor the engine. Most probably, I will go for a simpler and more flexible Pass approach by implementing a simple framegraph. While working on my thesis, I realized that working with static passes can be a bit cumbersome. Also, it blocks multi-threaded rendering possibilities. So, I plan a much bigger refactor by analyzing other architectures.
-- A proper scene structure to store scene related resources such as loaded scenes, meshes, camera, lights and more
-- Even though passes are abstracted out, drawing geometry is still done by calling them in drawGeometry function inside vk_engine. Add an abstraction over VulkanEngine to be able to write samples without touching anything in the engine.
+- Compile times are disgustingly long whenever a header file changes. Implement Interface/Implementation split or PIMPL for the Engine class.
+- Setup precompiled headers for the external libraries to boost compilation times again.
+- Realized that static pass idea is simple but too restrictive for multiple reasons. Refactor it into something more dynamic and flexible.
+- Implement Render or Frame Graphs.
+- Introduce scenes, which I have already done in the thesis code.
+- Refactor scene and mesh loading as well as the material system.
 - Add actual PBR shading. Currently, I have a placeholder 
 - Add Deferred Rendering Support (Adding G and Light Passes more accurately)
 - Add OBJ file loading
@@ -26,5 +29,6 @@ Structure Scene (PBR Shading is not yet implemented)
 
 ## References
 Mainly built upon the final version of: https://vkguide.dev/
+
 
 
