@@ -13,7 +13,7 @@ I develop the engine continuously.
 
 - Compile times are disgustingly long whenever a header file is modified. Implement Interface/Implementation split or PIMPL for the Engine class.
 - Setup precompiled headers for the external libraries to boost compilation times again.
-- Realized that static pass idea is simple but too restrictive for multiple reasons. Refactor it into something more dynamic and flexible (most likely into Renderers that makes use of passes).
+- Realized that static pass idea is simple but too restrictive for multiple reasons. Refactor it into something more dynamic and flexible.
 - Implement Render or Frame Graphs.
 - Introduce scenes, which I have already done in the thesis code.
 - Refactor scene and mesh loading as well as the material system.
@@ -29,6 +29,7 @@ Structure Scene (PBR Shading is not yet implemented)
 
 ## References
 Mainly built upon the final version of: https://vkguide.dev/
+
 
 
 
