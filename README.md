@@ -15,7 +15,7 @@ I develop the engine continuously.
 - Setup precompiled headers for the external libraries to boost compilation times again.
 - Realized that static pass class idea is simple but too restrictive for multiple reasons. Refactor it into something more dynamic and flexible.
 - Implement Render or Frame Graphs.
-- Convert the engine into an importable library independent of the application which will use it.
+- Convert the engine into an importable backend library independent of the application which will use it.
 - Move to SLANG from GLSL.
 - Add a proper shader compilation system.
 - Propose a proper material system.
@@ -31,6 +31,7 @@ Structure Scene (PBR Shading is not yet implemented)
 
 ## References
 Mainly built upon the final version of: https://vkguide.dev/
+
 
 
 
