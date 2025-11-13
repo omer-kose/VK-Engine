@@ -14,11 +14,12 @@ I develop the engine continuously.
 - Compile times are disgustingly long whenever a header file is modified. Implement Interface/Implementation split or PIMPL for the Engine class.
 - Setup precompiled headers for the external libraries to boost compilation times again.
 - Realized that static pass class idea is simple but too restrictive for multiple reasons. Refactor it into something more dynamic and flexible.
-- Implement Render or Frame Graphs.
 - Convert the engine into an importable backend library independent of the application which will use it.
+- Design and implement the renderer frontend that will use the backend.
 - Move to SLANG from GLSL.
 - Add a proper shader compilation system.
 - Propose a proper material system.
+- Implement Render or Frame Graphs.
 - Add actual PBR shading. Currently, I have a placeholder.
 - Add Deferred Rendering Support (Adding G and Light Passes more accurately).
 - Add OBJ file loading.
@@ -31,6 +32,7 @@ Structure Scene (PBR Shading is not yet implemented)
 
 ## References
 Mainly built upon the final version of: https://vkguide.dev/
+
 
 
 
