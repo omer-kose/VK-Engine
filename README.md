@@ -15,12 +15,14 @@ I develop the engine continuously.
 - Setup precompiled headers for the external libraries to boost compilation times again.
 - Realized that static pass class idea is simple but too restrictive for multiple reasons. Refactor it into something more dynamic and flexible.
 - Implement Render or Frame Graphs.
-- Introduce scenes, which I have already done in the thesis code.
-- Refactor scene and mesh loading as well as the material system.
-- Add actual PBR shading. Currently, I have a placeholder 
-- Add Deferred Rendering Support (Adding G and Light Passes more accurately)
-- Add OBJ file loading
-- and many more (implementing Graphics techniques inside the engine)
+- Convert the engine into an importable library independent of the application which will use it.
+- Move to SLANG from GLSL.
+- Add a proper shader compilation system.
+- Propose a proper material system.
+- Add actual PBR shading. Currently, I have a placeholder.
+- Add Deferred Rendering Support (Adding G and Light Passes more accurately).
+- Add OBJ file loading.
+- and many more (implementing Graphics techniques using the engine as the framework).
 
 ## Screenshots
 
@@ -29,6 +31,7 @@ Structure Scene (PBR Shading is not yet implemented)
 
 ## References
 Mainly built upon the final version of: https://vkguide.dev/
+
 
 
 
