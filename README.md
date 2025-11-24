@@ -19,10 +19,10 @@ I develop the engine continuously.
 - Move to SLANG from GLSL.
 - Add a proper shader compilation system.
 - Propose a proper material system.
-- Implement Render or Frame Graphs.
 - Add actual PBR shading. Currently, I have a placeholder.
 - Add Deferred Rendering Support (Adding G and Light Passes more accurately).
 - Add OBJ file loading.
+- Implement Render or Frame Graphs.
 - and many more (implementing Graphics techniques using the engine as the framework).
 
 ## Screenshots
@@ -31,7 +31,8 @@ Structure Scene (PBR Shading is not yet implemented)
 ![image](https://github.com/user-attachments/assets/88583114-87c6-4939-9380-0d9246d9ecc8)
 
 ## References
-Mainly built upon the final version of: https://vkguide.dev/
+Built upon the final version of: https://vkguide.dev/
+
 
 
 
