@@ -9,18 +9,19 @@
 - Abstraction for Materials and Passes
 
 ## TODO List
-I develop the engine continuously.
+Besides developing a fully-fledged graphics engine (or framework), I also use this project to improve my large software architecture skills. So, the code is subject to big changes or rewrites. 
 
-- Compile times are disgustingly long whenever a header file is modified. Implement Interface/Implementation split or PIMPL for the Engine class.
-- Setup precompiled headers for the external libraries to boost compilation times again.
+- The engine is not really designed around OOP but I might totally get rid of it as I prefer (and actually learn more about) group based thinking rather than element based thinking.
+- As I have seen in the thesis implementation, compile times tend to get disgustingly long whenever a header file is modified. Fix it.
+- Setup precompiled headers for the external libraries to boost compilation times further.
 - Realized that static pass class idea is simple but too restrictive for multiple reasons. Refactor it into something more dynamic and flexible.
 - Convert the engine into an importable backend library independent of the application which will use it.
 - Design and implement the renderer frontend that will use the backend.
 - Move to SLANG from GLSL.
 - Add a proper shader compilation system.
 - Propose a proper material system.
-- Add actual PBR shading. Currently, I have a placeholder.
 - Add Deferred Rendering Support (Adding G and Light Passes more accurately).
+- Add actual PBR shading. Currently, I have a placeholder.
 - Add OBJ file loading.
 - Implement Render or Frame Graphs.
 - and many more (implementing Graphics techniques using the engine as the framework).
@@ -32,6 +33,7 @@ Structure Scene (PBR Shading is not yet implemented)
 
 ## References
 Built upon the final version of: https://vkguide.dev/
+
 
 
 
