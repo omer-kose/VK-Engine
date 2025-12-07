@@ -11,7 +11,6 @@
 ## TODO List
 Besides developing a fully-fledged graphics engine (or framework), I also use this project to improve my large software architecture skills. So, the code is subject to big changes or rewrites. 
 
-- The engine is not really designed around OOP but I might totally get rid of it as I prefer (and actually learn more about) group based thinking rather than element based thinking.
 - As I have seen in the thesis implementation, compile times tend to get disgustingly long whenever a header file is modified. Fix it.
 - Setup precompiled headers for the external libraries to boost compilation times further.
 - Realized that static pass class idea is simple but too restrictive for multiple reasons. Refactor it into something more dynamic and flexible.
@@ -33,6 +32,7 @@ Structure Scene (PBR Shading is not yet implemented)
 
 ## References
 Built upon the final version of: https://vkguide.dev/
+
 
 
 
