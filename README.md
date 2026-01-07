@@ -16,7 +16,7 @@ Besides developing a fully-fledged graphics engine (or framework), I also use th
 - Realized that static pass class idea is simple but too restrictive for multiple reasons. Refactor it into something more dynamic and flexible.
 - Convert the engine into an importable backend library independent of the application which will use it.
 - Design and implement the renderer frontend that will use the backend.
-- Move to SLANG from GLSL.
+- Add SLANG support.
 - Add a proper shader compilation system.
 - Propose a proper material system.
 - Add Deferred Rendering Support (Adding G and Light Passes more accurately).
@@ -32,6 +32,7 @@ Structure Scene (PBR Shading is not yet implemented)
 
 ## References
 Built upon the final version of: https://vkguide.dev/
+
 
 
 
