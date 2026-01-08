@@ -11,11 +11,9 @@
 ## TODO List
 Besides developing a fully-fledged graphics engine (or framework), I also use this project to improve my large software architecture skills. So, the code is subject to big changes or rewrites. 
 
-- As I have seen in the thesis implementation, compile times tend to get disgustingly long whenever a header file is modified. Fix it.
-- Setup precompiled headers for the external libraries to boost compilation times further.
-- Realized that static pass class idea is simple but too restrictive for multiple reasons. Refactor it into something more dynamic and flexible.
 - Convert the engine into an importable backend library independent of the application which will use it.
-- Design and implement the renderer frontend that will use the backend.
+- Setup precompiled headers for the external libraries to boost compilation times.
+- Realized that static pass class idea is simple but too restrictive for multiple reasons. Refactor it into something more dynamic and flexible.
 - Add SLANG support.
 - Add a proper shader compilation system.
 - Propose a proper material system.
@@ -32,6 +30,7 @@ Structure Scene (PBR Shading is not yet implemented)
 
 ## References
 Built upon the final version of: https://vkguide.dev/
+
 
 
 
