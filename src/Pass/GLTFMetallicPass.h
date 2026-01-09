@@ -1,16 +1,20 @@
 #pragma once
 #include <Core/vk_types.h>
 
-class VulkanEngine;
-struct RenderObject;
+// Forward declare with the namespace
+namespace SK::VkRenderer
+{
+	struct Renderer;
+	struct RenderObject;
+};
 
 class GLTFMetallicPass
 {
 public:
-	static void Init(VulkanEngine* engine);
-	static void Execute(VulkanEngine* engine, VkCommandBuffer& cmd);
+	static void Init(SK::VkRenderer::Renderer* renderer);
+	static void Execute(SK::VkRenderer::Renderer* renderer, VkCommandBuffer& cmd);
 	static void Update();
-	static void ClearResources(VulkanEngine* engine);
+	static void ClearResources(SK::VkRenderer::Renderer* renderer);
 private:
 	static VkPipeline OpaquePipeline;
 	static VkPipeline TransparentPipeline;

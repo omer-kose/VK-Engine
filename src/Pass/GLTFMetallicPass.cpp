@@ -1,6 +1,6 @@
 #include "GLTFMetallicPass.h"
 
-#include <Core/vk_engine.h>
+#include <Core/vk_renderer.h>
 #include <Core/vk_pipelines.h>
 #include <Core/vk_initializers.h>
 
@@ -9,17 +9,17 @@ VkPipeline GLTFMetallicPass::OpaquePipeline = VK_NULL_HANDLE;
 VkPipeline GLTFMetallicPass::TransparentPipeline = VK_NULL_HANDLE;
 VkPipelineLayout GLTFMetallicPass::PipelineLayout = VK_NULL_HANDLE;
 
-void GLTFMetallicPass::Init(VulkanEngine* engine)
+void GLTFMetallicPass::Init(SK::VkRenderer::Renderer* renderer)
 {
     // Load the shaders
     VkShaderModule meshVertexShader;
-    if(!vkutil::loadShaderModule(engine->device, "../../shaders/glsl/gltf_metallic/mesh_vert.spv", &meshVertexShader))
+    if(!vkutil::loadShaderModule(renderer->device, "../../shaders/glsl/gltf_metallic/mesh_vert.spv", &meshVertexShader))
     {
         fmt::println("Error when building the mesh vertex shader");
     }
 
     VkShaderModule meshFragmentShader;
-    if(!vkutil::loadShaderModule(engine->device, "../../shaders/glsl/gltf_metallic/mesh_frag.spv", &meshFragmentShader))
+    if(!vkutil::loadShaderModule(renderer->device, "../../shaders/glsl/gltf_metallic/mesh_frag.spv", &meshFragmentShader))
     {
         fmt::println("Error when building the mesh fragment shader");
     }
@@ -36,10 +36,10 @@ void GLTFMetallicPass::Init(VulkanEngine* engine)
     layoutBuilder.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     layoutBuilder.addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
     layoutBuilder.addBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    VkDescriptorSetLayout materialLayout = layoutBuilder.build(engine->device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkDescriptorSetLayout materialLayout = layoutBuilder.build(renderer->device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // 2 sets: 0 -> Scene Descriptor Set, 1 -> Material Descriptor Set
-    VkDescriptorSetLayout layouts[] = { engine->getSceneDescriptorLayout(), materialLayout};
+    VkDescriptorSetLayout layouts[] = { renderer->sceneDataDescriptorLayout, materialLayout};
 
     // Mesh pipeline layout
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = vkinit::pipeline_layout_create_info();
@@ -48,7 +48,7 @@ void GLTFMetallicPass::Init(VulkanEngine* engine)
     pipelineLayoutInfo.setLayoutCount = 2;
     pipelineLayoutInfo.pSetLayouts = layouts;
 
-    VK_CHECK(vkCreatePipelineLayout(engine->device, &pipelineLayoutInfo, nullptr, &PipelineLayout));
+    VK_CHECK(vkCreatePipelineLayout(renderer->device, &pipelineLayoutInfo, nullptr, &PipelineLayout));
 
     // Build the pipeline
     PipelineBuilder pipelineBuilder;
@@ -61,28 +61,28 @@ void GLTFMetallicPass::Init(VulkanEngine* engine)
     pipelineBuilder.enableDepthTest(true, VK_COMPARE_OP_LESS_OR_EQUAL);
 
     // Render format
-    pipelineBuilder.setColorAttachmentFormat(engine->drawImage.imageFormat);
-    pipelineBuilder.setDepthFormat(engine->depthImage.imageFormat);
+    pipelineBuilder.setColorAttachmentFormat(renderer->drawImage.imageFormat);
+    pipelineBuilder.setDepthFormat(renderer->depthImage.imageFormat);
 
     pipelineBuilder.pipelineLayout = PipelineLayout;
     // Opaque Pipeline
-    OpaquePipeline = pipelineBuilder.buildPipeline(engine->device);
+    OpaquePipeline = pipelineBuilder.buildPipeline(renderer->device);
 
     // Transparent variant
     pipelineBuilder.enableBlendingAdditive();
     pipelineBuilder.enableDepthTest(false, VK_COMPARE_OP_LESS_OR_EQUAL);
-    TransparentPipeline = pipelineBuilder.buildPipeline(engine->device);
+    TransparentPipeline = pipelineBuilder.buildPipeline(renderer->device);
 
     // ShaderModules are not needed anymore
-    vkDestroyShaderModule(engine->device, meshVertexShader, nullptr);
-    vkDestroyShaderModule(engine->device, meshFragmentShader, nullptr);
+    vkDestroyShaderModule(renderer->device, meshVertexShader, nullptr);
+    vkDestroyShaderModule(renderer->device, meshFragmentShader, nullptr);
     // Descriptor Set Layout is not needed as Material descriptors will be created while getting instanced.
-    vkDestroyDescriptorSetLayout(engine->device, materialLayout, nullptr);
+    vkDestroyDescriptorSetLayout(renderer->device, materialLayout, nullptr);
 }
 
-void GLTFMetallicPass::Execute(VulkanEngine* engine, VkCommandBuffer& cmd)
+void GLTFMetallicPass::Execute(SK::VkRenderer::Renderer* renderer, VkCommandBuffer& cmd)
 {
-    const DrawContext* ctx = engine->getDrawContext();
+    const SK::VkRenderer::DrawContext* ctx = &renderer->mainDrawContext;
     std::vector<uint32_t> opaqueDraws;
     opaqueDraws.reserve(ctx->opaqueGLTFSurfaces.size());
 
@@ -93,8 +93,8 @@ void GLTFMetallicPass::Execute(VulkanEngine* engine, VkCommandBuffer& cmd)
 
     // sort the opaque surfaces by material and mesh
     std::sort(opaqueDraws.begin(), opaqueDraws.end(), [&](const auto& iA, const auto& iB) {
-        const RenderObject& A = ctx->opaqueGLTFSurfaces[iA];
-        const RenderObject& B = ctx->opaqueGLTFSurfaces[iB];
+        const SK::VkRenderer::RenderObject& A = ctx->opaqueGLTFSurfaces[iA];
+        const SK::VkRenderer::RenderObject& B = ctx->opaqueGLTFSurfaces[iB];
         if(A.materialInstance == B.materialInstance)
         {
             return A.indexBuffer < B.indexBuffer;
@@ -109,17 +109,17 @@ void GLTFMetallicPass::Execute(VulkanEngine* engine, VkCommandBuffer& cmd)
     MaterialInstance* lastMaterial = nullptr;
     VkBuffer lastIndexBuffer = VK_NULL_HANDLE;
 
-    auto draw = [&](const RenderObject& robj, VkPipeline pipeline) {
+    auto draw = [&](const SK::VkRenderer::RenderObject& robj, VkPipeline pipeline) {
         if(robj.materialInstance != lastMaterial)
         {
             lastMaterial = robj.materialInstance;
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-            VkDescriptorSet sceneDescriptorSet = engine->getSceneBufferDescriptorSet();
+            VkDescriptorSet sceneDescriptorSet = SK::VkRenderer::fetchCurrentSceneBufferDescriptorSet(renderer);;
             vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &sceneDescriptorSet, 0, nullptr);
 
             // Set dynamic viewport and scissor again in case of an override (all of the material pipelines use dynamic states so setting them once after a bind is actually enough)
-            engine->setViewport(cmd);
-            engine->setScissor(cmd);
+            SK::VkRenderer::setViewport(renderer, cmd);
+            SK::VkRenderer::setScissor(renderer, cmd);
 
             vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 1, 1, &robj.materialInstance->materialSet, 0, nullptr);
         }
@@ -143,7 +143,7 @@ void GLTFMetallicPass::Execute(VulkanEngine* engine, VkCommandBuffer& cmd)
         draw(ctx->opaqueGLTFSurfaces[idx], OpaquePipeline);
     }
 
-    for(const RenderObject& robj : ctx->transparentGLTFSurfaces)
+    for(const SK::VkRenderer::RenderObject& robj : ctx->transparentGLTFSurfaces)
     {
         draw(robj, TransparentPipeline);
     }
@@ -153,10 +153,10 @@ void GLTFMetallicPass::Update()
 {
 }
 
-void GLTFMetallicPass::ClearResources(VulkanEngine* engine)
+void GLTFMetallicPass::ClearResources(SK::VkRenderer::Renderer* renderer)
 {
-    vkDestroyPipelineLayout(engine->device, PipelineLayout, nullptr);
+    vkDestroyPipelineLayout(renderer->device, PipelineLayout, nullptr);
 
-    vkDestroyPipeline(engine->device, OpaquePipeline, nullptr);
-    vkDestroyPipeline(engine->device, TransparentPipeline, nullptr);
+    vkDestroyPipeline(renderer->device, OpaquePipeline, nullptr);
+    vkDestroyPipeline(renderer->device, TransparentPipeline, nullptr);
 }

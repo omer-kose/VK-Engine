@@ -3,7 +3,7 @@
 #include "stb_image.h"
 #include <iostream>
 
-#include "vk_engine.h"
+#include "vk_renderer.h"
 #include "vk_initializers.h"
 #include "vk_types.h"
 #include <glm/gtx/quaternion.hpp>
@@ -13,7 +13,7 @@
 #include <fastgltf/tools.hpp>
 
 
-std::optional<AllocatedImage> loadImage(VulkanEngine* engine, fastgltf::Asset& asset, fastgltf::Image& image)
+std::optional<AllocatedImage> loadImage(SK::VkRenderer::Renderer* renderer, fastgltf::Asset& asset, fastgltf::Image& image)
 {
 	AllocatedImage newImage = {};
 
@@ -34,7 +34,7 @@ std::optional<AllocatedImage> loadImage(VulkanEngine* engine, fastgltf::Asset& a
 				imageSize.height = height;
 				imageSize.depth = 1;
 
-				newImage = engine->createImage(data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+				newImage = SK::VkRenderer::createImage(renderer, data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 
 				stbi_image_free(data);
 			}
@@ -48,7 +48,7 @@ std::optional<AllocatedImage> loadImage(VulkanEngine* engine, fastgltf::Asset& a
 				imageSize.height = height;
 				imageSize.depth = 1;
 
-				newImage = engine->createImage(data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+				newImage = SK::VkRenderer::createImage(renderer, data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 
 				stbi_image_free(data);	
 			}
@@ -68,7 +68,7 @@ std::optional<AllocatedImage> loadImage(VulkanEngine* engine, fastgltf::Asset& a
 						imageSize.height = height;
 						imageSize.depth = 1;
 
-						newImage = engine->createImage(data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+						newImage = SK::VkRenderer::createImage(renderer, data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 
 						stbi_image_free(data);
 					}
@@ -123,12 +123,12 @@ VkSamplerMipmapMode extractMipmapMode(fastgltf::Filter filter)
 }
 
 
-std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::string_view filePath)
+std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(SK::VkRenderer::Renderer* renderer, std::string_view filePath)
 {
 	fmt::print("Loading GLTF: {}", filePath);
 
 	std::shared_ptr<LoadedGLTF> scene = std::make_shared<LoadedGLTF>();
-	scene->engine = engine;
+	scene->renderer = renderer;
 
 	fastgltf::Parser parser{};
 
@@ -181,7 +181,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1},
 	};
 
-	scene->descriptorAllocator.init(engine->device, asset.materials.size(), poolSizes);
+	scene->descriptorAllocator.init(renderer->device, asset.materials.size(), poolSizes);
 
 	// Load samplers
 	for(fastgltf::Sampler& sampler : asset.samplers)
@@ -196,7 +196,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 		samplerInfo.mipmapMode = extractMipmapMode(sampler.minFilter.value_or(fastgltf::Filter::Nearest));
 
 		VkSampler newSampler;
-		vkCreateSampler(engine->device, &samplerInfo, nullptr, &newSampler);
+		vkCreateSampler(renderer->device, &samplerInfo, nullptr, &newSampler);
 
 		scene->samplers.push_back(newSampler);
 	}
@@ -210,7 +210,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 	// Load the textures
 	for(fastgltf::Image& image : asset.images)
 	{
-		std::optional<AllocatedImage> img = loadImage(engine, asset, image);
+		std::optional<AllocatedImage> img = loadImage(renderer, asset, image);
 
 		if(img.has_value())
 		{
@@ -220,12 +220,12 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 		else
 		{
 			// failed to load, default to error image but give an error
-			textures.push_back(engine->errorCheckerboardImage);
+			textures.push_back(renderer->errorCheckerboardImage);
 			fmt::print("Failed to load gltf texture: {} \n", image.name);
 		}
 	}
 
-	scene->materialDataBuffer = engine->createBuffer(asset.materials.size() * sizeof(GLTFMetallicRoughnessMaterial::MaterialConstants), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+	scene->materialDataBuffer = SK::VkRenderer::createBuffer(renderer, asset.materials.size() * sizeof(GLTFMetallicRoughnessMaterial::MaterialConstants), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 	int dataIndex = 0;
 	GLTFMetallicRoughnessMaterial::MaterialConstants* pMaterialDataBuffer = (GLTFMetallicRoughnessMaterial::MaterialConstants*)scene->materialDataBuffer.allocInfo.pMappedData;
 
@@ -255,10 +255,10 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 
 		GLTFMetallicRoughnessMaterial::MaterialResources materialResources;
 		// Default the material textures
-		materialResources.colorImage = engine->whiteImage;
-		materialResources.colorSampler = engine->defaultSamplerLinear;
-		materialResources.metalRoughnessImage = engine->whiteImage;
-		materialResources.metalRoughnessSampler = engine->defaultSamplerLinear;
+		materialResources.colorImage = renderer->whiteImage;
+		materialResources.colorSampler = renderer->defaultSamplerLinear;
+		materialResources.metalRoughnessImage = renderer->whiteImage;
+		materialResources.metalRoughnessSampler = renderer->defaultSamplerLinear;
 
 		// Set the uniform buffer for the material data
 		materialResources.dataBuffer = scene->materialDataBuffer.buffer;
@@ -274,7 +274,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 		}
 
 		// create the material instance
-		*newMat = GLTFMetallicRoughnessMaterial::CreateInstance(engine->device, passType, materialResources, scene->descriptorAllocator);
+		*newMat = GLTFMetallicRoughnessMaterial::CreateInstance(renderer->device, passType, materialResources, scene->descriptorAllocator);
 
 		++dataIndex;
 	}
@@ -391,7 +391,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 			newmesh->surfaces.push_back(newSurface);
 		}
 
-		newmesh->meshBuffers = engine->uploadMesh(vertices, indices);
+		newmesh->meshBuffers = SK::VkRenderer::uploadMesh(renderer, vertices, indices);
 	}
 
 	// Load all the nodes
@@ -457,7 +457,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 	return scene;
 }
 
-std::optional<std::vector<std::shared_ptr<GLTFMeshAsset>>> loadGltfMeshes(VulkanEngine* engine, std::filesystem::path filePath)
+std::optional<std::vector<std::shared_ptr<GLTFMeshAsset>>> loadGltfMeshes(SK::VkRenderer::Renderer* renderer, std::filesystem::path filePath)
 {
 	std::cout << "Loading GLTF: " << filePath << std::endl;
 
@@ -574,7 +574,7 @@ std::optional<std::vector<std::shared_ptr<GLTFMeshAsset>>> loadGltfMeshes(Vulkan
 			}
 		}
 
-		newMesh.meshBuffers = engine->uploadMesh(vertices, indices);
+		newMesh.meshBuffers = SK::VkRenderer::uploadMesh(renderer, vertices, indices);
 		
 		meshes.emplace_back(std::make_shared<GLTFMeshAsset>(std::move(newMesh)));
 	}
@@ -582,7 +582,7 @@ std::optional<std::vector<std::shared_ptr<GLTFMeshAsset>>> loadGltfMeshes(Vulkan
 	return meshes;
 }
 
-void LoadedGLTF::registerDraw(const glm::mat4& topMatrix, DrawContext& ctx)
+void LoadedGLTF::registerDraw(const glm::mat4& topMatrix, SK::VkRenderer::DrawContext& ctx)
 {
 	for(auto& n : topNodes)
 	{
@@ -592,27 +592,27 @@ void LoadedGLTF::registerDraw(const glm::mat4& topMatrix, DrawContext& ctx)
 
 void LoadedGLTF::clearAll()
 {
-	VkDevice device = engine->device;
+	VkDevice device = renderer->device;
 
 	descriptorAllocator.destroyPools(device);
 	
-	engine->destroyBuffer(materialDataBuffer);
+	SK::VkRenderer::destroyBuffer(renderer, materialDataBuffer);
 
 	for(auto& [k, v] : meshes)
 	{
-		engine->destroyBuffer(v->meshBuffers.vertexBuffer);
-		engine->destroyBuffer(v->meshBuffers.indexBuffer);
+		SK::VkRenderer::destroyBuffer(renderer, v->meshBuffers.vertexBuffer);
+		SK::VkRenderer::destroyBuffer(renderer, v->meshBuffers.indexBuffer);
 	}
 
 	for(auto& [k, v] : textures)
 	{
-		if(v.image == engine->errorCheckerboardImage.image)
+		if(v.image == renderer->errorCheckerboardImage.image)
 		{
 			// Don't destroy the default images of the engine
 			continue;
 		}
 
-		engine->destroyImage(v);
+		SK::VkRenderer::destroyImage(renderer, v);
 	}
 
 	for(auto& sampler : samplers)
@@ -621,7 +621,7 @@ void LoadedGLTF::clearAll()
 	}
 }
 
-void GLTFMeshNode::registerDraw(const glm::mat4& topMatrix, DrawContext& ctx)
+void GLTFMeshNode::registerDraw(const glm::mat4& topMatrix, SK::VkRenderer::DrawContext& ctx)
 {
 	// Instead of directly using the worldTransform of the Mesh, it is multiplied with the topMatrix given. This allows drawing the same mesh multiple times with a different transform
 	// without altering its worldTransform field.
@@ -629,7 +629,7 @@ void GLTFMeshNode::registerDraw(const glm::mat4& topMatrix, DrawContext& ctx)
 
 	for(auto& s : mesh->surfaces)
 	{
-		RenderObject robj;
+		SK::VkRenderer::RenderObject robj;
 		robj.indexCount = s.count;
 		robj.firstIndex = s.startIndex;
 		robj.indexBuffer = mesh->meshBuffers.indexBuffer.buffer;
