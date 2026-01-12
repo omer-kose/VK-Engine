@@ -3,7 +3,6 @@
 #include <chrono>
 #include <thread>
 
-#include <SDL.h>
 #include <SDL_vulkan.h>
 
 #include <Core/vk_initializers.h>
@@ -21,27 +20,16 @@
 
 #include <glm/gtx/transform.hpp>
 
+constexpr bool useValidationLayers = true;
 
-constexpr bool bUseValidationLayers = true;
-
-void SK::VkRenderer::init(Renderer* renderer)
+void SK::VkRenderer::init(Renderer* renderer, struct SDL_Window* window, uint32_t windowWidth, uint32_t windowHeight)
 {
-    // only one engine initialization is allowed with the application.
-    assert(loadedEngine == nullptr);
+    // only one renderer initialization is allowed with the application.
+    assert(renderer->isInitialized == false);
 
-    // We initialize SDL and create a window with it.
-    SDL_Init(SDL_INIT_VIDEO);
-
-    SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
-
-    renderer->window = SDL_CreateWindow(
-        "Vulkan Engine",
-        SDL_WINDOWPOS_UNDEFINED,
-        SDL_WINDOWPOS_UNDEFINED,
-        renderer->windowExtent.width,
-        renderer->windowExtent.height,
-        window_flags
-    );
+    // Store window data coming from the App for later use
+    renderer->window = window;
+    renderer->windowExtent = VkExtent2D{ windowWidth, windowHeight };
 
     // Vulkan Bootstrapping
     m_initVulkan(renderer);
@@ -576,7 +564,7 @@ void SK::VkRenderer::m_initVulkan(Renderer* renderer)
 
     // Create the Vulkan instance with basic debug features.
     auto instRet = builder.set_app_name("Vulkan Engine")
-        .request_validation_layers(bUseValidationLayers)
+        .request_validation_layers(useValidationLayers)
         .use_default_debug_messenger()
         .require_api_version(1, 3, 0)
         .build();

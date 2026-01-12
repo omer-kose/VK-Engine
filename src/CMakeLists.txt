@@ -5,6 +5,12 @@ file(GLOB_RECURSE SRC_CORE
 	"Core/*.cpp"
 )
 
+file(GLOB_RECURSE SRC_APP
+	"Application/*.h"
+	"Application/*.hpp"
+	"Application/*.cpp"
+)
+
 file(GLOB_RECURSE SRC_PASS
 	"Pass/*.h"
 	"Pass/*.hpp"
@@ -25,10 +31,10 @@ file(GLOB SRC
 )
 
 # Create executable with all found sources
-add_executable(engine ${SRC} ${SRC_CORE} ${SRC_PASS} ${SRC_MATERIALS})
+add_executable(engine ${SRC} ${SRC_CORE} ${SRC_PASS} ${SRC_MATERIALS} ${SRC_APP})
 
 # Add filters for the solution
-source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SRC_CORE} ${SRC_PASS} ${SRC_MATERIALS}) 
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SRC_CORE} ${SRC_PASS} ${SRC_MATERIALS} ${SRC_APP})
 
 set_property(TARGET engine PROPERTY CXX_STANDARD 20)
 target_compile_definitions(engine PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)

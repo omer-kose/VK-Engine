@@ -89,14 +89,15 @@ namespace SK::VkRenderer
 
 	struct Renderer
 	{
-		struct SDL_Window* window{ nullptr };
+		// Window related data stored (Window and other related params are owned by the App)
+		struct SDL_Window* window{ nullptr }; // A non-owning ptr pointing to the window created by the App.
+		VkExtent2D windowExtent{ }; // windowExtent is the window size determined by the application.
 
 		bool isInitialized{ false };
 		uint32_t frameNumber{ 0 };
 		bool freezeRendering{ false };
 		bool resizeRequested{ false };
 		float renderScale{ 1.0f };
-		VkExtent2D windowExtent{ 1920 , 1080 };
 		// Vulkan Context
 		VkInstance instance; // Vulkan library handle
 		VkDebugUtilsMessengerEXT debugMessenger; // Vulkan debug output handle
@@ -182,7 +183,7 @@ namespace SK::VkRenderer
 
 
 	// initializes everything in the engine
-	void init(Renderer* renderer);
+	void init(Renderer* renderer, struct SDL_Window* window, uint32_t windowWidth, uint32_t windowHeight);
 
 	// shuts down the engine
 	void cleanup(Renderer* renderer);
