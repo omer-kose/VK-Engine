@@ -14,11 +14,14 @@
 #define VMA_IMPLEMENTATION
 #include "vk_mem_alloc.h"
 
+#include "camera.h"
+
+#include <glm/gtx/transform.hpp>
+
+// TODO: To be moved out 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_vulkan.h"
-
-#include <glm/gtx/transform.hpp>
 
 constexpr bool useValidationLayers = true;
 
@@ -52,12 +55,10 @@ void SK::VkRenderer::init(Renderer* renderer, struct SDL_Window* window, uint32_
     // everything went fine
     renderer->isInitialized = true;
 
-    m_initCamera(renderer, glm::vec3(30.f, -0.0f, -85.0f), 0.0f, 0.0f);
-    
     m_loadSceneData(renderer);
 }
 
-void SK::VkRenderer::cleanup(Renderer* renderer)
+void SK::VkRenderer::shutdown(Renderer* renderer)
 {
     if(renderer->isInitialized) 
     {
@@ -92,7 +93,11 @@ void SK::VkRenderer::cleanup(Renderer* renderer)
 
         vkb::destroy_debug_utils_messenger(renderer->instance, renderer->debugMessenger);
         vkDestroyInstance(renderer->instance, nullptr);
-        SDL_DestroyWindow(renderer->window);
+
+        // Nullify non-owning pointers
+        renderer->window = nullptr;
+        
+        renderer->isInitialized = false;
     }
 }
 
@@ -235,15 +240,15 @@ void SK::VkRenderer::drawImgui(Renderer* renderer, VkCommandBuffer cmd, VkImageV
     vkCmdEndRendering(cmd);
 }
 
-void SK::VkRenderer::updateScene(Renderer* renderer)
+void SK::VkRenderer::updateScene(Renderer* renderer, Camera* camera)
 {
     auto start = std::chrono::system_clock::now();
 
-    renderer->mainCamera.update();
+    camera->update();
 
     renderer->loadedScenes["structure"]->registerDraw(glm::mat4(1.0f), renderer->mainDrawContext);
 
-    renderer->sceneData.view = renderer->mainCamera.getViewMatrix();
+    renderer->sceneData.view = camera->getViewMatrix();
     // camera projection
     renderer->sceneData.proj = glm::perspectiveRH_ZO(glm::radians(70.f), (float)renderer->windowExtent.width / (float)renderer->windowExtent.height, 0.1f, 10000.f);
 
@@ -262,83 +267,6 @@ void SK::VkRenderer::updateScene(Renderer* renderer)
     auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
     renderer->stats.sceneUpdateTime = elapsed.count() / 1000.0f;
-}
-
-void SK::VkRenderer::run(Renderer* renderer)
-{
-    SDL_Event e;
-    bool bQuit = false;
-
-    // main loop
-    while(!bQuit) 
-    {
-        // Begin frame time clock
-        auto start = std::chrono::system_clock::now();
-
-        // Handle events on queue
-        while(SDL_PollEvent(&e) != 0) 
-        {
-            // close the window when user alt-f4s or clicks the X button
-            if(e.type == SDL_QUIT)
-                bQuit = true;
-
-            if(e.type == SDL_WINDOWEVENT) 
-            {
-                if(e.window.event == SDL_WINDOWEVENT_MINIMIZED) 
-                {
-                    renderer->freezeRendering = true;
-                }
-                if(e.window.event == SDL_WINDOWEVENT_RESTORED) 
-                {
-                    renderer->freezeRendering = false;
-                }
-            }
-
-            renderer->mainCamera.processSDLEvent(e);
-            // send SDL event to ImGui for processing
-            ImGui_ImplSDL2_ProcessEvent(&e);
-        }
-
-        // do not draw if we are minimized
-        if(renderer->freezeRendering)
-        {
-            // throttle the speed to avoid the endless spinning
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            continue;
-        }
-
-        if(renderer->resizeRequested)
-        {
-            m_resizeSwapchain(renderer);
-        }
-
-        // ImGui new frame
-        ImGui_ImplVulkan_NewFrame();
-        ImGui_ImplSDL2_NewFrame();
-        ImGui::NewFrame();
-
-        ImGui::Begin("Stats");
-
-        ImGui::Text("frametime %f ms", renderer->stats.frameTime);
-        ImGui::Text("geometry draw recording time %f ms", renderer->stats.geometryDrawRecordTime);
-        ImGui::Text("update time %f ms", renderer->stats.sceneUpdateTime);
-        ImGui::Text("triangles %i", renderer->stats.triangleCount);
-        ImGui::Text("draws %i", renderer->stats.drawCallCount);
-        ImGui::End();
-
-        // Make ImGui calculate internal draw structures
-        ImGui::Render();
-
-        updateScene(renderer);
-
-        draw(renderer);
-
-        auto end = std::chrono::system_clock::now();
-        // Convert to microseconds (integer), then come back to miliseconds
-        auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-
-        renderer->stats.frameTime = elapsed.count() / 1000.0f;
-    }
 }
 
 void SK::VkRenderer::immediateSubmit(Renderer* renderer, std::function<void(VkCommandBuffer cmd)>&& function)
@@ -845,7 +773,7 @@ void SK::VkRenderer::m_initDescriptors(Renderer* renderer)
         renderer->frames[i].frameDescriptorAllocator = DescriptorAllocatorGrowable{};
         renderer->frames[i].frameDescriptorAllocator.init(renderer->device, 1000, framePoolSizes);
 
-        // Pools in the frame descriptor allocators must be destroyed with the engine cleanup (not with frame cleanup)
+        // Pools in the frame descriptor allocators must be destroyed with the renderer shutdown (not with frame shutdown)
         renderer->mainDeletionQueue.pushFunction([=]() {
             renderer->frames[i].frameDescriptorAllocator.destroyPools(renderer->device);
         });
@@ -1019,14 +947,6 @@ void SK::VkRenderer::m_initGlobalSceneBuffer(Renderer* renderer)
         writer.writeBuffer(0, renderer->gpuSceneDataBuffer[i].buffer, sizeof(GPUSceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
         writer.updateSet(renderer->device, renderer->sceneDescriptorSet[i]);
     }
-}
-
-void SK::VkRenderer::m_initCamera(Renderer* renderer, glm::vec3 position, float pitch, float yaw)
-{
-    renderer->mainCamera.velocity = glm::vec3(0.0f);
-    renderer->mainCamera.position = position;
-    renderer->mainCamera.pitch = pitch;
-    renderer->mainCamera.yaw = yaw;
 }
 
 void SK::VkRenderer::m_loadSceneData(Renderer* renderer)

@@ -4,9 +4,11 @@
 #include <Core/vk_descriptors.h>
 #include <Core/vk_loader.h>
 
-#include <camera.h>
-
 #include <Pass/GLTFMetallicPass.h>
+
+// Forward declarations
+struct SDL_Window;
+class Camera;
 
 namespace SK::VkRenderer
 {
@@ -90,7 +92,7 @@ namespace SK::VkRenderer
 	struct Renderer
 	{
 		// Window related data stored (Window and other related params are owned by the App)
-		struct SDL_Window* window{ nullptr }; // A non-owning ptr pointing to the window created by the App.
+		SDL_Window* window{ nullptr }; // A non-owning ptr pointing to the window created by the App.
 		VkExtent2D windowExtent{ }; // windowExtent is the window size determined by the application.
 
 		bool isInitialized{ false };
@@ -135,9 +137,6 @@ namespace SK::VkRenderer
 
 		// Main color attachment clear value 
 		VkClearValue colorAttachmentClearValue = { 0.0f, 0.0f, 0.0f, 1.0f };
-
-		// Camera
-		Camera mainCamera;
 
 		// Draw Image
 		AllocatedImage drawImage;
@@ -185,8 +184,8 @@ namespace SK::VkRenderer
 	// initializes everything in the engine
 	void init(Renderer* renderer, struct SDL_Window* window, uint32_t windowWidth, uint32_t windowHeight);
 
-	// shuts down the engine
-	void cleanup(Renderer* renderer);
+	// shuts down the renderer
+	void shutdown(Renderer* renderer);
 
 	// draw functionality
 	void draw(Renderer* renderer); // core draw loop
@@ -195,10 +194,7 @@ namespace SK::VkRenderer
 	void drawImgui(Renderer* renderer, VkCommandBuffer cmd, VkImageView targetImageView);
 
 	// Updates TODO: To be taken out of here
-	void updateScene(Renderer* renderer);
-
-	//run main loop TODO: To be taken out of here
-	void run(Renderer* renderer);
+	void updateScene(Renderer* renderer, Camera* camera);
 
 	void immediateSubmit(Renderer* renderer, std::function<void(VkCommandBuffer cmd)>&& function);
 
@@ -251,9 +247,6 @@ namespace SK::VkRenderer
 
 	// Init Scene Buffer
 	void m_initGlobalSceneBuffer(Renderer* renderer);
-
-	// Camera
-	void m_initCamera(Renderer* renderer, glm::vec3 position, float pitch, float yaw);
 
 	// Loading Scene Data
 	void m_loadSceneData(Renderer* renderer);

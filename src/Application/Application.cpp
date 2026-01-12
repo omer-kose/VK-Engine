@@ -2,6 +2,10 @@
 
 #include <SDL.h>
 
+// TODO: ImGui specific code will be moved to a UI layer
+#include "imgui_impl_sdl2.h"
+
+
 void SK::Application::init(Application* application, uint32_t windowWidth, uint32_t windowHeight)
 {
     assert(application->isInitialized == false);
@@ -23,5 +27,55 @@ void SK::Application::init(Application* application, uint32_t windowWidth, uint3
         window_flags
     );
 
+    initCamera(application, glm::vec3(30.f, -0.0f, -85.0f), 0.0f, 0.0f);
+
     application->isInitialized = true;
+}
+
+void SK::Application::handleSDLEvents(Application* application)
+{
+    SDL_Event e;
+
+    // Handle events on queue
+    while(SDL_PollEvent(&e) != 0)
+    {
+        // close the window when user alt-f4s or clicks the X button
+        if(e.type == SDL_QUIT)
+        {
+            application->shouldQuit = true;
+        }
+
+        if(e.type == SDL_WINDOWEVENT)
+        {
+            if(e.window.event == SDL_WINDOWEVENT_MINIMIZED)
+            {
+                application->isMinimized = true;
+            }
+            if(e.window.event == SDL_WINDOWEVENT_RESTORED)
+            {
+                application->isMinimized = false;
+            }
+        }
+
+        application->mainCamera.processSDLEvent(e);
+        
+        // TODO: To be moved to UI Layer
+        // send SDL event to ImGui for processing
+        ImGui_ImplSDL2_ProcessEvent(&e);
+    }
+}
+
+void SK::Application::initCamera(Application* application, glm::vec3 position, float pitch, float yaw)
+{
+    application->mainCamera.velocity = glm::vec3(0.0f);
+    application->mainCamera.position = position;
+    application->mainCamera.pitch = pitch;
+    application->mainCamera.yaw = yaw;
+}
+
+void SK::Application::shutdown(Application* application)
+{
+    SDL_DestroyWindow(application->window);
+    application->window = nullptr;
+    application->isInitialized = false;
 }
