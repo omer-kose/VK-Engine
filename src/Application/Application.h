@@ -2,7 +2,6 @@
 
 #include <stdint.h>
 
-// Forward declare in the global scope to make SDL_Window namespace independent. 
 struct SDL_Window;
 
 namespace SK::Application
