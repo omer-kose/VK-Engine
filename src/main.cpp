@@ -8,6 +8,53 @@
 
 #include <thread>
 
+// TODO: For now, scene loading and building the draw context is in the main function. They will be moved out
+#include <Core/vk_loader.h>
+#include <glm/gtx/transform.hpp>
+// Loaded scenes
+std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loadedScenes;
+// Draw Context
+SK::VkRenderer::DrawContext drawContext;
+// GPU Scene Data
+GPUSceneData gpuSceneData;
+
+void loadSceneData(SK::VkRenderer::Renderer* renderer)
+{
+    std::string structurePath = "../../assets/structure.glb";
+    auto loadedStructureScene = loadGltf(renderer, structurePath);
+    assert(loadedStructureScene.has_value());
+    loadedScenes["structure"] = loadedStructureScene.value();
+}
+
+void loadScene(SK::VkRenderer::Renderer* renderer)
+{
+    loadSceneData(renderer);
+}
+
+void updateSceneTemp(SK::VkRenderer::Renderer* renderer, Camera& camera)
+{
+    // TODO: Update timings are missing here but Engine Stats should be reconsidered too. Not sure if they should be in renderer.
+
+    camera.update();
+
+    loadedScenes["structure"]->registerDraw(glm::mat4(1.0f), drawContext);
+
+    // TODO: Scene Data is directly set here. Not good!
+    gpuSceneData.view = camera.getViewMatrix();
+    // camera projection
+    gpuSceneData.proj = glm::perspectiveRH_ZO(glm::radians(70.f), (float)renderer->windowExtent.width / (float)renderer->windowExtent.height, 0.1f, 10000.f);
+
+    // invert the Y direction on projection matrix so that we are more similar
+    // to opengl and gltf axis
+    gpuSceneData.proj[1][1] *= -1;
+    gpuSceneData.viewproj = gpuSceneData.proj * gpuSceneData.view;
+
+    //some default lighting parameters
+    gpuSceneData.ambientColor = glm::vec4(0.1f);
+    gpuSceneData.sunlightColor = glm::vec4(1.0f);
+    gpuSceneData.sunlightDirection = glm::vec4(0.0f, 1.0f, 0.5f, 1.0f);
+}
+
 int main(int argc, char* argv[])
 {
 	SK::Application::Application application;
@@ -18,6 +65,8 @@ int main(int argc, char* argv[])
 
     SK::UI::UI ui;
     SK::UI::init(&ui, &vkRenderer);
+
+    loadScene(&vkRenderer);
 
     // main loop
     while(!application.shouldQuit)
@@ -56,9 +105,14 @@ int main(int argc, char* argv[])
         // --- UI FRAME END ---
         SK::UI::endFrame();
 
-        SK::VkRenderer::updateScene(&vkRenderer, &application.mainCamera);
+        updateSceneTemp(&vkRenderer, application.mainCamera);
 
-        SK::VkRenderer::draw(&vkRenderer);
+        SK::VkRenderer::draw(&vkRenderer, drawContext, gpuSceneData);
+        
+        // TODO: To be moved out to a proper place
+        // After drawing clear out the DrawContext
+        drawContext.opaqueGLTFSurfaces.clear();
+        drawContext.transparentGLTFSurfaces.clear();
 
         auto end = std::chrono::system_clock::now();
         // Convert to microseconds (integer), then come back to miliseconds
@@ -69,6 +123,9 @@ int main(int argc, char* argv[])
 
     // Make sure that GPU finished executing every command before shutting down the systems.
     vkDeviceWaitIdle(vkRenderer.device);
+
+    // TODO: To be moved out to a proper place
+    loadedScenes.clear();
 
     // Once everything is safe to delete shut the systems down.
     SK::UI::shutdown(&ui);

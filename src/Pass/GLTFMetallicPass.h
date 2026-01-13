@@ -6,13 +6,14 @@ namespace SK::VkRenderer
 {
 	struct Renderer;
 	struct RenderObject;
+	struct DrawContext;
 };
 
 class GLTFMetallicPass
 {
 public:
 	static void Init(SK::VkRenderer::Renderer* renderer);
-	static void Execute(SK::VkRenderer::Renderer* renderer, VkCommandBuffer& cmd);
+	static void Execute(SK::VkRenderer::Renderer* renderer, VkCommandBuffer& cmd, const SK::VkRenderer::DrawContext& ctx);
 	static void Update();
 	static void ClearResources(SK::VkRenderer::Renderer* renderer);
 private:

@@ -72,6 +72,7 @@ struct GPUDrawPushConstants
     VkDeviceAddress vertexBufferAddress;
 };
 
+// CPU side reflection of the global scene uniform buffer used by shaders.
 struct GPUSceneData
 {
     glm::mat4 view;

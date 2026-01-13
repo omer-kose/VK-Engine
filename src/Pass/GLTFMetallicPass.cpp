@@ -39,7 +39,7 @@ void GLTFMetallicPass::Init(SK::VkRenderer::Renderer* renderer)
     VkDescriptorSetLayout materialLayout = layoutBuilder.build(renderer->device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // 2 sets: 0 -> Scene Descriptor Set, 1 -> Material Descriptor Set
-    VkDescriptorSetLayout layouts[] = { renderer->sceneDataDescriptorLayout, materialLayout};
+    VkDescriptorSetLayout layouts[] = { renderer->gpuSceneDataDescriptorLayout, materialLayout};
 
     // Mesh pipeline layout
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = vkinit::pipeline_layout_create_info();
@@ -80,21 +80,20 @@ void GLTFMetallicPass::Init(SK::VkRenderer::Renderer* renderer)
     vkDestroyDescriptorSetLayout(renderer->device, materialLayout, nullptr);
 }
 
-void GLTFMetallicPass::Execute(SK::VkRenderer::Renderer* renderer, VkCommandBuffer& cmd)
+void GLTFMetallicPass::Execute(SK::VkRenderer::Renderer* renderer, VkCommandBuffer& cmd, const SK::VkRenderer::DrawContext& ctx)
 {
-    const SK::VkRenderer::DrawContext* ctx = &renderer->mainDrawContext;
     std::vector<uint32_t> opaqueDraws;
-    opaqueDraws.reserve(ctx->opaqueGLTFSurfaces.size());
+    opaqueDraws.reserve(ctx.opaqueGLTFSurfaces.size());
 
-    for(uint32_t i = 0; i < ctx->opaqueGLTFSurfaces.size(); ++i)
+    for(uint32_t i = 0; i < ctx.opaqueGLTFSurfaces.size(); ++i)
     {
         opaqueDraws.push_back(i);
     }
 
     // sort the opaque surfaces by material and mesh
     std::sort(opaqueDraws.begin(), opaqueDraws.end(), [&](const auto& iA, const auto& iB) {
-        const SK::VkRenderer::RenderObject& A = ctx->opaqueGLTFSurfaces[iA];
-        const SK::VkRenderer::RenderObject& B = ctx->opaqueGLTFSurfaces[iB];
+        const SK::VkRenderer::RenderObject& A = ctx.opaqueGLTFSurfaces[iA];
+        const SK::VkRenderer::RenderObject& B = ctx.opaqueGLTFSurfaces[iB];
         if(A.materialInstance == B.materialInstance)
         {
             return A.indexBuffer < B.indexBuffer;
@@ -114,8 +113,8 @@ void GLTFMetallicPass::Execute(SK::VkRenderer::Renderer* renderer, VkCommandBuff
         {
             lastMaterial = robj.materialInstance;
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-            VkDescriptorSet sceneDescriptorSet = SK::VkRenderer::fetchCurrentSceneBufferDescriptorSet(renderer);;
-            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &sceneDescriptorSet, 0, nullptr);
+            VkDescriptorSet gpuSceneDescriptorSet = SK::VkRenderer::fetchCurrentSceneBufferDescriptorSet(renderer);;
+            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &gpuSceneDescriptorSet, 0, nullptr);
 
             // Set dynamic viewport and scissor again in case of an override (all of the material pipelines use dynamic states so setting them once after a bind is actually enough)
             SK::VkRenderer::setViewport(renderer, cmd);
@@ -140,10 +139,10 @@ void GLTFMetallicPass::Execute(SK::VkRenderer::Renderer* renderer, VkCommandBuff
 
     for(uint32_t idx : opaqueDraws)
     {
-        draw(ctx->opaqueGLTFSurfaces[idx], OpaquePipeline);
+        draw(ctx.opaqueGLTFSurfaces[idx], OpaquePipeline);
     }
 
-    for(const SK::VkRenderer::RenderObject& robj : ctx->transparentGLTFSurfaces)
+    for(const SK::VkRenderer::RenderObject& robj : ctx.transparentGLTFSurfaces)
     {
         draw(robj, TransparentPipeline);
     }

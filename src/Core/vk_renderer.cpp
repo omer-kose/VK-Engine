@@ -47,8 +47,6 @@ void SK::VkRenderer::init(Renderer* renderer, struct SDL_Window* window, uint32_
 
     // everything went fine
     renderer->isInitialized = true;
-
-    m_loadSceneData(renderer);
 }
 
 void SK::VkRenderer::shutdown(Renderer* renderer)
@@ -67,8 +65,6 @@ void SK::VkRenderer::shutdown(Renderer* renderer)
 
             renderer->frames[i].deletionQueue.flush();
         }
-
-        renderer->loadedScenes.clear();
 
         m_clearMaterialLayouts(renderer);
 
@@ -91,7 +87,7 @@ void SK::VkRenderer::shutdown(Renderer* renderer)
     }
 }
 
-void SK::VkRenderer::draw(Renderer* renderer)
+void SK::VkRenderer::draw(Renderer* renderer, const DrawContext& ctx, const GPUSceneData& sceneData)
 {
     FrameData& currentFrame = fetchCurrentFrameData(renderer);
     // Wait until the GPU has finished rendering the last frame of the same modularity (0->1->2->3  wait on 2 for 0 and wait on 3 for 1 and so on)
@@ -133,7 +129,7 @@ void SK::VkRenderer::draw(Renderer* renderer)
     vkutil::transitionImage(cmd, renderer->depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
     
     // encode main drawing commands 
-    drawMain(renderer, cmd);
+    drawMain(renderer, cmd, ctx, sceneData);
 
     // Transition the draw image and the swapchain image into their correct layouts
     vkutil::transitionImage(cmd, renderer->drawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
@@ -189,9 +185,9 @@ void SK::VkRenderer::draw(Renderer* renderer)
     ++renderer->frameNumber;
 }
 
-void SK::VkRenderer::drawMain(Renderer* renderer, VkCommandBuffer cmd)
+void SK::VkRenderer::drawMain(Renderer* renderer, VkCommandBuffer cmd, const DrawContext& ctx, const GPUSceneData& sceneData)
 {
-    updateSceneBuffer(renderer);
+    updateSceneBuffer(renderer, sceneData);
 
     // When rendering geometry we need to use COLOR_ATTACHMENT_OPTIMAL as it is the most optimal layout for rendering with graphics pipeline
     vkutil::transitionImage(cmd, renderer->drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
@@ -205,7 +201,7 @@ void SK::VkRenderer::drawMain(Renderer* renderer, VkCommandBuffer cmd)
 
     auto start = std::chrono::system_clock::now();
 
-    drawGeometry(renderer, cmd);
+    drawGeometry(renderer, cmd, ctx);
 
     auto end = std::chrono::system_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
@@ -215,43 +211,15 @@ void SK::VkRenderer::drawMain(Renderer* renderer, VkCommandBuffer cmd)
     vkCmdEndRendering(cmd);
 }
 
-void SK::VkRenderer::drawGeometry(Renderer* renderer, VkCommandBuffer cmd)
+void SK::VkRenderer::drawGeometry(Renderer* renderer, VkCommandBuffer cmd, const DrawContext& ctx)
 {
     // Go through all the graphics passes and execute them
-    GLTFMetallicPass::Execute(renderer, cmd);
+    GLTFMetallicPass::Execute(renderer, cmd, ctx);
 
+    // TODO: Move these out from here. Builder of the DrawContext should clean them
     // Drawing is done context can be cleared
-    renderer->mainDrawContext.opaqueGLTFSurfaces.clear();
-    renderer->mainDrawContext.transparentGLTFSurfaces.clear();
-}
-
-void SK::VkRenderer::updateScene(Renderer* renderer, Camera* camera)
-{
-    auto start = std::chrono::system_clock::now();
-
-    camera->update();
-
-    renderer->loadedScenes["structure"]->registerDraw(glm::mat4(1.0f), renderer->mainDrawContext);
-
-    renderer->sceneData.view = camera->getViewMatrix();
-    // camera projection
-    renderer->sceneData.proj = glm::perspectiveRH_ZO(glm::radians(70.f), (float)renderer->windowExtent.width / (float)renderer->windowExtent.height, 0.1f, 10000.f);
-
-    // invert the Y direction on projection matrix so that we are more similar
-    // to opengl and gltf axis
-    renderer->sceneData.proj[1][1] *= -1;
-    renderer->sceneData.viewproj = renderer->sceneData.proj * renderer->sceneData.view;
-
-    //some default lighting parameters
-    renderer->sceneData.ambientColor = glm::vec4(0.1f);
-    renderer->sceneData.sunlightColor = glm::vec4(1.0f);
-    renderer->sceneData.sunlightDirection = glm::vec4(0.0f, 1.0f, 0.5f, 1.0f);
-
-    auto end = std::chrono::system_clock::now();
-    // Convert to microseconds (integer), then come back to miliseconds
-    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-
-    renderer->stats.sceneUpdateTime = elapsed.count() / 1000.0f;
+    //renderer->mainDrawContext.opaqueGLTFSurfaces.clear();
+    //renderer->mainDrawContext.transparentGLTFSurfaces.clear();
 }
 
 void SK::VkRenderer::immediateSubmit(Renderer* renderer, std::function<void(VkCommandBuffer cmd)>&& function)
@@ -432,16 +400,16 @@ GPUMeshBuffers SK::VkRenderer::uploadMesh(Renderer* renderer, std::span<Vertex> 
     Both update and bind scene buffer functions must be called after the frame fence waits as it will be guaranteed that the frame is done being used by GPU. Otherwise, the data can be corrupted. 
     (calling in drawMain() will suffice)
 */
-void SK::VkRenderer::updateSceneBuffer(Renderer* renderer)
+void SK::VkRenderer::updateSceneBuffer(Renderer* renderer, const GPUSceneData& sceneData)
 {
     // Update the scene buffer
     GPUSceneData* pGpuSceneDataBuffer = (GPUSceneData*)renderer->gpuSceneDataBuffer[renderer->frameNumber % FRAME_OVERLAP].allocation->GetMappedData();
-    *pGpuSceneDataBuffer = renderer->sceneData;
+    *pGpuSceneDataBuffer = sceneData;
 }
 
 VkDescriptorSet SK::VkRenderer::fetchCurrentSceneBufferDescriptorSet(Renderer* renderer)
 {
-    return renderer->sceneDescriptorSet[renderer->frameNumber % FRAME_OVERLAP];
+    return renderer->gpuSceneDescriptorSet[renderer->frameNumber % FRAME_OVERLAP];
 }
 
 void SK::VkRenderer::setViewport(Renderer* renderer, VkCommandBuffer cmd)
@@ -729,7 +697,7 @@ void SK::VkRenderer::m_initDescriptors(Renderer* renderer)
     {
         DescriptorLayoutBuilder builder;
         builder.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-        renderer->sceneDataDescriptorLayout = builder.build(renderer->device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+        renderer->gpuSceneDataDescriptorLayout = builder.build(renderer->device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
     }
 
     // Allocate a descriptor set for the draw image
@@ -747,7 +715,7 @@ void SK::VkRenderer::m_initDescriptors(Renderer* renderer)
 
         vkDestroyDescriptorSetLayout(renderer->device, renderer->drawImageDescriptorSetLayout, nullptr);
         vkDestroyDescriptorSetLayout(renderer->device, renderer->displayTextureDescriptorSetLayout, nullptr);
-        vkDestroyDescriptorSetLayout(renderer->device, renderer->sceneDataDescriptorLayout, nullptr);
+        vkDestroyDescriptorSetLayout(renderer->device, renderer->gpuSceneDataDescriptorLayout, nullptr);
     });
 
     // Init the per-frame descriptor allocators
@@ -871,17 +839,9 @@ void SK::VkRenderer::m_initGlobalSceneBuffer(Renderer* renderer)
         });
 
         // Create a descriptor set for the uniform data
-        renderer->sceneDescriptorSet[i] = renderer->globalDescriptorAllocator.allocate(renderer->device, renderer->sceneDataDescriptorLayout);
+        renderer->gpuSceneDescriptorSet[i] = renderer->globalDescriptorAllocator.allocate(renderer->device, renderer->gpuSceneDataDescriptorLayout);
         DescriptorWriter writer;
         writer.writeBuffer(0, renderer->gpuSceneDataBuffer[i].buffer, sizeof(GPUSceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-        writer.updateSet(renderer->device, renderer->sceneDescriptorSet[i]);
+        writer.updateSet(renderer->device, renderer->gpuSceneDescriptorSet[i]);
     }
-}
-
-void SK::VkRenderer::m_loadSceneData(Renderer* renderer)
-{
-    std::string structurePath = "../../assets/structure.glb";
-    auto loadedStructureScene = loadGltf(renderer, structurePath);
-    assert(loadedStructureScene.has_value());
-    renderer->loadedScenes["structure"] = loadedStructureScene.value();
 }

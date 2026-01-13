@@ -156,10 +156,12 @@ namespace SK::VkRenderer
 		VkDescriptorSet drawImageDescriptorSet;
 		// Descriptor layout for single texture display
 		VkDescriptorSetLayout displayTextureDescriptorSetLayout;
+		// Scene Descriptor Layout (Global Descriptor Set 0 Layout)
+		VkDescriptorSetLayout gpuSceneDataDescriptorLayout;
 
 		// Per-frame Global Scene (uniform) Buffer and the descriptor set (Shared by the whole engine which uses scene data so it is persistent per-frame no need to reallocate) 
 		AllocatedBuffer gpuSceneDataBuffer[FRAME_OVERLAP];
-		VkDescriptorSet sceneDescriptorSet[FRAME_OVERLAP];
+		VkDescriptorSet gpuSceneDescriptorSet[FRAME_OVERLAP];
 
 		// Default textures
 		AllocatedImage whiteImage;
@@ -174,17 +176,6 @@ namespace SK::VkRenderer
 		// Default materials
 		MaterialInstance defaultMaterialInstance;
 
-		// Main Draw Context
-		DrawContext mainDrawContext;
-
-		// Loaded scenes
-		std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loadedScenes;
-
-		// Draw Resources
-		GPUSceneData sceneData;
-		// Draw Resource Descriptor Layouts
-		VkDescriptorSetLayout sceneDataDescriptorLayout;
-
 		std::vector<OverlayPass> overlayPasses;
 	};
 
@@ -196,12 +187,9 @@ namespace SK::VkRenderer
 	void shutdown(Renderer* renderer);
 
 	// draw functionality
-	void draw(Renderer* renderer); // core draw loop
-	void drawMain(Renderer* renderer, VkCommandBuffer cmd); // function to simplify the main draw function. It handles some transitions, attachments and calls to actualy drawing functionality below
-	void drawGeometry(Renderer* renderer, VkCommandBuffer cmd);
-
-	// Updates TODO: To be taken out of here
-	void updateScene(Renderer* renderer, Camera* camera);
+	void draw(Renderer* renderer, const DrawContext& ctx, const GPUSceneData& gpuSceneData); // core draw loop
+	void drawMain(Renderer* renderer, VkCommandBuffer cmd, const DrawContext& ctx, const GPUSceneData& gpuSceneData); // function to simplify the main draw function. It handles some transitions, attachments and calls to actualy drawing functionality below
+	void drawGeometry(Renderer* renderer, VkCommandBuffer cmd, const DrawContext& ctx);
 
 	void immediateSubmit(Renderer* renderer, std::function<void(VkCommandBuffer cmd)>&& function);
 
@@ -215,7 +203,7 @@ namespace SK::VkRenderer
 
 	GPUMeshBuffers uploadMesh(Renderer* renderer, std::span<Vertex> vertices, std::span<uint32_t> indices);
 
-	void updateSceneBuffer(Renderer* renderer);
+	void updateSceneBuffer(Renderer* renderer, const GPUSceneData& gpuSceneData);
 	VkDescriptorSet fetchCurrentSceneBufferDescriptorSet(Renderer* renderer);
 
 	void setViewport(Renderer* renderer, VkCommandBuffer cmd);
@@ -253,7 +241,4 @@ namespace SK::VkRenderer
 
 	// Init Scene Buffer
 	void m_initGlobalSceneBuffer(Renderer* renderer);
-
-	// Loading Scene Data
-	void m_loadSceneData(Renderer* renderer);
 };
