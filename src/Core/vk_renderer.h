@@ -70,6 +70,12 @@ namespace SK::VkRenderer
 	{
 		std::vector<RenderObject> opaqueGLTFSurfaces;
 		std::vector<RenderObject> transparentGLTFSurfaces;
+
+		void clear()
+		{
+			opaqueGLTFSurfaces.clear();
+			transparentGLTFSurfaces.clear();
+		}
 	};
 
 	/*

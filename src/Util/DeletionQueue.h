@@ -7,6 +7,8 @@ namespace SK::Util
 {
 	struct DeletionQueue
 	{
+		std::deque<std::function<void()>> deletors;
+
 		void pushFunction(std::function<void()>&& function)
 		{
 			deletors.push_back(function);
@@ -22,8 +24,5 @@ namespace SK::Util
 
 			deletors.clear();
 		}
-
-		std::deque<std::function<void()>> deletors;
-
 	};
 }

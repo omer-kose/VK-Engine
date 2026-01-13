@@ -111,8 +111,7 @@ int main(int argc, char* argv[])
         
         // TODO: To be moved out to a proper place
         // After drawing clear out the DrawContext
-        drawContext.opaqueGLTFSurfaces.clear();
-        drawContext.transparentGLTFSurfaces.clear();
+        drawContext.clear();
 
         auto end = std::chrono::system_clock::now();
         // Convert to microseconds (integer), then come back to miliseconds
