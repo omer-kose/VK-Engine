@@ -1,5 +1,6 @@
 #include <Application/Application.h>
 #include <Core/vk_renderer.h>
+#include <UI/UI.h>
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
@@ -14,6 +15,9 @@ int main(int argc, char* argv[])
 
 	SK::VkRenderer::Renderer vkRenderer;
 	SK::VkRenderer::init(&vkRenderer, application.window, application.windowWidth, application.windowHeight);
+
+    SK::UI::UI ui;
+    SK::UI::init(&ui, &vkRenderer);
 
     // main loop
     while(!application.shouldQuit)
@@ -57,7 +61,6 @@ int main(int argc, char* argv[])
 
         SK::VkRenderer::updateScene(&vkRenderer, &application.mainCamera);
 
-        // TODO: Draw still calls to ImGui draw as ImGui requires command buffer that is being used that frame as well
         SK::VkRenderer::draw(&vkRenderer);
 
         auto end = std::chrono::system_clock::now();
@@ -67,7 +70,13 @@ int main(int argc, char* argv[])
         vkRenderer.stats.frameTime = elapsed.count() / 1000.0f;
     }
 
-	SK::VkRenderer::shutdown(&vkRenderer);
+    // Make sure that GPU finished executing every command before shutting down the systems.
+    vkDeviceWaitIdle(vkRenderer.device);
+
+    // Once everything is safe to delete shut the systems down.
+    SK::UI::shutdown(&ui);
+
+    SK::VkRenderer::shutdown(&vkRenderer);
 
 	SK::Application::shutdown(&application);
 

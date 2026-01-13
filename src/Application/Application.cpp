@@ -2,9 +2,7 @@
 
 #include <SDL.h>
 
-// TODO: ImGui specific code will be moved to a UI layer
-#include "imgui_impl_sdl2.h"
-
+#include <UI/UI.h>
 
 void SK::Application::init(Application* application, uint32_t windowWidth, uint32_t windowHeight)
 {
@@ -59,9 +57,8 @@ void SK::Application::handleSDLEvents(Application* application)
 
         application->mainCamera.processSDLEvent(e);
         
-        // TODO: To be moved to UI Layer
         // send SDL event to ImGui for processing
-        ImGui_ImplSDL2_ProcessEvent(&e);
+        UI::processSDLEvents(e);
     }
 }
 
@@ -75,7 +72,12 @@ void SK::Application::initCamera(Application* application, glm::vec3 position, f
 
 void SK::Application::shutdown(Application* application)
 {
-    SDL_DestroyWindow(application->window);
-    application->window = nullptr;
+    if(application->isInitialized)
+    {
+        SDL_DestroyWindow(application->window);
+        application->window = nullptr;
+        application->isInitialized = false;
+    }
+
     application->isInitialized = false;
 }

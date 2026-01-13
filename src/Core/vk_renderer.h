@@ -1,4 +1,7 @@
-﻿#pragma once
+﻿/*
+	Vulkan Renderer Backend
+*/
+#pragma once
 
 #include <Core/vk_types.h>
 #include <Core/vk_descriptors.h>
@@ -6,34 +9,14 @@
 
 #include <Pass/GLTFMetallicPass.h>
 
+#include <Util/DeletionQueue.h>
+
 // Forward declarations
 struct SDL_Window;
 class Camera;
 
 namespace SK::VkRenderer
 {
-	struct DeletionQueue
-	{
-		void pushFunction(std::function<void()>&& function)
-		{
-			deletors.push_back(function);
-		}
-
-		void flush()
-		{
-			// Reverse iterate the deletion queue to execute all the deletion functions
-			for(auto it = deletors.rbegin(); it != deletors.rend(); ++it)
-			{
-				(*it)();
-			}
-
-			deletors.clear();
-		}
-
-		std::deque<std::function<void()>> deletors;
-
-	};
-
 	struct FrameData
 	{
 		VkCommandPool commandPool;
@@ -45,7 +28,7 @@ namespace SK::VkRenderer
 		DescriptorAllocatorGrowable frameDescriptorAllocator;
 
 		// Per-Frame Resource Deletion Queue
-		DeletionQueue deletionQueue;
+		SK::Util::DeletionQueue deletionQueue;
 	};
 
 	struct RenderStats
@@ -89,6 +72,26 @@ namespace SK::VkRenderer
 		std::vector<RenderObject> transparentGLTFSurfaces;
 	};
 
+	/*
+		Pass Context holds required information for a pass to use. It will be an opaque type for the passes.
+	*/
+	struct PassContext
+	{
+		VkCommandBuffer cmd;
+		VkImageView targetImageView;
+		VkExtent2D imageExtent;
+	};
+
+	// TODO: Subject to change
+	// Passes 
+	
+	// Such as UI, Gizmos etc.
+	struct OverlayPass
+	{
+		void (*draw)(Renderer*, PassContext* passCtx);
+	};
+
+
 	struct Renderer
 	{
 		// Window related data stored (Window and other related params are owned by the App)
@@ -125,7 +128,7 @@ namespace SK::VkRenderer
 		FrameData frames[FRAME_OVERLAP];
 
 		// Global Resource Deletion Queue
-		DeletionQueue mainDeletionQueue;
+		SK::Util::DeletionQueue mainDeletionQueue;
 
 		// Engine stats
 		RenderStats stats;
@@ -178,6 +181,8 @@ namespace SK::VkRenderer
 		GPUSceneData sceneData;
 		// Draw Resource Descriptor Layouts
 		VkDescriptorSetLayout sceneDataDescriptorLayout;
+
+		std::vector<OverlayPass> overlayPasses;
 	};
 
 
@@ -191,7 +196,6 @@ namespace SK::VkRenderer
 	void draw(Renderer* renderer); // core draw loop
 	void drawMain(Renderer* renderer, VkCommandBuffer cmd); // function to simplify the main draw function. It handles some transitions, attachments and calls to actualy drawing functionality below
 	void drawGeometry(Renderer* renderer, VkCommandBuffer cmd);
-	void drawImgui(Renderer* renderer, VkCommandBuffer cmd, VkImageView targetImageView);
 
 	// Updates TODO: To be taken out of here
 	void updateScene(Renderer* renderer, Camera* camera);
@@ -216,6 +220,8 @@ namespace SK::VkRenderer
 
 	FrameData& fetchCurrentFrameData(Renderer* renderer);
 
+	void registerOverlayPass(Renderer* renderer, OverlayPass pass);
+
 	/*
 		Internal Helpers
 	*/
@@ -238,9 +244,6 @@ namespace SK::VkRenderer
 	// Material Layouts
 	void m_initMaterialLayouts(Renderer* renderer);
 	void m_clearMaterialLayouts(Renderer* renderer);
-
-	// ImGui
-	void m_initImgui(Renderer* renderer);
 
 	// Default Engine Data
 	void m_initDefaultData(Renderer* renderer);

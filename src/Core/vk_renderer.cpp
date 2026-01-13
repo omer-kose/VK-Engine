@@ -18,11 +18,6 @@
 
 #include <glm/gtx/transform.hpp>
 
-// TODO: To be moved out 
-#include "imgui.h"
-#include "imgui_impl_sdl2.h"
-#include "imgui_impl_vulkan.h"
-
 constexpr bool useValidationLayers = true;
 
 void SK::VkRenderer::init(Renderer* renderer, struct SDL_Window* window, uint32_t windowWidth, uint32_t windowHeight)
@@ -46,8 +41,6 @@ void SK::VkRenderer::init(Renderer* renderer, struct SDL_Window* window, uint32_
 
     m_initPasses(renderer);
 
-    m_initImgui(renderer);
-
     m_initDefaultData(renderer);
 
     m_initGlobalSceneBuffer(renderer);
@@ -62,9 +55,6 @@ void SK::VkRenderer::shutdown(Renderer* renderer)
 {
     if(renderer->isInitialized) 
     {
-        // make sure that GPU is done with the command buffers
-        vkDeviceWaitIdle(renderer->device);
-
         for(int i = 0; i < FRAME_OVERLAP; ++i)
         {
             // Destroy sync objects
@@ -142,7 +132,7 @@ void SK::VkRenderer::draw(Renderer* renderer)
     // Transition depth image to optimal depth layout
     vkutil::transitionImage(cmd, renderer->depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
     
-    // encode drawing commands except ImGui
+    // encode main drawing commands 
     drawMain(renderer, cmd);
 
     // Transition the draw image and the swapchain image into their correct layouts
@@ -152,10 +142,15 @@ void SK::VkRenderer::draw(Renderer* renderer)
     // Execute a copy operation from the draw image into the swapchain image
     vkutil::copyImageToImage(cmd, renderer->drawImage.image, renderer->swapchainImages[swapchainImageIndex], renderer->drawExtent, renderer->swapchainExtent);
 
-    // After drawing, we need to draw ImGui on top of the swapchain image, so transition the swapchain image into optimal drawing layout
+    // After drawing, we need to draw overlays on top of the swapchain image, so transition the swapchain image into optimal drawing layout
     vkutil::transitionImage(cmd, renderer->swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
-    drawImgui(renderer, cmd, renderer->swapchainImageViews[swapchainImageIndex]);
+    // Execute overlay passes
+    for(auto& pass : renderer->overlayPasses)
+    {
+        PassContext ctx = { cmd, renderer->swapchainImageViews[swapchainImageIndex], renderer->swapchainExtent };
+        pass.draw(renderer, &ctx);
+    }
 
     // Transition swapchain image into the presentation layout
     vkutil::transitionImage(cmd, renderer->swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
@@ -228,16 +223,6 @@ void SK::VkRenderer::drawGeometry(Renderer* renderer, VkCommandBuffer cmd)
     // Drawing is done context can be cleared
     renderer->mainDrawContext.opaqueGLTFSurfaces.clear();
     renderer->mainDrawContext.transparentGLTFSurfaces.clear();
-}
-
-void SK::VkRenderer::drawImgui(Renderer* renderer, VkCommandBuffer cmd, VkImageView targetImageView)
-{
-    VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(targetImageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    VkRenderingInfo renderInfo = vkinit::rendering_info(renderer->swapchainExtent, &colorAttachment, nullptr);
-
-    vkCmdBeginRendering(cmd, &renderInfo);
-    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
-    vkCmdEndRendering(cmd);
 }
 
 void SK::VkRenderer::updateScene(Renderer* renderer, Camera* camera)
@@ -484,6 +469,11 @@ void SK::VkRenderer::setScissor(Renderer* renderer, VkCommandBuffer cmd)
 SK::VkRenderer::FrameData& SK::VkRenderer::fetchCurrentFrameData(Renderer* renderer)
 {
     return renderer->frames[renderer->frameNumber % FRAME_OVERLAP];
+}
+
+void SK::VkRenderer::registerOverlayPass(Renderer* renderer, OverlayPass pass)
+{
+    renderer->overlayPasses.push_back(pass);
 }
 
 void SK::VkRenderer::m_initVulkan(Renderer* renderer)
@@ -798,67 +788,6 @@ void SK::VkRenderer::m_initMaterialLayouts(Renderer* renderer)
 void SK::VkRenderer::m_clearMaterialLayouts(Renderer* renderer)
 {
     GLTFMetallicRoughnessMaterial::ClearMaterialLayout(renderer->device);
-}
-
-void SK::VkRenderer::m_initImgui(Renderer* renderer)
-{
-    // 1: create descriptor pool for IMGUI
-    // the size of the pool is very oversize, but it's copied from imgui demo  itself.
-    VkDescriptorPoolSize poolSizes[] = { 
-        { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
-        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
-        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
-        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 } 
-    };
-
-    VkDescriptorPoolCreateInfo poolInfo = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO, .pNext = nullptr};
-    poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    poolInfo.maxSets = 1000;
-    poolInfo.poolSizeCount = (uint32_t)std::size(poolSizes);
-    poolInfo.pPoolSizes = poolSizes;
-
-    VkDescriptorPool imguiPool; 
-    VK_CHECK(vkCreateDescriptorPool(renderer->device, &poolInfo, nullptr, &imguiPool));
-
-    // 2. Initialize the ImGui Library
-    // Initialize the core structures of ImGui
-    ImGui::CreateContext();
-    // Initialize ImGui for SDL
-    ImGui_ImplSDL2_InitForVulkan(renderer->window);
-    // Initialize ImGui for Vulkan
-    ImGui_ImplVulkan_InitInfo initInfo = {};
-    initInfo.Instance = renderer->instance;
-    initInfo.PhysicalDevice = renderer->chosenGPU;
-    initInfo.Device = renderer->device;
-    initInfo.Queue = renderer->graphicsQueue;
-    initInfo.DescriptorPool = imguiPool;
-    initInfo.MinImageCount = 3;
-    initInfo.ImageCount = 3;
-    initInfo.UseDynamicRendering = true;
-
-    // Dynamic rendering parameters for ImGui to use
-    initInfo.PipelineRenderingCreateInfo = {.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO, .pNext = nullptr};
-    initInfo.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
-    initInfo.PipelineRenderingCreateInfo.pColorAttachmentFormats = &renderer->swapchainImageFormat;
-
-    initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-
-    ImGui_ImplVulkan_Init(&initInfo);
-
-    ImGui_ImplVulkan_CreateFontsTexture();
-
-    // Push the ImGui related destroy functions
-    renderer->mainDeletionQueue.pushFunction([=](){
-        ImGui_ImplVulkan_Shutdown();
-        vkDestroyDescriptorPool(renderer->device, imguiPool, nullptr);
-    });
 }
 
 void SK::VkRenderer::m_initDefaultData(Renderer* renderer)
