@@ -27,5 +27,5 @@ namespace SK::UI
 	void shutdown(UI* ui);
 
 	// Registered to the Renderer's Overlay passes.
-	void draw(SK::VkRenderer::Renderer* renderer, SK::VkRenderer::PassContext* ctx);
+	void draw(SK::VkRenderer::PassContext* ctx);
 };

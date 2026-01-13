@@ -82,7 +82,7 @@ void SK::UI::processSDLEvents(const SDL_Event& e)
     ImGui_ImplSDL2_ProcessEvent(&e);
 }
 
-void SK::UI::draw(SK::VkRenderer::Renderer* renderer, SK::VkRenderer::PassContext* ctx)
+void SK::UI::draw(SK::VkRenderer::PassContext* ctx)
 {
     VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(ctx->targetImageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     VkRenderingInfo renderInfo = vkinit::rendering_info(ctx->imageExtent, &colorAttachment, nullptr);

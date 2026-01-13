@@ -149,7 +149,7 @@ void SK::VkRenderer::draw(Renderer* renderer)
     for(auto& pass : renderer->overlayPasses)
     {
         PassContext ctx = { cmd, renderer->swapchainImageViews[swapchainImageIndex], renderer->swapchainExtent };
-        pass.draw(renderer, &ctx);
+        pass.draw(&ctx);
     }
 
     // Transition swapchain image into the presentation layout

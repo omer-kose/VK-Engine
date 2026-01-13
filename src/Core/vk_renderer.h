@@ -80,6 +80,9 @@ namespace SK::VkRenderer
 		VkCommandBuffer cmd;
 		VkImageView targetImageView;
 		VkExtent2D imageExtent;
+
+		// Optional field. Passes are not forced to depend on Renderer. If they need renderer this field will be filled by the renderer during execution of the passes 
+		Renderer* renderer; 
 	};
 
 	// TODO: Subject to change
@@ -88,7 +91,7 @@ namespace SK::VkRenderer
 	// Such as UI, Gizmos etc.
 	struct OverlayPass
 	{
-		void (*draw)(Renderer*, PassContext* passCtx);
+		void (*draw)(PassContext* passCtx);
 	};
 
 
