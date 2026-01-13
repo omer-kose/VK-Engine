@@ -82,6 +82,19 @@ void SK::UI::processSDLEvents(const SDL_Event& e)
     ImGui_ImplSDL2_ProcessEvent(&e);
 }
 
+void SK::UI::beginFrame()
+{
+    ImGui_ImplVulkan_NewFrame();
+    ImGui_ImplSDL2_NewFrame();
+    ImGui::NewFrame();
+}
+
+void SK::UI::endFrame()
+{
+    // Make ImGui calculate internal draw structures
+    ImGui::Render();
+}
+
 void SK::UI::draw(SK::VkRenderer::PassContext* ctx)
 {
     VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(ctx->targetImageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);

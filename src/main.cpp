@@ -41,14 +41,11 @@ int main(int argc, char* argv[])
             SK::VkRenderer::m_resizeSwapchain(&vkRenderer);
         }
 
-        // TODO: ImGui is handled here for now
-        // ImGui new frame
-        ImGui_ImplVulkan_NewFrame();
-        ImGui_ImplSDL2_NewFrame();
-        ImGui::NewFrame();
+        // --- UI FRAME BEGIN ---
+        SK::UI::beginFrame();
 
+        // --- PROGRAM SPECIFIC UI CODE ---
         ImGui::Begin("Stats");
-
         ImGui::Text("frametime %f ms", vkRenderer.stats.frameTime);
         ImGui::Text("geometry draw recording time %f ms", vkRenderer.stats.geometryDrawRecordTime);
         ImGui::Text("update time %f ms", vkRenderer.stats.sceneUpdateTime);
@@ -56,8 +53,8 @@ int main(int argc, char* argv[])
         ImGui::Text("draws %i", vkRenderer.stats.drawCallCount);
         ImGui::End();
 
-        // Make ImGui calculate internal draw structures
-        ImGui::Render();
+        // --- UI FRAME END ---
+        SK::UI::endFrame();
 
         SK::VkRenderer::updateScene(&vkRenderer, &application.mainCamera);
 

@@ -24,6 +24,8 @@ namespace SK::UI
 
 	void init(UI* ui, SK::VkRenderer::Renderer* renderer);
 	void processSDLEvents(const SDL_Event& e);
+	void beginFrame();
+	void endFrame();
 	void shutdown(UI* ui);
 
 	// Registered to the Renderer's Overlay passes.
