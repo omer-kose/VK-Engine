@@ -215,11 +215,6 @@ void SK::VkRenderer::drawGeometry(Renderer* renderer, VkCommandBuffer cmd, const
 {
     // Go through all the graphics passes and execute them
     GLTFMetallicPass::Execute(renderer, cmd, ctx);
-
-    // TODO: Move these out from here. Builder of the DrawContext should clean them
-    // Drawing is done context can be cleared
-    //renderer->mainDrawContext.opaqueGLTFSurfaces.clear();
-    //renderer->mainDrawContext.transparentGLTFSurfaces.clear();
 }
 
 void SK::VkRenderer::immediateSubmit(Renderer* renderer, std::function<void(VkCommandBuffer cmd)>&& function)
