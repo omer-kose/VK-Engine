@@ -20,6 +20,33 @@
 
 constexpr bool useValidationLayers = true;
 
+static size_t hashPipelineKey(const SK::VkRendererBackend::PipelineKey& k)
+{
+    size_t h = 0;
+    auto hc = [&](auto v)
+    {
+        std::hash<std::decay_t<decltype(v)>> hasher;
+        h ^= hasher(v) + 0x9e3779b9 + (h << 6) + (h >> 2);
+    };
+
+    hc(k.vertShader);
+    hc(k.fragShader);
+    hc(k.topology);
+    hc(k.polygonMode);
+    hc(k.cullMode);
+    hc(k.frontFace);
+    hc(k.depthTest);
+    hc(k.depthWrite);
+    hc(k.depthCompare);
+    hc(k.blending);
+    hc(k.colorFormat);
+    hc(k.depthFormat);
+    hc((uint64_t)k.layout);
+
+    return h;
+}
+
+
 void SK::VkRendererBackend::init(Renderer* renderer, struct SDL_Window* window, uint32_t windowWidth, uint32_t windowHeight)
 {
     // only one renderer initialization is allowed with the application.
@@ -65,6 +92,10 @@ void SK::VkRendererBackend::shutdown(Renderer* renderer)
 
             renderer->frames[i].deletionQueue.flush();
         }
+
+        // Clear out the caches
+        clearShaderCache(renderer);
+        clearPipelineCache(renderer);
 
         m_clearMaterialLayouts(renderer);
 
@@ -437,6 +468,97 @@ SK::VkRendererBackend::FrameData& SK::VkRendererBackend::fetchCurrentFrameData(R
 void SK::VkRendererBackend::registerOverlayPass(Renderer* renderer, OverlayPass pass)
 {
     renderer->overlayPasses.push_back(pass);
+}
+
+VkShaderModule SK::VkRendererBackend::getOrLoadShader(Renderer* renderer, const char* path)
+{
+    size_t hash = std::hash<std::string>{}(path);
+
+    auto it = renderer->shaderCache.find(hash);
+    if(it != renderer->shaderCache.end())
+    {
+        return it->second;
+    }
+
+    VkShaderModule shaderModule;
+    if(!vkutil::loadShaderModule(renderer->device, path, &shaderModule))
+    {
+        return VK_NULL_HANDLE;
+    }
+
+    renderer->shaderCache[hash] = shaderModule;
+    return shaderModule;
+}
+    
+void SK::VkRendererBackend::clearShaderCache(Renderer* renderer)
+{
+    for(auto it = renderer->shaderCache.begin(); it != renderer->shaderCache.end(); ++it)
+    {
+        vkDestroyShaderModule(renderer->device, it->second, nullptr);
+    }
+    renderer->shaderCache.clear();
+}
+
+VkPipeline SK::VkRendererBackend::getOrCreatePipeline(Renderer* renderer, const PipelineKey& key)
+{
+    size_t hash = hashPipelineKey(key);
+
+    auto it = renderer->pipelineCache.find(hash);
+    if(it != renderer->pipelineCache.end())
+    {
+        return it->second;
+    }
+
+    PipelineBuilder builder;
+    builder.clear();
+
+    builder.setShaders(
+        renderer->shaderCache[key.vertShader],
+        renderer->shaderCache[key.fragShader]
+    );
+
+    builder.setInputTopology(key.topology);
+    builder.setPolygonMode(key.polygonMode);
+    builder.setCullMode(key.cullMode, key.frontFace);
+    // Hardcoding for now
+    builder.setMultiSamplingNone();
+
+    if(key.blending)
+    {
+        builder.enableBlendingAdditive();
+    }
+    else
+    {
+        builder.disableBlending();
+    }
+
+    if(key.depthTest)
+    {
+        builder.enableDepthTest(key.depthWrite, key.depthCompare);
+    }
+    else
+    {
+        builder.disableDepthTest();
+    }
+
+    builder.setColorAttachmentFormat(key.colorFormat);
+    builder.setDepthFormat(key.depthFormat);
+
+    builder.pipelineLayout = key.layout;
+
+    VkPipeline pipeline = builder.buildPipeline(renderer->device);
+
+    renderer->pipelineCache[hash] = pipeline;
+    return pipeline;
+}
+
+void SK::VkRendererBackend::clearPipelineCache(Renderer* renderer)
+{
+    for(auto it = renderer->pipelineCache.begin(); it != renderer->pipelineCache.end(); ++it)
+    {
+        vkDestroyPipeline(renderer->device, it->second, nullptr);
+    }
+    renderer->pipelineCache.clear();
 }
 
 void SK::VkRendererBackend::m_initVulkan(Renderer* renderer)

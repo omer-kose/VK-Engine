@@ -12,14 +12,14 @@ VkPipelineLayout GLTFMetallicPass::PipelineLayout = VK_NULL_HANDLE;
 void GLTFMetallicPass::Init(SK::VkRendererBackend::Renderer* renderer)
 {
     // Load the shaders
-    VkShaderModule meshVertexShader;
-    if(!vkutil::loadShaderModule(renderer->device, "../../shaders/glsl/gltf_metallic/mesh_vert.spv", &meshVertexShader))
+    VkShaderModule meshVertexShader = SK::VkRendererBackend::getOrLoadShader(renderer, "../../shaders/glsl/gltf_metallic/mesh_vert.spv");
+    if(!meshVertexShader)
     {
         fmt::println("Error when building the mesh vertex shader");
     }
 
-    VkShaderModule meshFragmentShader;
-    if(!vkutil::loadShaderModule(renderer->device, "../../shaders/glsl/gltf_metallic/mesh_frag.spv", &meshFragmentShader))
+    VkShaderModule meshFragmentShader = SK::VkRendererBackend::getOrLoadShader(renderer, "../../shaders/glsl/gltf_metallic/mesh_frag.spv");;
+    if(!meshFragmentShader)
     {
         fmt::println("Error when building the mesh fragment shader");
     }
@@ -50,32 +50,34 @@ void GLTFMetallicPass::Init(SK::VkRendererBackend::Renderer* renderer)
 
     VK_CHECK(vkCreatePipelineLayout(renderer->device, &pipelineLayoutInfo, nullptr, &PipelineLayout));
 
-    // Build the pipeline
-    PipelineBuilder pipelineBuilder;
-    pipelineBuilder.setShaders(meshVertexShader, meshFragmentShader);
-    pipelineBuilder.setInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-    pipelineBuilder.setPolygonMode(VK_POLYGON_MODE_FILL);
-    pipelineBuilder.setCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
-    pipelineBuilder.setMultiSamplingNone();
-    pipelineBuilder.disableBlending();
-    pipelineBuilder.enableDepthTest(true, VK_COMPARE_OP_LESS_OR_EQUAL);
+    // Build the pipeline keys and retrieve the pipelines from the renderer backend
+    size_t vertHash = std::hash<std::string>{}("../../shaders/glsl/gltf_metallic/mesh_vert.spv");
+    size_t fragHash = std::hash<std::string>{}("../../shaders/glsl/gltf_metallic/mesh_frag.spv");
 
-    // Render format
-    pipelineBuilder.setColorAttachmentFormat(renderer->drawImage.imageFormat);
-    pipelineBuilder.setDepthFormat(renderer->depthImage.imageFormat);
+    SK::VkRendererBackend::PipelineKey opaqueKey = {};
+    opaqueKey.vertShader = vertHash;
+    opaqueKey.fragShader = fragHash;
+    opaqueKey.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    opaqueKey.polygonMode = VK_POLYGON_MODE_FILL;
+    opaqueKey.cullMode = VK_CULL_MODE_NONE;
+    opaqueKey.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    opaqueKey.depthTest = true;
+    opaqueKey.depthWrite = true;
+    opaqueKey.depthCompare = VK_COMPARE_OP_LESS_OR_EQUAL;
+    opaqueKey.blending = false;
+    opaqueKey.colorFormat = renderer->drawImage.imageFormat;
+    opaqueKey.depthFormat = renderer->depthImage.imageFormat;
+    opaqueKey.layout = PipelineLayout;
 
-    pipelineBuilder.pipelineLayout = PipelineLayout;
-    // Opaque Pipeline
-    OpaquePipeline = pipelineBuilder.buildPipeline(renderer->device);
+    OpaquePipeline = SK::VkRendererBackend::getOrCreatePipeline(renderer, opaqueKey);
 
-    // Transparent variant
-    pipelineBuilder.enableBlendingAdditive();
-    pipelineBuilder.enableDepthTest(false, VK_COMPARE_OP_LESS_OR_EQUAL);
-    TransparentPipeline = pipelineBuilder.buildPipeline(renderer->device);
+    SK::VkRendererBackend::PipelineKey transparentKey = opaqueKey;
+    transparentKey.blending = true;
+    transparentKey.depthWrite = false;
+    transparentKey.depthTest = false;
 
-    // ShaderModules are not needed anymore
-    vkDestroyShaderModule(renderer->device, meshVertexShader, nullptr);
-    vkDestroyShaderModule(renderer->device, meshFragmentShader, nullptr);
+    TransparentPipeline = SK::VkRendererBackend::getOrCreatePipeline(renderer, transparentKey);
+
     // Descriptor Set Layout is not needed as Material descriptors will be created while getting instanced.
     vkDestroyDescriptorSetLayout(renderer->device, materialLayout, nullptr);
 }
@@ -155,7 +157,4 @@ void GLTFMetallicPass::Update()
 void GLTFMetallicPass::ClearResources(SK::VkRendererBackend::Renderer* renderer)
 {
     vkDestroyPipelineLayout(renderer->device, PipelineLayout, nullptr);
-
-    vkDestroyPipeline(renderer->device, OpaquePipeline, nullptr);
-    vkDestroyPipeline(renderer->device, TransparentPipeline, nullptr);
 }

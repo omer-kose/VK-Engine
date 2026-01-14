@@ -78,6 +78,28 @@ namespace SK::VkRendererBackend
 		}
 	};
 
+	struct PipelineKey
+	{
+		size_t vertShader;
+		size_t fragShader;
+
+		VkPrimitiveTopology topology;
+		VkPolygonMode polygonMode;
+		VkCullModeFlags cullMode;
+		VkFrontFace frontFace;
+
+		bool depthTest;
+		bool depthWrite;
+		VkCompareOp depthCompare;
+
+		bool blending;
+
+		VkFormat colorFormat;
+		VkFormat depthFormat;
+
+		VkPipelineLayout layout;
+	};
+
 	/*
 		Pass Context holds required information for a pass to use. It will be an opaque type for the passes.
 
@@ -107,6 +129,7 @@ namespace SK::VkRendererBackend
 	};
 
 
+	// TODO: Rename this into VkContext or smth
 	struct Renderer
 	{
 		// Window related data stored (Window and other related params are owned by the App)
@@ -189,6 +212,12 @@ namespace SK::VkRendererBackend
 		MaterialInstance defaultMaterialInstance;
 
 		std::vector<OverlayPass> overlayPasses;
+
+		// Shader cache
+		std::unordered_map<size_t, VkShaderModule> shaderCache;
+
+		// Pipeline cache
+		std::unordered_map<size_t, VkPipeline> pipelineCache;
 	};
 
 
@@ -224,6 +253,12 @@ namespace SK::VkRendererBackend
 	FrameData& fetchCurrentFrameData(Renderer* renderer);
 
 	void registerOverlayPass(Renderer* renderer, OverlayPass pass);
+
+	VkShaderModule getOrLoadShader(Renderer* renderer, const char* path);
+	void clearShaderCache(Renderer* renderer);
+
+	VkPipeline getOrCreatePipeline(Renderer* renderer, const PipelineKey& key);
+	void clearPipelineCache(Renderer* renderer);
 
 	/*
 		Internal Helpers
