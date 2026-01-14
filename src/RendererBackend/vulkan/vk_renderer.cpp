@@ -492,9 +492,9 @@ VkShaderModule SK::VkRendererBackend::getOrLoadShader(Renderer* renderer, const 
     
 void SK::VkRendererBackend::clearShaderCache(Renderer* renderer)
 {
-    for(auto it = renderer->shaderCache.begin(); it != renderer->shaderCache.end(); ++it)
+    for(auto& [k, s] : renderer->shaderCache)
     {
-        vkDestroyShaderModule(renderer->device, it->second, nullptr);
+        vkDestroyShaderModule(renderer->device, s, nullptr);
     }
     renderer->shaderCache.clear();
 }
@@ -554,9 +554,9 @@ VkPipeline SK::VkRendererBackend::getOrCreatePipeline(Renderer* renderer, const 
 
 void SK::VkRendererBackend::clearPipelineCache(Renderer* renderer)
 {
-    for(auto it = renderer->pipelineCache.begin(); it != renderer->pipelineCache.end(); ++it)
+    for(auto& [k, p] : renderer->pipelineCache)
     {
-        vkDestroyPipeline(renderer->device, it->second, nullptr);
+        vkDestroyPipeline(renderer->device, p, nullptr);
     }
     renderer->pipelineCache.clear();
 }
