@@ -8,7 +8,7 @@
 // Forward declarations
 union SDL_Event;
 
-namespace SK::VkRenderer
+namespace SK::VkRendererBackend
 {
 	struct Renderer;
 	struct PassContext; // for ImGui overlay draw pass
@@ -22,12 +22,12 @@ namespace SK::UI
 		bool isInitialized = false;
 	};
 
-	void init(UI* ui, SK::VkRenderer::Renderer* renderer);
+	void init(UI* ui, SK::VkRendererBackend::Renderer* renderer);
 	void processSDLEvents(const SDL_Event& e);
 	void beginFrame();
 	void endFrame();
 	void shutdown(UI* ui);
 
 	// Registered to the Renderer's Overlay passes.
-	void draw(SK::VkRenderer::PassContext* ctx);
+	void draw(SK::VkRendererBackend::PassContext* ctx);
 };

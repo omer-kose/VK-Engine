@@ -1,4 +1,4 @@
-﻿#include <Core/vk_loader.h>
+﻿#include <RendererBackend/vk_loader.h>
 
 #include "stb_image.h"
 #include <iostream>
@@ -13,7 +13,7 @@
 #include <fastgltf/tools.hpp>
 
 
-std::optional<AllocatedImage> loadImage(SK::VkRenderer::Renderer* renderer, fastgltf::Asset& asset, fastgltf::Image& image)
+std::optional<AllocatedImage> loadImage(SK::VkRendererBackend::Renderer* renderer, fastgltf::Asset& asset, fastgltf::Image& image)
 {
 	AllocatedImage newImage = {};
 
@@ -34,7 +34,7 @@ std::optional<AllocatedImage> loadImage(SK::VkRenderer::Renderer* renderer, fast
 				imageSize.height = height;
 				imageSize.depth = 1;
 
-				newImage = SK::VkRenderer::createImage(renderer, data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+				newImage = SK::VkRendererBackend::createImage(renderer, data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 
 				stbi_image_free(data);
 			}
@@ -48,7 +48,7 @@ std::optional<AllocatedImage> loadImage(SK::VkRenderer::Renderer* renderer, fast
 				imageSize.height = height;
 				imageSize.depth = 1;
 
-				newImage = SK::VkRenderer::createImage(renderer, data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+				newImage = SK::VkRendererBackend::createImage(renderer, data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 
 				stbi_image_free(data);	
 			}
@@ -68,7 +68,7 @@ std::optional<AllocatedImage> loadImage(SK::VkRenderer::Renderer* renderer, fast
 						imageSize.height = height;
 						imageSize.depth = 1;
 
-						newImage = SK::VkRenderer::createImage(renderer, data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+						newImage = SK::VkRendererBackend::createImage(renderer, data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 
 						stbi_image_free(data);
 					}
@@ -123,7 +123,7 @@ VkSamplerMipmapMode extractMipmapMode(fastgltf::Filter filter)
 }
 
 
-std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(SK::VkRenderer::Renderer* renderer, std::string_view filePath)
+std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(SK::VkRendererBackend::Renderer* renderer, std::string_view filePath)
 {
 	fmt::print("Loading GLTF: {}", filePath);
 
@@ -225,7 +225,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(SK::VkRenderer::Renderer* re
 		}
 	}
 
-	scene->materialDataBuffer = SK::VkRenderer::createBuffer(renderer, asset.materials.size() * sizeof(GLTFMetallicRoughnessMaterial::MaterialConstants), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+	scene->materialDataBuffer = SK::VkRendererBackend::createBuffer(renderer, asset.materials.size() * sizeof(GLTFMetallicRoughnessMaterial::MaterialConstants), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 	int dataIndex = 0;
 	GLTFMetallicRoughnessMaterial::MaterialConstants* pMaterialDataBuffer = (GLTFMetallicRoughnessMaterial::MaterialConstants*)scene->materialDataBuffer.allocInfo.pMappedData;
 
@@ -391,7 +391,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(SK::VkRenderer::Renderer* re
 			newmesh->surfaces.push_back(newSurface);
 		}
 
-		newmesh->meshBuffers = SK::VkRenderer::uploadMesh(renderer, vertices, indices);
+		newmesh->meshBuffers = SK::VkRendererBackend::uploadMesh(renderer, vertices, indices);
 	}
 
 	// Load all the nodes
@@ -457,7 +457,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(SK::VkRenderer::Renderer* re
 	return scene;
 }
 
-std::optional<std::vector<std::shared_ptr<GLTFMeshAsset>>> loadGltfMeshes(SK::VkRenderer::Renderer* renderer, std::filesystem::path filePath)
+std::optional<std::vector<std::shared_ptr<GLTFMeshAsset>>> loadGltfMeshes(SK::VkRendererBackend::Renderer* renderer, std::filesystem::path filePath)
 {
 	std::cout << "Loading GLTF: " << filePath << std::endl;
 
@@ -574,7 +574,7 @@ std::optional<std::vector<std::shared_ptr<GLTFMeshAsset>>> loadGltfMeshes(SK::Vk
 			}
 		}
 
-		newMesh.meshBuffers = SK::VkRenderer::uploadMesh(renderer, vertices, indices);
+		newMesh.meshBuffers = SK::VkRendererBackend::uploadMesh(renderer, vertices, indices);
 		
 		meshes.emplace_back(std::make_shared<GLTFMeshAsset>(std::move(newMesh)));
 	}
@@ -582,7 +582,7 @@ std::optional<std::vector<std::shared_ptr<GLTFMeshAsset>>> loadGltfMeshes(SK::Vk
 	return meshes;
 }
 
-void LoadedGLTF::registerDraw(const glm::mat4& topMatrix, SK::VkRenderer::DrawContext& ctx)
+void LoadedGLTF::registerDraw(const glm::mat4& topMatrix, SK::VkRendererBackend::DrawContext& ctx)
 {
 	for(auto& n : topNodes)
 	{
@@ -596,12 +596,12 @@ void LoadedGLTF::clearAll()
 
 	descriptorAllocator.destroyPools(device);
 	
-	SK::VkRenderer::destroyBuffer(renderer, materialDataBuffer);
+	SK::VkRendererBackend::destroyBuffer(renderer, materialDataBuffer);
 
 	for(auto& [k, v] : meshes)
 	{
-		SK::VkRenderer::destroyBuffer(renderer, v->meshBuffers.vertexBuffer);
-		SK::VkRenderer::destroyBuffer(renderer, v->meshBuffers.indexBuffer);
+		SK::VkRendererBackend::destroyBuffer(renderer, v->meshBuffers.vertexBuffer);
+		SK::VkRendererBackend::destroyBuffer(renderer, v->meshBuffers.indexBuffer);
 	}
 
 	for(auto& [k, v] : textures)
@@ -612,7 +612,7 @@ void LoadedGLTF::clearAll()
 			continue;
 		}
 
-		SK::VkRenderer::destroyImage(renderer, v);
+		SK::VkRendererBackend::destroyImage(renderer, v);
 	}
 
 	for(auto& sampler : samplers)
@@ -621,7 +621,7 @@ void LoadedGLTF::clearAll()
 	}
 }
 
-void GLTFMeshNode::registerDraw(const glm::mat4& topMatrix, SK::VkRenderer::DrawContext& ctx)
+void GLTFMeshNode::registerDraw(const glm::mat4& topMatrix, SK::VkRendererBackend::DrawContext& ctx)
 {
 	// Instead of directly using the worldTransform of the Mesh, it is multiplied with the topMatrix given. This allows drawing the same mesh multiple times with a different transform
 	// without altering its worldTransform field.
@@ -629,7 +629,7 @@ void GLTFMeshNode::registerDraw(const glm::mat4& topMatrix, SK::VkRenderer::Draw
 
 	for(auto& s : mesh->surfaces)
 	{
-		SK::VkRenderer::RenderObject robj;
+		SK::VkRendererBackend::RenderObject robj;
 		robj.indexCount = s.count;
 		robj.firstIndex = s.startIndex;
 		robj.indexBuffer = mesh->meshBuffers.indexBuffer.buffer;

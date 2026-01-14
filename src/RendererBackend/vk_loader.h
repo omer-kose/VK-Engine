@@ -10,7 +10,7 @@
 #include <Materials/GLTFMetallicMaterial.h>
 
 // Forward declare with the namespace
-namespace SK::VkRenderer
+namespace SK::VkRendererBackend
 {
 	struct Renderer;
 };
@@ -51,7 +51,7 @@ struct GLTFMeshNode : public GLTFSceneNode
 	std::shared_ptr<GLTFMeshAsset> mesh;
 
 	// Creates a Render Object and adds all the surfaces in the mesh into the context's opaqueGLTFSurfaces
-	virtual void registerDraw(const glm::mat4& topMatrix, SK::VkRenderer::DrawContext& ctx) override;
+	virtual void registerDraw(const glm::mat4& topMatrix, SK::VkRendererBackend::DrawContext& ctx) override;
 };
 
 struct LoadedGLTF : public IRenderable
@@ -72,19 +72,19 @@ struct LoadedGLTF : public IRenderable
 	// All the MaterialConstants data is held in a single buffer contiguously
 	AllocatedBuffer materialDataBuffer;
 
-	SK::VkRenderer::Renderer* renderer;
+	SK::VkRendererBackend::Renderer* renderer;
 
 	~LoadedGLTF() { clearAll(); };
 
-	virtual void registerDraw(const glm::mat4& topMatrix, SK::VkRenderer::DrawContext& ctx);
+	virtual void registerDraw(const glm::mat4& topMatrix, SK::VkRendererBackend::DrawContext& ctx);
 
 private:
 	void clearAll();
 };
 
-std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(SK::VkRenderer::Renderer* renderer, std::string_view filePath);
+std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(SK::VkRendererBackend::Renderer* renderer, std::string_view filePath);
 
 // Aside from debugging this is not used as it is only used to load the meshes directly. 
-std::optional<std::vector<std::shared_ptr<GLTFMeshAsset>>> loadGltfMeshes(SK::VkRenderer::Renderer* renderer, std::filesystem::path filePath);
+std::optional<std::vector<std::shared_ptr<GLTFMeshAsset>>> loadGltfMeshes(SK::VkRendererBackend::Renderer* renderer, std::filesystem::path filePath);
 
 /* GLTF END */

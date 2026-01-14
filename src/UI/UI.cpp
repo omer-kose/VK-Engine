@@ -1,7 +1,7 @@
 #include "UI.h"
 
-#include <Core/vk_renderer.h>
-#include <Core/vk_initializers.h>
+#include <RendererBackend/vk_renderer.h>
+#include <RendererBackend/vk_initializers.h>
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
@@ -9,7 +9,7 @@
 
 #include "SDL_events.h"
 
-void SK::UI::init(UI* ui, SK::VkRenderer::Renderer* renderer)
+void SK::UI::init(UI* ui, SK::VkRendererBackend::Renderer* renderer)
 {
     // 1: create descriptor pool for IMGUI
     // the size of the pool is very oversize, but it's copied from imgui demo  itself.
@@ -70,9 +70,9 @@ void SK::UI::init(UI* ui, SK::VkRenderer::Renderer* renderer)
     });
 
     // Register UI draw to renderer's overlay passes
-    SK::VkRenderer::OverlayPass pass;
+    SK::VkRendererBackend::OverlayPass pass;
     pass.draw = &draw;
-    SK::VkRenderer::registerOverlayPass(renderer, pass);
+    SK::VkRendererBackend::registerOverlayPass(renderer, pass);
 
     ui->isInitialized = true;
 }
@@ -95,7 +95,7 @@ void SK::UI::endFrame()
     ImGui::Render();
 }
 
-void SK::UI::draw(SK::VkRenderer::PassContext* ctx)
+void SK::UI::draw(SK::VkRendererBackend::PassContext* ctx)
 {
     VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(ctx->targetImageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     VkRenderingInfo renderInfo = vkinit::rendering_info(ctx->imageExtent, &colorAttachment, nullptr);

@@ -1,8 +1,8 @@
 # Add all the subdirectories of source files
-file(GLOB_RECURSE SRC_CORE
-	"Core/*.h"
-	"Core/*.hpp"
-	"Core/*.cpp"
+file(GLOB_RECURSE SRC_RENDERER_BACKEND
+	"RendererBackend/*.h"
+	"RendererBackend/*.hpp"
+	"RendererBackend/*.cpp"
 )
 
 file(GLOB_RECURSE SRC_APP
@@ -44,10 +44,10 @@ file(GLOB SRC
 )
 
 # Create executable with all found sources
-add_executable(engine ${SRC} ${SRC_CORE} ${SRC_PASS} ${SRC_MATERIALS} ${SRC_APP} ${SRC_UI} ${SRC_UTIL})
+add_executable(engine ${SRC} ${SRC_RENDERER_BACKEND} ${SRC_PASS} ${SRC_MATERIALS} ${SRC_APP} ${SRC_UI} ${SRC_UTIL})
 
 # Add filters for the solution
-source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SRC_CORE} ${SRC_PASS} ${SRC_MATERIALS} ${SRC_APP} ${SRC_UI} ${SRC_UTIL})
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SRC_RENDERER_BACKEND} ${SRC_PASS} ${SRC_MATERIALS} ${SRC_APP} ${SRC_UI} ${SRC_UTIL})
 
 set_property(TARGET engine PROPERTY CXX_STANDARD 20)
 target_compile_definitions(engine PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)

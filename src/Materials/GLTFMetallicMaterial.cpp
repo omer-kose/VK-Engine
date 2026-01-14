@@ -1,11 +1,11 @@
 #include "GLTFMetallicMaterial.h"
 
-#include <Core/vk_renderer.h>
+#include <RendererBackend/vk_renderer.h>
 
 VkDescriptorSetLayout GLTFMetallicRoughnessMaterial::MaterialLayout = VK_NULL_HANDLE;
 DescriptorWriter GLTFMetallicRoughnessMaterial::Writer = {};
 
-void GLTFMetallicRoughnessMaterial::BuildMaterialLayout(SK::VkRenderer::Renderer* renderer)
+void GLTFMetallicRoughnessMaterial::BuildMaterialLayout(SK::VkRendererBackend::Renderer* renderer)
 {
     // Layout of the GLTF Metallic Roughness Material set
     DescriptorLayoutBuilder layoutBuilder;

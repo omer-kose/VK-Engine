@@ -3,9 +3,9 @@
 */
 #pragma once
 
-#include <Core/vk_types.h>
-#include <Core/vk_descriptors.h>
-#include <Core/vk_loader.h>
+#include <RendererBackend/vk_types.h>
+#include <RendererBackend/vk_descriptors.h>
+#include <RendererBackend/vk_loader.h>
 
 #include <Pass/GLTFMetallicPass.h>
 
@@ -15,7 +15,7 @@
 struct SDL_Window;
 class Camera;
 
-namespace SK::VkRenderer
+namespace SK::VkRendererBackend
 {
 	struct FrameData
 	{
@@ -80,19 +80,25 @@ namespace SK::VkRenderer
 
 	/*
 		Pass Context holds required information for a pass to use. It will be an opaque type for the passes.
+
+		TODO: Name is too general 
 	*/
 	struct PassContext
 	{
 		VkCommandBuffer cmd;
+
+		// Optional fields not all the passes needs them
 		VkImageView targetImageView;
 		VkExtent2D imageExtent;
-
-		// Optional field. Passes are not forced to depend on Renderer. If they need renderer this field will be filled by the renderer during execution of the passes 
 		Renderer* renderer; 
 	};
 
 	// TODO: Subject to change
-	// Passes 
+	/*
+		Reusable Passes that will be commonly used by all the programs like rendering UI, Gizmos etc. 
+		Programs, will and can hold their own fields for UI for example but they don't have to manually render them. Renderer can render those automatically.
+		So, programs using the renderer framework can only focus on their own core pipelines and algorithms.
+	*/
 	
 	// Such as UI, Gizmos etc.
 	struct OverlayPass

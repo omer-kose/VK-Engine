@@ -84,7 +84,7 @@ struct GPUSceneData
 };
 
 // Forward declare with the namespace
-namespace SK::VkRenderer
+namespace SK::VkRendererBackend
 {
     struct DrawContext;
 };
@@ -92,7 +92,7 @@ namespace SK::VkRenderer
 // Base class for renderable dynamic object
 class IRenderable
 {
-    virtual void registerDraw(const glm::mat4& topMatrix, SK::VkRenderer::DrawContext& ctx) = 0;
+    virtual void registerDraw(const glm::mat4& topMatrix, SK::VkRendererBackend::DrawContext& ctx) = 0;
 };
 
 /*
@@ -118,7 +118,7 @@ struct GLTFSceneNode : public IRenderable
         }
     }
 
-    virtual void registerDraw(const glm::mat4& topMatrix, SK::VkRenderer::DrawContext& ctx)
+    virtual void registerDraw(const glm::mat4& topMatrix, SK::VkRendererBackend::DrawContext& ctx)
     {
         // draw children 
         for(auto c : children)

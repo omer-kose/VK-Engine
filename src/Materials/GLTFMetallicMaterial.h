@@ -1,12 +1,12 @@
 #pragma once
 
-#include <Core/vk_types.h>
-#include <Core/vk_descriptors.h>
+#include <RendererBackend/vk_types.h>
+#include <RendererBackend/vk_descriptors.h>
 
 #include "Material.h"
 
 // Forward declare with the namespace
-namespace SK::VkRenderer
+namespace SK::VkRendererBackend
 {
 	struct Renderer;
 };
@@ -34,7 +34,7 @@ public:
 		uint32_t dataBufferOffset; // Multiple materials in a GLTF file will be stored in a single buffer, so the actual data for the specific material instance is fetched with this offset
 	};
 
-	static void BuildMaterialLayout(SK::VkRenderer::Renderer* renderer);
+	static void BuildMaterialLayout(SK::VkRendererBackend::Renderer* renderer);
 
 	// This static class only stores material layout. The material resources are allocated outside per material instance. Allocator-side must clean them properly.
 	static void ClearMaterialLayout(VkDevice device);

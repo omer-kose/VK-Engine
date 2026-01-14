@@ -1,15 +1,15 @@
 #include "GLTFMetallicPass.h"
 
-#include <Core/vk_renderer.h>
-#include <Core/vk_pipelines.h>
-#include <Core/vk_initializers.h>
+#include <RendererBackend/vk_renderer.h>
+#include <RendererBackend/vk_pipelines.h>
+#include <RendererBackend/vk_initializers.h>
 
 // Define the static members
 VkPipeline GLTFMetallicPass::OpaquePipeline = VK_NULL_HANDLE;
 VkPipeline GLTFMetallicPass::TransparentPipeline = VK_NULL_HANDLE;
 VkPipelineLayout GLTFMetallicPass::PipelineLayout = VK_NULL_HANDLE;
 
-void GLTFMetallicPass::Init(SK::VkRenderer::Renderer* renderer)
+void GLTFMetallicPass::Init(SK::VkRendererBackend::Renderer* renderer)
 {
     // Load the shaders
     VkShaderModule meshVertexShader;
@@ -80,7 +80,7 @@ void GLTFMetallicPass::Init(SK::VkRenderer::Renderer* renderer)
     vkDestroyDescriptorSetLayout(renderer->device, materialLayout, nullptr);
 }
 
-void GLTFMetallicPass::Execute(SK::VkRenderer::Renderer* renderer, VkCommandBuffer& cmd, const SK::VkRenderer::DrawContext& ctx)
+void GLTFMetallicPass::Execute(SK::VkRendererBackend::Renderer* renderer, VkCommandBuffer& cmd, const SK::VkRendererBackend::DrawContext& ctx)
 {
     std::vector<uint32_t> opaqueDraws;
     opaqueDraws.reserve(ctx.opaqueGLTFSurfaces.size());
@@ -92,8 +92,8 @@ void GLTFMetallicPass::Execute(SK::VkRenderer::Renderer* renderer, VkCommandBuff
 
     // sort the opaque surfaces by material and mesh
     std::sort(opaqueDraws.begin(), opaqueDraws.end(), [&](const auto& iA, const auto& iB) {
-        const SK::VkRenderer::RenderObject& A = ctx.opaqueGLTFSurfaces[iA];
-        const SK::VkRenderer::RenderObject& B = ctx.opaqueGLTFSurfaces[iB];
+        const SK::VkRendererBackend::RenderObject& A = ctx.opaqueGLTFSurfaces[iA];
+        const SK::VkRendererBackend::RenderObject& B = ctx.opaqueGLTFSurfaces[iB];
         if(A.materialInstance == B.materialInstance)
         {
             return A.indexBuffer < B.indexBuffer;
@@ -108,17 +108,17 @@ void GLTFMetallicPass::Execute(SK::VkRenderer::Renderer* renderer, VkCommandBuff
     MaterialInstance* lastMaterial = nullptr;
     VkBuffer lastIndexBuffer = VK_NULL_HANDLE;
 
-    auto draw = [&](const SK::VkRenderer::RenderObject& robj, VkPipeline pipeline) {
+    auto draw = [&](const SK::VkRendererBackend::RenderObject& robj, VkPipeline pipeline) {
         if(robj.materialInstance != lastMaterial)
         {
             lastMaterial = robj.materialInstance;
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-            VkDescriptorSet gpuSceneDescriptorSet = SK::VkRenderer::fetchCurrentSceneBufferDescriptorSet(renderer);;
+            VkDescriptorSet gpuSceneDescriptorSet = SK::VkRendererBackend::fetchCurrentSceneBufferDescriptorSet(renderer);;
             vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &gpuSceneDescriptorSet, 0, nullptr);
 
             // Set dynamic viewport and scissor again in case of an override (all of the material pipelines use dynamic states so setting them once after a bind is actually enough)
-            SK::VkRenderer::setViewport(renderer, cmd);
-            SK::VkRenderer::setScissor(renderer, cmd);
+            SK::VkRendererBackend::setViewport(renderer, cmd);
+            SK::VkRendererBackend::setScissor(renderer, cmd);
 
             vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 1, 1, &robj.materialInstance->materialSet, 0, nullptr);
         }
@@ -142,7 +142,7 @@ void GLTFMetallicPass::Execute(SK::VkRenderer::Renderer* renderer, VkCommandBuff
         draw(ctx.opaqueGLTFSurfaces[idx], OpaquePipeline);
     }
 
-    for(const SK::VkRenderer::RenderObject& robj : ctx.transparentGLTFSurfaces)
+    for(const SK::VkRendererBackend::RenderObject& robj : ctx.transparentGLTFSurfaces)
     {
         draw(robj, TransparentPipeline);
     }
@@ -152,7 +152,7 @@ void GLTFMetallicPass::Update()
 {
 }
 
-void GLTFMetallicPass::ClearResources(SK::VkRenderer::Renderer* renderer)
+void GLTFMetallicPass::ClearResources(SK::VkRendererBackend::Renderer* renderer)
 {
     vkDestroyPipelineLayout(renderer->device, PipelineLayout, nullptr);
 

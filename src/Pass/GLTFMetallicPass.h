@@ -1,8 +1,8 @@
 #pragma once
-#include <Core/vk_types.h>
+#include <RendererBackend/vk_types.h>
 
 // Forward declare with the namespace
-namespace SK::VkRenderer
+namespace SK::VkRendererBackend
 {
 	struct Renderer;
 	struct RenderObject;
@@ -12,10 +12,10 @@ namespace SK::VkRenderer
 class GLTFMetallicPass
 {
 public:
-	static void Init(SK::VkRenderer::Renderer* renderer);
-	static void Execute(SK::VkRenderer::Renderer* renderer, VkCommandBuffer& cmd, const SK::VkRenderer::DrawContext& ctx);
+	static void Init(SK::VkRendererBackend::Renderer* renderer);
+	static void Execute(SK::VkRendererBackend::Renderer* renderer, VkCommandBuffer& cmd, const SK::VkRendererBackend::DrawContext& ctx);
 	static void Update();
-	static void ClearResources(SK::VkRenderer::Renderer* renderer);
+	static void ClearResources(SK::VkRendererBackend::Renderer* renderer);
 private:
 	static VkPipeline OpaquePipeline;
 	static VkPipeline TransparentPipeline;

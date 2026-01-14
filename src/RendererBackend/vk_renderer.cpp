@@ -5,10 +5,10 @@
 
 #include <SDL_vulkan.h>
 
-#include <Core/vk_initializers.h>
-#include <Core/vk_types.h>
-#include <Core/vk_images.h>
-#include <Core/vk_pipelines.h>
+#include <RendererBackend/vk_initializers.h>
+#include <RendererBackend/vk_types.h>
+#include <RendererBackend/vk_images.h>
+#include <RendererBackend/vk_pipelines.h>
 #include "VkBootstrap.h"
 
 #define VMA_IMPLEMENTATION
@@ -20,7 +20,7 @@
 
 constexpr bool useValidationLayers = true;
 
-void SK::VkRenderer::init(Renderer* renderer, struct SDL_Window* window, uint32_t windowWidth, uint32_t windowHeight)
+void SK::VkRendererBackend::init(Renderer* renderer, struct SDL_Window* window, uint32_t windowWidth, uint32_t windowHeight)
 {
     // only one renderer initialization is allowed with the application.
     assert(renderer->isInitialized == false);
@@ -49,7 +49,7 @@ void SK::VkRenderer::init(Renderer* renderer, struct SDL_Window* window, uint32_
     renderer->isInitialized = true;
 }
 
-void SK::VkRenderer::shutdown(Renderer* renderer)
+void SK::VkRendererBackend::shutdown(Renderer* renderer)
 {
     if(renderer->isInitialized) 
     {
@@ -87,7 +87,7 @@ void SK::VkRenderer::shutdown(Renderer* renderer)
     }
 }
 
-void SK::VkRenderer::draw(Renderer* renderer, const DrawContext& ctx, const GPUSceneData& sceneData)
+void SK::VkRendererBackend::draw(Renderer* renderer, const DrawContext& ctx, const GPUSceneData& sceneData)
 {
     FrameData& currentFrame = fetchCurrentFrameData(renderer);
     // Wait until the GPU has finished rendering the last frame of the same modularity (0->1->2->3  wait on 2 for 0 and wait on 3 for 1 and so on)
@@ -185,7 +185,7 @@ void SK::VkRenderer::draw(Renderer* renderer, const DrawContext& ctx, const GPUS
     ++renderer->frameNumber;
 }
 
-void SK::VkRenderer::drawMain(Renderer* renderer, VkCommandBuffer cmd, const DrawContext& ctx, const GPUSceneData& sceneData)
+void SK::VkRendererBackend::drawMain(Renderer* renderer, VkCommandBuffer cmd, const DrawContext& ctx, const GPUSceneData& sceneData)
 {
     updateSceneBuffer(renderer, sceneData);
 
@@ -211,13 +211,13 @@ void SK::VkRenderer::drawMain(Renderer* renderer, VkCommandBuffer cmd, const Dra
     vkCmdEndRendering(cmd);
 }
 
-void SK::VkRenderer::drawGeometry(Renderer* renderer, VkCommandBuffer cmd, const DrawContext& ctx)
+void SK::VkRendererBackend::drawGeometry(Renderer* renderer, VkCommandBuffer cmd, const DrawContext& ctx)
 {
     // Go through all the graphics passes and execute them
     GLTFMetallicPass::Execute(renderer, cmd, ctx);
 }
 
-void SK::VkRenderer::immediateSubmit(Renderer* renderer, std::function<void(VkCommandBuffer cmd)>&& function)
+void SK::VkRendererBackend::immediateSubmit(Renderer* renderer, std::function<void(VkCommandBuffer cmd)>&& function)
 {
     // Before starting submitting and waiting on the fence reset them
     VK_CHECK(vkResetFences(renderer->device, 1, &renderer->immeadiateFence));
@@ -238,7 +238,7 @@ void SK::VkRenderer::immediateSubmit(Renderer* renderer, std::function<void(VkCo
     VK_CHECK(vkWaitForFences(renderer->device, 1, &renderer->immeadiateFence, true, 9999999999));
 }
 
-AllocatedBuffer SK::VkRenderer::createBuffer(Renderer* renderer, size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage)
+AllocatedBuffer SK::VkRendererBackend::createBuffer(Renderer* renderer, size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage)
 {
     // Allocate buffer
     VkBufferCreateInfo bufferInfo = { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, .pNext = nullptr };
@@ -255,12 +255,12 @@ AllocatedBuffer SK::VkRenderer::createBuffer(Renderer* renderer, size_t allocSiz
     return newBuffer;
 }
 
-void SK::VkRenderer::destroyBuffer(Renderer* renderer, const AllocatedBuffer& buffer)
+void SK::VkRendererBackend::destroyBuffer(Renderer* renderer, const AllocatedBuffer& buffer)
 {
     vmaDestroyBuffer(renderer->vmaAllocator, buffer.buffer, buffer.allocation);
 }
 
-AllocatedImage SK::VkRenderer::createImage(Renderer* renderer, VkExtent3D imageExtent, VkFormat format, VkImageUsageFlags usage, bool mipMapped)
+AllocatedImage SK::VkRendererBackend::createImage(Renderer* renderer, VkExtent3D imageExtent, VkFormat format, VkImageUsageFlags usage, bool mipMapped)
 {
     AllocatedImage newImage;
     newImage.imageFormat = format;
@@ -296,7 +296,7 @@ AllocatedImage SK::VkRenderer::createImage(Renderer* renderer, VkExtent3D imageE
     return newImage;
 }
 
-AllocatedImage SK::VkRenderer::createImage(Renderer* renderer, void* data, VkExtent3D imageExtent, VkFormat format, VkImageUsageFlags usage, bool mipMapped)
+AllocatedImage SK::VkRendererBackend::createImage(Renderer* renderer, void* data, VkExtent3D imageExtent, VkFormat format, VkImageUsageFlags usage, bool mipMapped)
 {
     // Hardcoding the textures to be RGBA 8 bit format. This should be sufficient as most of the textures are in that format.
     size_t dataSize = imageExtent.depth * imageExtent.width * imageExtent.height * 4;
@@ -341,13 +341,13 @@ AllocatedImage SK::VkRenderer::createImage(Renderer* renderer, void* data, VkExt
     return newImage;
 }
 
-void SK::VkRenderer::destroyImage(Renderer* renderer, const AllocatedImage& img)
+void SK::VkRendererBackend::destroyImage(Renderer* renderer, const AllocatedImage& img)
 {
     vkDestroyImageView(renderer->device, img.imageView, nullptr);
     vmaDestroyImage(renderer->vmaAllocator, img.image, img.allocation);
 }
 
-GPUMeshBuffers SK::VkRenderer::uploadMesh(Renderer* renderer, std::span<Vertex> vertices, std::span<uint32_t> indices)
+GPUMeshBuffers SK::VkRendererBackend::uploadMesh(Renderer* renderer, std::span<Vertex> vertices, std::span<uint32_t> indices)
 {
     const size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
     const size_t indexBufferSize = indices.size() * sizeof(uint32_t);
@@ -395,19 +395,19 @@ GPUMeshBuffers SK::VkRenderer::uploadMesh(Renderer* renderer, std::span<Vertex> 
     Both update and bind scene buffer functions must be called after the frame fence waits as it will be guaranteed that the frame is done being used by GPU. Otherwise, the data can be corrupted. 
     (calling in drawMain() will suffice)
 */
-void SK::VkRenderer::updateSceneBuffer(Renderer* renderer, const GPUSceneData& sceneData)
+void SK::VkRendererBackend::updateSceneBuffer(Renderer* renderer, const GPUSceneData& sceneData)
 {
     // Update the scene buffer
     GPUSceneData* pGpuSceneDataBuffer = (GPUSceneData*)renderer->gpuSceneDataBuffer[renderer->frameNumber % FRAME_OVERLAP].allocation->GetMappedData();
     *pGpuSceneDataBuffer = sceneData;
 }
 
-VkDescriptorSet SK::VkRenderer::fetchCurrentSceneBufferDescriptorSet(Renderer* renderer)
+VkDescriptorSet SK::VkRendererBackend::fetchCurrentSceneBufferDescriptorSet(Renderer* renderer)
 {
     return renderer->gpuSceneDescriptorSet[renderer->frameNumber % FRAME_OVERLAP];
 }
 
-void SK::VkRenderer::setViewport(Renderer* renderer, VkCommandBuffer cmd)
+void SK::VkRendererBackend::setViewport(Renderer* renderer, VkCommandBuffer cmd)
 {
     VkViewport viewport = {};
     viewport.x = 0;
@@ -419,7 +419,7 @@ void SK::VkRenderer::setViewport(Renderer* renderer, VkCommandBuffer cmd)
     vkCmdSetViewport(cmd, 0, 1, &viewport);
 }
 
-void SK::VkRenderer::setScissor(Renderer* renderer, VkCommandBuffer cmd)
+void SK::VkRendererBackend::setScissor(Renderer* renderer, VkCommandBuffer cmd)
 {
     VkRect2D scissor = {};
     scissor.offset.x = 0;
@@ -429,17 +429,17 @@ void SK::VkRenderer::setScissor(Renderer* renderer, VkCommandBuffer cmd)
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 }
 
-SK::VkRenderer::FrameData& SK::VkRenderer::fetchCurrentFrameData(Renderer* renderer)
+SK::VkRendererBackend::FrameData& SK::VkRendererBackend::fetchCurrentFrameData(Renderer* renderer)
 {
     return renderer->frames[renderer->frameNumber % FRAME_OVERLAP];
 }
 
-void SK::VkRenderer::registerOverlayPass(Renderer* renderer, OverlayPass pass)
+void SK::VkRendererBackend::registerOverlayPass(Renderer* renderer, OverlayPass pass)
 {
     renderer->overlayPasses.push_back(pass);
 }
 
-void SK::VkRenderer::m_initVulkan(Renderer* renderer)
+void SK::VkRendererBackend::m_initVulkan(Renderer* renderer)
 {
     vkb::InstanceBuilder builder;
 
@@ -502,7 +502,7 @@ void SK::VkRenderer::m_initVulkan(Renderer* renderer)
     });
 }
 
-void SK::VkRenderer::m_initSwapchain(Renderer* renderer)
+void SK::VkRendererBackend::m_initSwapchain(Renderer* renderer)
 {
     m_createSwapchain(renderer, renderer->windowExtent.width, renderer->windowExtent.height);
 
@@ -560,7 +560,7 @@ void SK::VkRenderer::m_initSwapchain(Renderer* renderer)
     });
 }
 
-void SK::VkRenderer::m_initCommands(Renderer* renderer)
+void SK::VkRendererBackend::m_initCommands(Renderer* renderer)
 {
     // Create the command pool and allow for resetting of individual command buffers
     VkCommandPoolCreateInfo commandPoolInfo = vkinit::command_pool_create_info(renderer->graphicsQueueFamily, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
@@ -586,7 +586,7 @@ void SK::VkRenderer::m_initCommands(Renderer* renderer)
     });
 }
 
-void SK::VkRenderer::m_initSyncStructures(Renderer* renderer)
+void SK::VkRendererBackend::m_initSyncStructures(Renderer* renderer)
 {
     //create syncronization structures
     //one fence to control when the gpu has finished rendering the frame,
@@ -610,7 +610,7 @@ void SK::VkRenderer::m_initSyncStructures(Renderer* renderer)
     });
 }
 
-void SK::VkRenderer::m_createSwapchain(Renderer* renderer, uint32_t width, uint32_t height)
+void SK::VkRendererBackend::m_createSwapchain(Renderer* renderer, uint32_t width, uint32_t height)
 {
     vkb::SwapchainBuilder swapchainBuilder{ renderer->chosenGPU, renderer->device, renderer->surface};
 
@@ -632,7 +632,7 @@ void SK::VkRenderer::m_createSwapchain(Renderer* renderer, uint32_t width, uint3
     renderer->swapchainImageViews = vkbSwapchain.get_image_views().value();
 }
 
-void SK::VkRenderer::m_destroySwapchain(Renderer* renderer)
+void SK::VkRendererBackend::m_destroySwapchain(Renderer* renderer)
 {
     // Deleting the swapchain deletes the images it holds internally.
     vkDestroySwapchainKHR(renderer->device, renderer->swapchain, nullptr);
@@ -647,7 +647,7 @@ void SK::VkRenderer::m_destroySwapchain(Renderer* renderer)
     renderer->swapchainImageViews.clear();
 }
 
-void SK::VkRenderer::m_resizeSwapchain(Renderer* renderer)
+void SK::VkRendererBackend::m_resizeSwapchain(Renderer* renderer)
 {
     // Don't change the images and views while the gpu is still handling them
     vkDeviceWaitIdle(renderer->device);
@@ -664,7 +664,7 @@ void SK::VkRenderer::m_resizeSwapchain(Renderer* renderer)
     renderer->resizeRequested = false;
 }
 
-void SK::VkRenderer::m_initDescriptors(Renderer* renderer)
+void SK::VkRendererBackend::m_initDescriptors(Renderer* renderer)
 {
     // Create the global growable descriptor allocator 
     std::vector<DescriptorAllocatorGrowable::PoolSize> sizes = {
@@ -733,27 +733,27 @@ void SK::VkRenderer::m_initDescriptors(Renderer* renderer)
     }
 }
 
-void SK::VkRenderer::m_initPasses(Renderer* renderer)
+void SK::VkRendererBackend::m_initPasses(Renderer* renderer)
 {
     GLTFMetallicPass::Init(renderer);
 }
 
-void SK::VkRenderer::m_clearPassResources(Renderer* renderer)
+void SK::VkRendererBackend::m_clearPassResources(Renderer* renderer)
 {
     GLTFMetallicPass::ClearResources(renderer);
 }
 
-void SK::VkRenderer::m_initMaterialLayouts(Renderer* renderer)
+void SK::VkRendererBackend::m_initMaterialLayouts(Renderer* renderer)
 {
     GLTFMetallicRoughnessMaterial::BuildMaterialLayout(renderer);
 }
 
-void SK::VkRenderer::m_clearMaterialLayouts(Renderer* renderer)
+void SK::VkRendererBackend::m_clearMaterialLayouts(Renderer* renderer)
 {
     GLTFMetallicRoughnessMaterial::ClearMaterialLayout(renderer->device);
 }
 
-void SK::VkRenderer::m_initDefaultData(Renderer* renderer)
+void SK::VkRendererBackend::m_initDefaultData(Renderer* renderer)
 {
     // Default textures
     // 3 default textures 1 pixel each
@@ -823,7 +823,7 @@ void SK::VkRenderer::m_initDefaultData(Renderer* renderer)
     renderer->defaultMaterialInstance = GLTFMetallicRoughnessMaterial::CreateInstance(renderer->device, MaterialPass::Opaque, defaultMaterialResources, renderer->globalDescriptorAllocator);
 }
 
-void SK::VkRenderer::m_initGlobalSceneBuffer(Renderer* renderer)
+void SK::VkRendererBackend::m_initGlobalSceneBuffer(Renderer* renderer)
 {
     for(int i = 0; i < FRAME_OVERLAP; ++i)
     {

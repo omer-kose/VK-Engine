@@ -1,5 +1,5 @@
 #include <Application/Application.h>
-#include <Core/vk_renderer.h>
+#include <RendererBackend/vk_renderer.h>
 #include <UI/UI.h>
 
 #include "imgui.h"
@@ -9,16 +9,16 @@
 #include <thread>
 
 // TODO: For now, scene loading and building the draw context is in the main function. They will be moved out
-#include <Core/vk_loader.h>
+#include <RendererBackend/vk_loader.h>
 #include <glm/gtx/transform.hpp>
 // Loaded scenes
 std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loadedScenes;
 // Draw Context
-SK::VkRenderer::DrawContext drawContext;
+SK::VkRendererBackend::DrawContext drawContext;
 // GPU Scene Data
 GPUSceneData gpuSceneData;
 
-void loadSceneData(SK::VkRenderer::Renderer* renderer)
+void loadSceneData(SK::VkRendererBackend::Renderer* renderer)
 {
     std::string structurePath = "../../assets/structure.glb";
     auto loadedStructureScene = loadGltf(renderer, structurePath);
@@ -26,12 +26,12 @@ void loadSceneData(SK::VkRenderer::Renderer* renderer)
     loadedScenes["structure"] = loadedStructureScene.value();
 }
 
-void loadScene(SK::VkRenderer::Renderer* renderer)
+void loadScene(SK::VkRendererBackend::Renderer* renderer)
 {
     loadSceneData(renderer);
 }
 
-void updateSceneTemp(SK::VkRenderer::Renderer* renderer, Camera& camera)
+void updateSceneTemp(SK::VkRendererBackend::Renderer* renderer, Camera& camera)
 {
     // TODO: Update timings are missing here but Engine Stats should be reconsidered too. Not sure if they should be in renderer.
 
@@ -60,8 +60,8 @@ int main(int argc, char* argv[])
 	SK::Application::Application application;
 	SK::Application::init(&application, 1920, 1080);
 
-	SK::VkRenderer::Renderer vkRenderer;
-	SK::VkRenderer::init(&vkRenderer, application.window, application.windowWidth, application.windowHeight);
+	SK::VkRendererBackend::Renderer vkRenderer;
+	SK::VkRendererBackend::init(&vkRenderer, application.window, application.windowWidth, application.windowHeight);
 
     SK::UI::UI ui;
     SK::UI::init(&ui, &vkRenderer);
@@ -87,7 +87,7 @@ int main(int argc, char* argv[])
         // Renderer checks for a resize requirement every frame internally
         if(vkRenderer.resizeRequested)
         {
-            SK::VkRenderer::m_resizeSwapchain(&vkRenderer);
+            SK::VkRendererBackend::m_resizeSwapchain(&vkRenderer);
         }
 
         // --- UI FRAME BEGIN ---
@@ -107,7 +107,7 @@ int main(int argc, char* argv[])
 
         updateSceneTemp(&vkRenderer, application.mainCamera);
 
-        SK::VkRenderer::draw(&vkRenderer, drawContext, gpuSceneData);
+        SK::VkRendererBackend::draw(&vkRenderer, drawContext, gpuSceneData);
         
         // TODO: To be moved out to a proper place
         // After drawing clear out the DrawContext
@@ -129,7 +129,7 @@ int main(int argc, char* argv[])
     // Once everything is safe to delete shut the systems down.
     SK::UI::shutdown(&ui);
 
-    SK::VkRenderer::shutdown(&vkRenderer);
+    SK::VkRendererBackend::shutdown(&vkRenderer);
 
 	SK::Application::shutdown(&application);
 
