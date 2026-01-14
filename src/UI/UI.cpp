@@ -1,7 +1,7 @@
 #include "UI.h"
 
-#include <RendererBackend/vk_renderer.h>
-#include <RendererBackend/vk_initializers.h>
+#include <RendererBackend/vulkan/vk_renderer.h>
+#include <RendererBackend/vulkan/vk_initializers.h>
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"

@@ -5,10 +5,10 @@
 
 #include <SDL_vulkan.h>
 
-#include <RendererBackend/vk_initializers.h>
-#include <RendererBackend/vk_types.h>
-#include <RendererBackend/vk_images.h>
-#include <RendererBackend/vk_pipelines.h>
+#include <RendererBackend/vulkan/vk_initializers.h>
+#include <RendererBackend/vulkan/vk_types.h>
+#include <RendererBackend/vulkan/vk_images.h>
+#include <RendererBackend/vulkan/vk_pipelines.h>
 #include "VkBootstrap.h"
 
 #define VMA_IMPLEMENTATION

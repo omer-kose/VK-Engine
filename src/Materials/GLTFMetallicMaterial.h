@@ -1,7 +1,7 @@
 #pragma once
 
-#include <RendererBackend/vk_types.h>
-#include <RendererBackend/vk_descriptors.h>
+#include <RendererBackend/vulkan/vk_types.h>
+#include <RendererBackend/vulkan/vk_descriptors.h>
 
 #include "Material.h"
 

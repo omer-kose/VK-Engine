@@ -1,6 +1,6 @@
 #include "GLTFMetallicMaterial.h"
 
-#include <RendererBackend/vk_renderer.h>
+#include <RendererBackend/vulkan/vk_renderer.h>
 
 VkDescriptorSetLayout GLTFMetallicRoughnessMaterial::MaterialLayout = VK_NULL_HANDLE;
 DescriptorWriter GLTFMetallicRoughnessMaterial::Writer = {};

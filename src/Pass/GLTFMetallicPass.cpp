@@ -1,8 +1,8 @@
 #include "GLTFMetallicPass.h"
 
-#include <RendererBackend/vk_renderer.h>
-#include <RendererBackend/vk_pipelines.h>
-#include <RendererBackend/vk_initializers.h>
+#include <RendererBackend/vulkan/vk_renderer.h>
+#include <RendererBackend/vulkan/vk_pipelines.h>
+#include <RendererBackend/vulkan/vk_initializers.h>
 
 // Define the static members
 VkPipeline GLTFMetallicPass::OpaquePipeline = VK_NULL_HANDLE;

@@ -1,5 +1,5 @@
 #include <Application/Application.h>
-#include <RendererBackend/vk_renderer.h>
+#include <RendererBackend/vulkan/vk_renderer.h>
 #include <UI/UI.h>
 
 #include "imgui.h"
@@ -9,7 +9,7 @@
 #include <thread>
 
 // TODO: For now, scene loading and building the draw context is in the main function. They will be moved out
-#include <RendererBackend/vk_loader.h>
+#include <RendererBackend/vulkan/vk_loader.h>
 #include <glm/gtx/transform.hpp>
 // Loaded scenes
 std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loadedScenes;

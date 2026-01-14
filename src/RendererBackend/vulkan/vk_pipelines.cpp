@@ -1,7 +1,7 @@
-﻿#include <RendererBackend/vk_pipelines.h>
+﻿#include <RendererBackend/vulkan/vk_pipelines.h>
 
 #include <fstream>
-#include <RendererBackend/vk_initializers.h>
+#include <RendererBackend/vulkan/vk_initializers.h>
 
 bool vkutil::loadShaderModule(VkDevice device, const char* filePath, VkShaderModule* outShaderModule)
 {

@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include <RendererBackend/vk_types.h>
+#include <RendererBackend/vulkan/vk_types.h>
 
 namespace vkinit {
 //> init_cmd
