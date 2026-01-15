@@ -4,7 +4,7 @@
 // Forward declare with the namespace
 namespace SK::VkRendererBackend
 {
-	struct Renderer;
+	struct RendererBackend;
 	struct RenderObject;
 	struct DrawContext;
 };
@@ -12,10 +12,10 @@ namespace SK::VkRendererBackend
 class GLTFMetallicPass
 {
 public:
-	static void Init(SK::VkRendererBackend::Renderer* renderer);
-	static void Execute(SK::VkRendererBackend::Renderer* renderer, VkCommandBuffer& cmd, const SK::VkRendererBackend::DrawContext& ctx);
+	static void Init(SK::VkRendererBackend::RendererBackend* vkRendererBackend);
+	static void Execute(SK::VkRendererBackend::RendererBackend* vkRendererBackend, VkCommandBuffer& cmd, const SK::VkRendererBackend::DrawContext& ctx);
 	static void Update();
-	static void ClearResources(SK::VkRendererBackend::Renderer* renderer);
+	static void ClearResources(SK::VkRendererBackend::RendererBackend* vkRendererBackend);
 private:
 	static VkPipeline OpaquePipeline;
 	static VkPipeline TransparentPipeline;

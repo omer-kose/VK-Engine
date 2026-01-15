@@ -9,7 +9,7 @@
 
 #include "SDL_events.h"
 
-void SK::UI::init(UI* ui, SK::VkRendererBackend::Renderer* renderer)
+void SK::UI::init(UI* ui, SK::VkRendererBackend::RendererBackend* vkRendererBackend)
 {
     // 1: create descriptor pool for IMGUI
     // the size of the pool is very oversize, but it's copied from imgui demo  itself.
@@ -34,19 +34,19 @@ void SK::UI::init(UI* ui, SK::VkRendererBackend::Renderer* renderer)
     poolInfo.pPoolSizes = poolSizes;
 
     VkDescriptorPool imguiPool;
-    VK_CHECK(vkCreateDescriptorPool(renderer->device, &poolInfo, nullptr, &imguiPool));
+    VK_CHECK(vkCreateDescriptorPool(vkRendererBackend->device, &poolInfo, nullptr, &imguiPool));
 
     // 2. Initialize the ImGui Library
     // Initialize the core structures of ImGui
     ImGui::CreateContext();
     // Initialize ImGui for SDL
-    ImGui_ImplSDL2_InitForVulkan(renderer->window);
+    ImGui_ImplSDL2_InitForVulkan(vkRendererBackend->window);
     // Initialize ImGui for Vulkan
     ImGui_ImplVulkan_InitInfo initInfo = {};
-    initInfo.Instance = renderer->instance;
-    initInfo.PhysicalDevice = renderer->chosenGPU;
-    initInfo.Device = renderer->device;
-    initInfo.Queue = renderer->graphicsQueue;
+    initInfo.Instance = vkRendererBackend->instance;
+    initInfo.PhysicalDevice = vkRendererBackend->chosenGPU;
+    initInfo.Device = vkRendererBackend->device;
+    initInfo.Queue = vkRendererBackend->graphicsQueue;
     initInfo.DescriptorPool = imguiPool;
     initInfo.MinImageCount = 3;
     initInfo.ImageCount = 3;
@@ -55,7 +55,7 @@ void SK::UI::init(UI* ui, SK::VkRendererBackend::Renderer* renderer)
     // Dynamic rendering parameters for ImGui to use
     initInfo.PipelineRenderingCreateInfo = { .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO, .pNext = nullptr };
     initInfo.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
-    initInfo.PipelineRenderingCreateInfo.pColorAttachmentFormats = &renderer->swapchainImageFormat;
+    initInfo.PipelineRenderingCreateInfo.pColorAttachmentFormats = &vkRendererBackend->swapchainImageFormat;
 
     initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 
@@ -66,13 +66,13 @@ void SK::UI::init(UI* ui, SK::VkRendererBackend::Renderer* renderer)
     // UI will destroy its own resources
     ui->deletionQueue.pushFunction([=]() {
         ImGui_ImplVulkan_Shutdown();
-        vkDestroyDescriptorPool(renderer->device, imguiPool, nullptr);
+        vkDestroyDescriptorPool(vkRendererBackend->device, imguiPool, nullptr);
     });
 
-    // Register UI draw to renderer's overlay passes
+    // Register UI draw to vkRendererBackend's overlay passes
     SK::VkRendererBackend::OverlayPass pass;
     pass.draw = &draw;
-    SK::VkRendererBackend::registerOverlayPass(renderer, pass);
+    SK::VkRendererBackend::registerOverlayPass(vkRendererBackend, pass);
 
     ui->isInitialized = true;
 }

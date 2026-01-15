@@ -9,16 +9,16 @@ VkPipeline GLTFMetallicPass::OpaquePipeline = VK_NULL_HANDLE;
 VkPipeline GLTFMetallicPass::TransparentPipeline = VK_NULL_HANDLE;
 VkPipelineLayout GLTFMetallicPass::PipelineLayout = VK_NULL_HANDLE;
 
-void GLTFMetallicPass::Init(SK::VkRendererBackend::Renderer* renderer)
+void GLTFMetallicPass::Init(SK::VkRendererBackend::RendererBackend* vkRendererBackend)
 {
     // Load the shaders
-    VkShaderModule meshVertexShader = SK::VkRendererBackend::getOrLoadShader(renderer, "../../shaders/glsl/gltf_metallic/mesh_vert.spv");
+    VkShaderModule meshVertexShader = SK::VkRendererBackend::getOrLoadShader(vkRendererBackend, "../../shaders/glsl/gltf_metallic/mesh_vert.spv");
     if(!meshVertexShader)
     {
         fmt::println("Error when building the mesh vertex shader");
     }
 
-    VkShaderModule meshFragmentShader = SK::VkRendererBackend::getOrLoadShader(renderer, "../../shaders/glsl/gltf_metallic/mesh_frag.spv");;
+    VkShaderModule meshFragmentShader = SK::VkRendererBackend::getOrLoadShader(vkRendererBackend, "../../shaders/glsl/gltf_metallic/mesh_frag.spv");;
     if(!meshFragmentShader)
     {
         fmt::println("Error when building the mesh fragment shader");
@@ -36,17 +36,17 @@ void GLTFMetallicPass::Init(SK::VkRendererBackend::Renderer* renderer)
     layoutBuilder.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     layoutBuilder.addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
     layoutBuilder.addBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    VkDescriptorSetLayout materialLayout = layoutBuilder.build(renderer->device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkDescriptorSetLayout materialLayout = layoutBuilder.build(vkRendererBackend->device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // Mesh pipeline layout
     SK::VkRendererBackend::PipelineLayoutKey layoutKey;
     // 2 sets: 0 -> Scene Descriptor Set, 1 -> Material Descriptor Set
-    layoutKey.setLayouts = { renderer->gpuSceneDataDescriptorLayout, materialLayout };
+    layoutKey.setLayouts = { vkRendererBackend->gpuSceneDataDescriptorLayout, materialLayout };
     layoutKey.pushConstantRanges = { pushConstantRange };
 
-    PipelineLayout = SK::VkRendererBackend::getOrCreatePipelineLayout(renderer, layoutKey);
+    PipelineLayout = SK::VkRendererBackend::getOrCreatePipelineLayout(vkRendererBackend, layoutKey);
 
-    // Build the pipeline keys and retrieve the pipelines from the renderer backend
+    // Build the pipeline keys and retrieve the pipelines from the vkRendererBackend backend
     size_t vertHash = std::hash<std::string>{}("../../shaders/glsl/gltf_metallic/mesh_vert.spv");
     size_t fragHash = std::hash<std::string>{}("../../shaders/glsl/gltf_metallic/mesh_frag.spv");
 
@@ -61,24 +61,24 @@ void GLTFMetallicPass::Init(SK::VkRendererBackend::Renderer* renderer)
     opaqueKey.depthWrite = true;
     opaqueKey.depthCompare = VK_COMPARE_OP_LESS_OR_EQUAL;
     opaqueKey.blending = false;
-    opaqueKey.colorFormat = renderer->drawImage.imageFormat;
-    opaqueKey.depthFormat = renderer->depthImage.imageFormat;
+    opaqueKey.colorFormat = vkRendererBackend->drawImage.imageFormat;
+    opaqueKey.depthFormat = vkRendererBackend->depthImage.imageFormat;
     opaqueKey.layout = PipelineLayout;
 
-    OpaquePipeline = SK::VkRendererBackend::getOrCreatePipeline(renderer, opaqueKey);
+    OpaquePipeline = SK::VkRendererBackend::getOrCreatePipeline(vkRendererBackend, opaqueKey);
 
     SK::VkRendererBackend::PipelineKey transparentKey = opaqueKey;
     transparentKey.blending = true;
     transparentKey.depthWrite = false;
     transparentKey.depthTest = false;
 
-    TransparentPipeline = SK::VkRendererBackend::getOrCreatePipeline(renderer, transparentKey);
+    TransparentPipeline = SK::VkRendererBackend::getOrCreatePipeline(vkRendererBackend, transparentKey);
 
     // Descriptor Set Layout is not needed as Material descriptors will be created while getting instanced.
-    vkDestroyDescriptorSetLayout(renderer->device, materialLayout, nullptr);
+    vkDestroyDescriptorSetLayout(vkRendererBackend->device, materialLayout, nullptr);
 }
 
-void GLTFMetallicPass::Execute(SK::VkRendererBackend::Renderer* renderer, VkCommandBuffer& cmd, const SK::VkRendererBackend::DrawContext& ctx)
+void GLTFMetallicPass::Execute(SK::VkRendererBackend::RendererBackend* vkRendererBackend, VkCommandBuffer& cmd, const SK::VkRendererBackend::DrawContext& ctx)
 {
     std::vector<uint32_t> opaqueDraws;
     opaqueDraws.reserve(ctx.opaqueGLTFSurfaces.size());
@@ -111,12 +111,12 @@ void GLTFMetallicPass::Execute(SK::VkRendererBackend::Renderer* renderer, VkComm
         {
             lastMaterial = robj.materialInstance;
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-            VkDescriptorSet gpuSceneDescriptorSet = SK::VkRendererBackend::fetchCurrentSceneBufferDescriptorSet(renderer);;
+            VkDescriptorSet gpuSceneDescriptorSet = SK::VkRendererBackend::fetchCurrentSceneBufferDescriptorSet(vkRendererBackend);;
             vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &gpuSceneDescriptorSet, 0, nullptr);
 
             // Set dynamic viewport and scissor again in case of an override (all of the material pipelines use dynamic states so setting them once after a bind is actually enough)
-            SK::VkRendererBackend::setViewport(renderer, cmd);
-            SK::VkRendererBackend::setScissor(renderer, cmd);
+            SK::VkRendererBackend::setViewport(vkRendererBackend, cmd);
+            SK::VkRendererBackend::setScissor(vkRendererBackend, cmd);
 
             vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 1, 1, &robj.materialInstance->materialSet, 0, nullptr);
         }
@@ -150,6 +150,6 @@ void GLTFMetallicPass::Update()
 {
 }
 
-void GLTFMetallicPass::ClearResources(SK::VkRendererBackend::Renderer* renderer)
+void GLTFMetallicPass::ClearResources(SK::VkRendererBackend::RendererBackend* vkRendererBackend)
 {
 }

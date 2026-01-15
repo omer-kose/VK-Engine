@@ -18,22 +18,22 @@ SK::VkRendererBackend::DrawContext drawContext;
 // GPU Scene Data
 GPUSceneData gpuSceneData;
 
-void loadSceneData(SK::VkRendererBackend::Renderer* renderer)
+void loadSceneData(SK::VkRendererBackend::RendererBackend* vkRendererBackend)
 {
     std::string structurePath = "../../assets/structure.glb";
-    auto loadedStructureScene = loadGltf(renderer, structurePath);
+    auto loadedStructureScene = loadGltf(vkRendererBackend, structurePath);
     assert(loadedStructureScene.has_value());
     loadedScenes["structure"] = loadedStructureScene.value();
 }
 
-void loadScene(SK::VkRendererBackend::Renderer* renderer)
+void loadScene(SK::VkRendererBackend::RendererBackend* vkRendererBackend)
 {
-    loadSceneData(renderer);
+    loadSceneData(vkRendererBackend);
 }
 
-void updateSceneTemp(SK::VkRendererBackend::Renderer* renderer, Camera& camera)
+void updateSceneTemp(SK::VkRendererBackend::RendererBackend* vkRendererBackend, Camera& camera)
 {
-    // TODO: Update timings are missing here but Engine Stats should be reconsidered too. Not sure if they should be in renderer.
+    // TODO: Update timings are missing here but Engine Stats should be reconsidered too. Not sure if they should be in vkRendererBackend.
 
     camera.update();
 
@@ -42,7 +42,7 @@ void updateSceneTemp(SK::VkRendererBackend::Renderer* renderer, Camera& camera)
     // TODO: Scene Data is directly set here. Not good!
     gpuSceneData.view = camera.getViewMatrix();
     // camera projection
-    gpuSceneData.proj = glm::perspectiveRH_ZO(glm::radians(70.f), (float)renderer->windowExtent.width / (float)renderer->windowExtent.height, 0.1f, 10000.f);
+    gpuSceneData.proj = glm::perspectiveRH_ZO(glm::radians(70.f), (float)vkRendererBackend->windowExtent.width / (float)vkRendererBackend->windowExtent.height, 0.1f, 10000.f);
 
     // invert the Y direction on projection matrix so that we are more similar
     // to opengl and gltf axis
@@ -60,13 +60,13 @@ int main(int argc, char* argv[])
 	SK::Application::Application application;
 	SK::Application::init(&application, 1920, 1080);
 
-	SK::VkRendererBackend::Renderer vkRenderer;
-	SK::VkRendererBackend::init(&vkRenderer, application.window, application.windowWidth, application.windowHeight);
+	SK::VkRendererBackend::RendererBackend vkRendererBackend;
+	SK::VkRendererBackend::init(&vkRendererBackend, application.window, application.windowWidth, application.windowHeight);
 
     SK::UI::UI ui;
-    SK::UI::init(&ui, &vkRenderer);
+    SK::UI::init(&ui, &vkRendererBackend);
 
-    loadScene(&vkRenderer);
+    loadScene(&vkRendererBackend);
 
     // main loop
     while(!application.shouldQuit)
@@ -84,10 +84,10 @@ int main(int argc, char* argv[])
             continue;
         }
 
-        // Renderer checks for a resize requirement every frame internally
-        if(vkRenderer.resizeRequested)
+        // RendererBackend checks for a resize requirement every frame internally
+        if(vkRendererBackend.resizeRequested)
         {
-            SK::VkRendererBackend::m_resizeSwapchain(&vkRenderer);
+            SK::VkRendererBackend::m_resizeSwapchain(&vkRendererBackend);
         }
 
         // --- UI FRAME BEGIN ---
@@ -95,19 +95,19 @@ int main(int argc, char* argv[])
 
         // --- PROGRAM SPECIFIC UI CODE ---
         ImGui::Begin("Stats");
-        ImGui::Text("frametime %f ms", vkRenderer.stats.frameTime);
-        ImGui::Text("geometry draw recording time %f ms", vkRenderer.stats.geometryDrawRecordTime);
-        ImGui::Text("update time %f ms", vkRenderer.stats.sceneUpdateTime);
-        ImGui::Text("triangles %i", vkRenderer.stats.triangleCount);
-        ImGui::Text("draws %i", vkRenderer.stats.drawCallCount);
+        ImGui::Text("frametime %f ms", vkRendererBackend.stats.frameTime);
+        ImGui::Text("geometry draw recording time %f ms", vkRendererBackend.stats.geometryDrawRecordTime);
+        ImGui::Text("update time %f ms", vkRendererBackend.stats.sceneUpdateTime);
+        ImGui::Text("triangles %i", vkRendererBackend.stats.triangleCount);
+        ImGui::Text("draws %i", vkRendererBackend.stats.drawCallCount);
         ImGui::End();
 
         // --- UI FRAME END ---
         SK::UI::endFrame();
 
-        updateSceneTemp(&vkRenderer, application.mainCamera);
+        updateSceneTemp(&vkRendererBackend, application.mainCamera);
 
-        SK::VkRendererBackend::draw(&vkRenderer, drawContext, gpuSceneData);
+        SK::VkRendererBackend::draw(&vkRendererBackend, drawContext, gpuSceneData);
         
         // TODO: To be moved out to a proper place
         // After drawing clear out the DrawContext
@@ -117,11 +117,11 @@ int main(int argc, char* argv[])
         // Convert to microseconds (integer), then come back to miliseconds
         auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
-        vkRenderer.stats.frameTime = elapsed.count() / 1000.0f;
+        vkRendererBackend.stats.frameTime = elapsed.count() / 1000.0f;
     }
 
     // Make sure that GPU finished executing every command before shutting down the systems.
-    vkDeviceWaitIdle(vkRenderer.device);
+    vkDeviceWaitIdle(vkRendererBackend.device);
 
     // TODO: To be moved out to a proper place
     loadedScenes.clear();
@@ -129,7 +129,7 @@ int main(int argc, char* argv[])
     // Once everything is safe to delete shut the systems down.
     SK::UI::shutdown(&ui);
 
-    SK::VkRendererBackend::shutdown(&vkRenderer);
+    SK::VkRendererBackend::shutdown(&vkRendererBackend);
 
 	SK::Application::shutdown(&application);
 

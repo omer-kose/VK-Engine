@@ -12,7 +12,7 @@
 // Forward declare with the namespace
 namespace SK::VkRendererBackend
 {
-	struct Renderer;
+	struct RendererBackend;
 };
 
 // Bounds of a geometry. It both stores radius and extents. So, depending on the situation, a bounding box or a bounding sphere can be used
@@ -72,7 +72,7 @@ struct LoadedGLTF : public IRenderable
 	// All the MaterialConstants data is held in a single buffer contiguously
 	AllocatedBuffer materialDataBuffer;
 
-	SK::VkRendererBackend::Renderer* renderer;
+	SK::VkRendererBackend::RendererBackend* vkRendererBackend;
 
 	~LoadedGLTF() { clearAll(); };
 
@@ -82,9 +82,9 @@ private:
 	void clearAll();
 };
 
-std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(SK::VkRendererBackend::Renderer* renderer, std::string_view filePath);
+std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(SK::VkRendererBackend::RendererBackend* vkRendererBackend, std::string_view filePath);
 
 // Aside from debugging this is not used as it is only used to load the meshes directly. 
-std::optional<std::vector<std::shared_ptr<GLTFMeshAsset>>> loadGltfMeshes(SK::VkRendererBackend::Renderer* renderer, std::filesystem::path filePath);
+std::optional<std::vector<std::shared_ptr<GLTFMeshAsset>>> loadGltfMeshes(SK::VkRendererBackend::RendererBackend* vkRendererBackend, std::filesystem::path filePath);
 
 /* GLTF END */

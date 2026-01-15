@@ -8,7 +8,7 @@
 // Forward declare with the namespace
 namespace SK::VkRendererBackend
 {
-	struct Renderer;
+	struct RendererBackend;
 };
 
 // PBR Metallic Material follows the GLTF format
@@ -34,7 +34,7 @@ public:
 		uint32_t dataBufferOffset; // Multiple materials in a GLTF file will be stored in a single buffer, so the actual data for the specific material instance is fetched with this offset
 	};
 
-	static void BuildMaterialLayout(SK::VkRendererBackend::Renderer* renderer);
+	static void BuildMaterialLayout(SK::VkRendererBackend::RendererBackend* vkRendererBackend);
 
 	// This static class only stores material layout. The material resources are allocated outside per material instance. Allocator-side must clean them properly.
 	static void ClearMaterialLayout(VkDevice device);

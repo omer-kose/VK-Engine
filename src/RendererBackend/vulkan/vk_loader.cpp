@@ -13,7 +13,7 @@
 #include <fastgltf/tools.hpp>
 
 
-std::optional<AllocatedImage> loadImage(SK::VkRendererBackend::Renderer* renderer, fastgltf::Asset& asset, fastgltf::Image& image)
+std::optional<AllocatedImage> loadImage(SK::VkRendererBackend::RendererBackend* vkRendererBackend, fastgltf::Asset& asset, fastgltf::Image& image)
 {
 	AllocatedImage newImage = {};
 
@@ -34,7 +34,7 @@ std::optional<AllocatedImage> loadImage(SK::VkRendererBackend::Renderer* rendere
 				imageSize.height = height;
 				imageSize.depth = 1;
 
-				newImage = SK::VkRendererBackend::createImage(renderer, data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+				newImage = SK::VkRendererBackend::createImage(vkRendererBackend, data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 
 				stbi_image_free(data);
 			}
@@ -48,7 +48,7 @@ std::optional<AllocatedImage> loadImage(SK::VkRendererBackend::Renderer* rendere
 				imageSize.height = height;
 				imageSize.depth = 1;
 
-				newImage = SK::VkRendererBackend::createImage(renderer, data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+				newImage = SK::VkRendererBackend::createImage(vkRendererBackend, data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 
 				stbi_image_free(data);	
 			}
@@ -68,7 +68,7 @@ std::optional<AllocatedImage> loadImage(SK::VkRendererBackend::Renderer* rendere
 						imageSize.height = height;
 						imageSize.depth = 1;
 
-						newImage = SK::VkRendererBackend::createImage(renderer, data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+						newImage = SK::VkRendererBackend::createImage(vkRendererBackend, data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 
 						stbi_image_free(data);
 					}
@@ -123,12 +123,12 @@ VkSamplerMipmapMode extractMipmapMode(fastgltf::Filter filter)
 }
 
 
-std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(SK::VkRendererBackend::Renderer* renderer, std::string_view filePath)
+std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(SK::VkRendererBackend::RendererBackend* vkRendererBackend, std::string_view filePath)
 {
 	fmt::print("Loading GLTF: {}", filePath);
 
 	std::shared_ptr<LoadedGLTF> scene = std::make_shared<LoadedGLTF>();
-	scene->renderer = renderer;
+	scene->vkRendererBackend = vkRendererBackend;
 
 	fastgltf::Parser parser{};
 
@@ -181,7 +181,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(SK::VkRendererBackend::Rende
 		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1},
 	};
 
-	scene->descriptorAllocator.init(renderer->device, asset.materials.size(), poolSizes);
+	scene->descriptorAllocator.init(vkRendererBackend->device, asset.materials.size(), poolSizes);
 
 	// Load samplers
 	for(fastgltf::Sampler& sampler : asset.samplers)
@@ -196,7 +196,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(SK::VkRendererBackend::Rende
 		samplerInfo.mipmapMode = extractMipmapMode(sampler.minFilter.value_or(fastgltf::Filter::Nearest));
 
 		VkSampler newSampler;
-		vkCreateSampler(renderer->device, &samplerInfo, nullptr, &newSampler);
+		vkCreateSampler(vkRendererBackend->device, &samplerInfo, nullptr, &newSampler);
 
 		scene->samplers.push_back(newSampler);
 	}
@@ -210,7 +210,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(SK::VkRendererBackend::Rende
 	// Load the textures
 	for(fastgltf::Image& image : asset.images)
 	{
-		std::optional<AllocatedImage> img = loadImage(renderer, asset, image);
+		std::optional<AllocatedImage> img = loadImage(vkRendererBackend, asset, image);
 
 		if(img.has_value())
 		{
@@ -220,12 +220,12 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(SK::VkRendererBackend::Rende
 		else
 		{
 			// failed to load, default to error image but give an error
-			textures.push_back(renderer->errorCheckerboardImage);
+			textures.push_back(vkRendererBackend->errorCheckerboardImage);
 			fmt::print("Failed to load gltf texture: {} \n", image.name);
 		}
 	}
 
-	scene->materialDataBuffer = SK::VkRendererBackend::createBuffer(renderer, asset.materials.size() * sizeof(GLTFMetallicRoughnessMaterial::MaterialConstants), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+	scene->materialDataBuffer = SK::VkRendererBackend::createBuffer(vkRendererBackend, asset.materials.size() * sizeof(GLTFMetallicRoughnessMaterial::MaterialConstants), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 	int dataIndex = 0;
 	GLTFMetallicRoughnessMaterial::MaterialConstants* pMaterialDataBuffer = (GLTFMetallicRoughnessMaterial::MaterialConstants*)scene->materialDataBuffer.allocInfo.pMappedData;
 
@@ -255,10 +255,10 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(SK::VkRendererBackend::Rende
 
 		GLTFMetallicRoughnessMaterial::MaterialResources materialResources;
 		// Default the material textures
-		materialResources.colorImage = renderer->whiteImage;
-		materialResources.colorSampler = renderer->defaultSamplerLinear;
-		materialResources.metalRoughnessImage = renderer->whiteImage;
-		materialResources.metalRoughnessSampler = renderer->defaultSamplerLinear;
+		materialResources.colorImage = vkRendererBackend->whiteImage;
+		materialResources.colorSampler = vkRendererBackend->defaultSamplerLinear;
+		materialResources.metalRoughnessImage = vkRendererBackend->whiteImage;
+		materialResources.metalRoughnessSampler = vkRendererBackend->defaultSamplerLinear;
 
 		// Set the uniform buffer for the material data
 		materialResources.dataBuffer = scene->materialDataBuffer.buffer;
@@ -274,7 +274,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(SK::VkRendererBackend::Rende
 		}
 
 		// create the material instance
-		*newMat = GLTFMetallicRoughnessMaterial::CreateInstance(renderer->device, passType, materialResources, scene->descriptorAllocator);
+		*newMat = GLTFMetallicRoughnessMaterial::CreateInstance(vkRendererBackend->device, passType, materialResources, scene->descriptorAllocator);
 
 		++dataIndex;
 	}
@@ -391,7 +391,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(SK::VkRendererBackend::Rende
 			newmesh->surfaces.push_back(newSurface);
 		}
 
-		newmesh->meshBuffers = SK::VkRendererBackend::uploadMesh(renderer, vertices, indices);
+		newmesh->meshBuffers = SK::VkRendererBackend::uploadMesh(vkRendererBackend, vertices, indices);
 	}
 
 	// Load all the nodes
@@ -457,7 +457,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(SK::VkRendererBackend::Rende
 	return scene;
 }
 
-std::optional<std::vector<std::shared_ptr<GLTFMeshAsset>>> loadGltfMeshes(SK::VkRendererBackend::Renderer* renderer, std::filesystem::path filePath)
+std::optional<std::vector<std::shared_ptr<GLTFMeshAsset>>> loadGltfMeshes(SK::VkRendererBackend::RendererBackend* vkRendererBackend, std::filesystem::path filePath)
 {
 	std::cout << "Loading GLTF: " << filePath << std::endl;
 
@@ -574,7 +574,7 @@ std::optional<std::vector<std::shared_ptr<GLTFMeshAsset>>> loadGltfMeshes(SK::Vk
 			}
 		}
 
-		newMesh.meshBuffers = SK::VkRendererBackend::uploadMesh(renderer, vertices, indices);
+		newMesh.meshBuffers = SK::VkRendererBackend::uploadMesh(vkRendererBackend, vertices, indices);
 		
 		meshes.emplace_back(std::make_shared<GLTFMeshAsset>(std::move(newMesh)));
 	}
@@ -592,27 +592,27 @@ void LoadedGLTF::registerDraw(const glm::mat4& topMatrix, SK::VkRendererBackend:
 
 void LoadedGLTF::clearAll()
 {
-	VkDevice device = renderer->device;
+	VkDevice device = vkRendererBackend->device;
 
 	descriptorAllocator.destroyPools(device);
 	
-	SK::VkRendererBackend::destroyBuffer(renderer, materialDataBuffer);
+	SK::VkRendererBackend::destroyBuffer(vkRendererBackend, materialDataBuffer);
 
 	for(auto& [k, v] : meshes)
 	{
-		SK::VkRendererBackend::destroyBuffer(renderer, v->meshBuffers.vertexBuffer);
-		SK::VkRendererBackend::destroyBuffer(renderer, v->meshBuffers.indexBuffer);
+		SK::VkRendererBackend::destroyBuffer(vkRendererBackend, v->meshBuffers.vertexBuffer);
+		SK::VkRendererBackend::destroyBuffer(vkRendererBackend, v->meshBuffers.indexBuffer);
 	}
 
 	for(auto& [k, v] : textures)
 	{
-		if(v.image == renderer->errorCheckerboardImage.image)
+		if(v.image == vkRendererBackend->errorCheckerboardImage.image)
 		{
 			// Don't destroy the default images of the engine
 			continue;
 		}
 
-		SK::VkRendererBackend::destroyImage(renderer, v);
+		SK::VkRendererBackend::destroyImage(vkRendererBackend, v);
 	}
 
 	for(auto& sampler : samplers)

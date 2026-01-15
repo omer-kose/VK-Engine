@@ -118,14 +118,14 @@ namespace SK::VkRendererBackend
 		// Optional fields not all the passes needs them
 		VkImageView targetImageView;
 		VkExtent2D imageExtent;
-		Renderer* renderer; 
+		RendererBackend* vkRendererBackend; 
 	};
 
 	// TODO: Subject to change
 	/*
 		Reusable Passes that will be commonly used by all the programs like rendering UI, Gizmos etc. 
-		Programs, will and can hold their own fields for UI for example but they don't have to manually render them. Renderer can render those automatically.
-		So, programs using the renderer framework can only focus on their own core pipelines and algorithms.
+		Programs, will and can hold their own fields for UI for example but they don't have to manually render them. RendererBackend can render those automatically.
+		So, programs using the vkRendererBackend framework can only focus on their own core pipelines and algorithms.
 	*/
 	
 	// Such as UI, Gizmos etc.
@@ -135,8 +135,7 @@ namespace SK::VkRendererBackend
 	};
 
 
-	// TODO: Rename this into VkContext or smth
-	struct Renderer
+	struct RendererBackend
 	{
 		// Window related data stored (Window and other related params are owned by the App)
 		SDL_Window* window{ nullptr }; // A non-owning ptr pointing to the window created by the App.
@@ -144,7 +143,6 @@ namespace SK::VkRendererBackend
 
 		bool isInitialized{ false };
 		uint32_t frameNumber{ 0 };
-		bool freezeRendering{ false };
 		bool resizeRequested{ false };
 		float renderScale{ 1.0f };
 		// Vulkan Context
@@ -174,7 +172,7 @@ namespace SK::VkRendererBackend
 		// Global Resource Deletion Queue
 		SK::Util::DeletionQueue mainDeletionQueue;
 
-		// Engine stats
+		// Engine stats (TODO: Take this out)
 		RenderStats stats;
 
 		// Immeadiate submit structures
@@ -230,74 +228,74 @@ namespace SK::VkRendererBackend
 	};
 
 
-	// initializes everything in the engine
-	void init(Renderer* renderer, struct SDL_Window* window, uint32_t windowWidth, uint32_t windowHeight);
+	// initializes everything in the renderer backend
+	void init(RendererBackend* vkRendererBackend, struct SDL_Window* window, uint32_t windowWidth, uint32_t windowHeight);
 
-	// shuts down the renderer
-	void shutdown(Renderer* renderer);
+	// shuts down the renderer backend
+	void shutdown(RendererBackend* vkRendererBackend);
 
 	// draw functionality
-	void draw(Renderer* renderer, const DrawContext& ctx, const GPUSceneData& gpuSceneData); // core draw loop
-	void drawMain(Renderer* renderer, VkCommandBuffer cmd, const DrawContext& ctx, const GPUSceneData& gpuSceneData); // function to simplify the main draw function. It handles some transitions, attachments and calls to actualy drawing functionality below
-	void drawGeometry(Renderer* renderer, VkCommandBuffer cmd, const DrawContext& ctx);
+	void draw(RendererBackend* vkRendererBackend, const DrawContext& ctx, const GPUSceneData& gpuSceneData); // core draw loop
+	void drawMain(RendererBackend* vkRendererBackend, VkCommandBuffer cmd, const DrawContext& ctx, const GPUSceneData& gpuSceneData); // function to simplify the main draw function. It handles some transitions, attachments and calls to actualy drawing functionality below
+	void drawGeometry(RendererBackend* vkRendererBackend, VkCommandBuffer cmd, const DrawContext& ctx);
 
-	void immediateSubmit(Renderer* renderer, std::function<void(VkCommandBuffer cmd)>&& function);
+	void immediateSubmit(RendererBackend* vkRendererBackend, std::function<void(VkCommandBuffer cmd)>&& function);
 
-	// Renderer Utilities TODO: I think renderer shouldn't be responsible of providing such functionalities. The only reason of these being here is that renderer holds vmaAllocator  
-	AllocatedBuffer createBuffer(Renderer* renderer, size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
-	void destroyBuffer(Renderer* renderer, const AllocatedBuffer& buffer);
+	AllocatedBuffer createBuffer(RendererBackend* vkRendererBackend, size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+	void destroyBuffer(RendererBackend* vkRendererBackend, const AllocatedBuffer& buffer);
 
-	AllocatedImage createImage(Renderer* renderer, VkExtent3D imageExtent, VkFormat format, VkImageUsageFlags usage, bool mipMapped = false);
-	AllocatedImage createImage(Renderer* renderer, void* data, VkExtent3D imageExtent, VkFormat format, VkImageUsageFlags usage, bool mipMapped = false);
-	void destroyImage(Renderer* renderer, const AllocatedImage& img);
+	AllocatedImage createImage(RendererBackend* vkRendererBackend, VkExtent3D imageExtent, VkFormat format, VkImageUsageFlags usage, bool mipMapped = false);
+	AllocatedImage createImage(RendererBackend* vkRendererBackend, void* data, VkExtent3D imageExtent, VkFormat format, VkImageUsageFlags usage, bool mipMapped = false);
+	void destroyImage(RendererBackend* vkRendererBackend, const AllocatedImage& img);
 
-	GPUMeshBuffers uploadMesh(Renderer* renderer, std::span<Vertex> vertices, std::span<uint32_t> indices);
+	GPUMeshBuffers uploadMesh(RendererBackend* vkRendererBackend, std::span<Vertex> vertices, std::span<uint32_t> indices);
 
-	void updateSceneBuffer(Renderer* renderer, const GPUSceneData& gpuSceneData);
-	VkDescriptorSet fetchCurrentSceneBufferDescriptorSet(Renderer* renderer);
+	void updateSceneBuffer(RendererBackend* vkRendererBackend, const GPUSceneData& gpuSceneData);
+	VkDescriptorSet fetchCurrentSceneBufferDescriptorSet(RendererBackend* vkRendererBackend);
 
-	void setViewport(Renderer* renderer, VkCommandBuffer cmd);
-	void setScissor(Renderer* renderer, VkCommandBuffer cmd);
+	void setViewport(RendererBackend* vkRendererBackend, VkCommandBuffer cmd);
+	void setScissor(RendererBackend* vkRendererBackend, VkCommandBuffer cmd);
 
-	FrameData& fetchCurrentFrameData(Renderer* renderer);
+	FrameData& fetchCurrentFrameData(RendererBackend* vkRendererBackend);
 
-	void registerOverlayPass(Renderer* renderer, OverlayPass pass);
+	void registerOverlayPass(RendererBackend* vkRendererBackend, OverlayPass pass);
 
-	VkShaderModule getOrLoadShader(Renderer* renderer, const char* path);
-	void clearShaderCache(Renderer* renderer);
+	VkShaderModule getOrLoadShader(RendererBackend* vkRendererBackend, const char* path);
+	void clearShaderCache(RendererBackend* vkRendererBackend);
 
-	VkPipelineLayout getOrCreatePipelineLayout(Renderer* renderer, const PipelineLayoutKey& key);
-	void clearPipelineLayoutCache(Renderer* renderer);
+	VkPipelineLayout getOrCreatePipelineLayout(RendererBackend* vkRendererBackend, const PipelineLayoutKey& key);
+	void clearPipelineLayoutCache(RendererBackend* vkRendererBackend);
 
-	VkPipeline getOrCreatePipeline(Renderer* renderer, const PipelineKey& key);
-	void clearPipelineCache(Renderer* renderer);
+	VkPipeline getOrCreatePipeline(RendererBackend* vkRendererBackend, const PipelineKey& key);
+	void clearPipelineCache(RendererBackend* vkRendererBackend);
 
 	/*
 		Internal Helpers
+		TODO: Rename these?
 	*/
 	// Vulkan Context
-	void m_initVulkan(Renderer* renderer);
-	void m_initSwapchain(Renderer* renderer);
-	void m_initCommands(Renderer* renderer);
-	void m_initSyncStructures(Renderer* renderer);
+	void m_initVulkan(RendererBackend* vkRendererBackend);
+	void m_initSwapchain(RendererBackend* vkRendererBackend);
+	void m_initCommands(RendererBackend* vkRendererBackend);
+	void m_initSyncStructures(RendererBackend* vkRendererBackend);
 	// Swapchain
-	void m_createSwapchain(Renderer* renderer, uint32_t width, uint32_t height);
-	void m_destroySwapchain(Renderer* renderer);
-	void m_resizeSwapchain(Renderer* renderer);
+	void m_createSwapchain(RendererBackend* vkRendererBackend, uint32_t width, uint32_t height);
+	void m_destroySwapchain(RendererBackend* vkRendererBackend);
+	void m_resizeSwapchain(RendererBackend* vkRendererBackend);
 	// Descriptors
-	void m_initDescriptors(Renderer* renderer);
+	void m_initDescriptors(RendererBackend* vkRendererBackend);
 
 	// Passes
-	void m_initPasses(Renderer* renderer);
-	void m_clearPassResources(Renderer* renderer);
+	void m_initPasses(RendererBackend* vkRendererBackend);
+	void m_clearPassResources(RendererBackend* vkRendererBackend);
 
 	// Material Layouts
-	void m_initMaterialLayouts(Renderer* renderer);
-	void m_clearMaterialLayouts(Renderer* renderer);
+	void m_initMaterialLayouts(RendererBackend* vkRendererBackend);
+	void m_clearMaterialLayouts(RendererBackend* vkRendererBackend);
 
 	// Default Engine Data
-	void m_initDefaultData(Renderer* renderer);
+	void m_initDefaultData(RendererBackend* vkRendererBackend);
 
 	// Init Scene Buffer
-	void m_initGlobalSceneBuffer(Renderer* renderer);
+	void m_initGlobalSceneBuffer(RendererBackend* vkRendererBackend);
 };
