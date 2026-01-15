@@ -20,6 +20,31 @@
 
 constexpr bool useValidationLayers = true;
 
+static size_t hashPipelineLayoutKey(const SK::VkRendererBackend::PipelineLayoutKey& k)
+{
+    size_t h = 0;
+
+    auto hc = [&](auto v)
+    {
+        std::hash<uint64_t> hasher;
+        h ^= hasher((uint64_t)v) + 0x9e3779b9 + (h << 6) + (h >> 2);
+    };
+    
+    for(auto l : k.setLayouts)
+    {
+        hc(l);
+    }
+
+    for(auto& pc : k.pushConstantRanges)
+    {
+        hc(pc.offset);
+        hc(pc.size);
+        hc(pc.stageFlags);
+    }
+
+    return h;
+}
+
 static size_t hashPipelineKey(const SK::VkRendererBackend::PipelineKey& k)
 {
     size_t h = 0;
@@ -95,6 +120,7 @@ void SK::VkRendererBackend::shutdown(Renderer* renderer)
 
         // Clear out the caches
         clearShaderCache(renderer);
+        clearPipelineLayoutCache(renderer);
         clearPipelineCache(renderer);
 
         m_clearMaterialLayouts(renderer);
@@ -496,7 +522,41 @@ void SK::VkRendererBackend::clearShaderCache(Renderer* renderer)
     {
         vkDestroyShaderModule(renderer->device, s, nullptr);
     }
+
     renderer->shaderCache.clear();
+}
+
+VkPipelineLayout SK::VkRendererBackend::getOrCreatePipelineLayout(Renderer* renderer, const PipelineLayoutKey& key)
+{
+    size_t hash = hashPipelineLayoutKey(key);
+
+    auto it = renderer->pipelineLayoutCache.find(hash);
+    if(it != renderer->pipelineLayoutCache.end())
+    {
+        return it->second;
+    }
+
+    VkPipelineLayoutCreateInfo info = vkinit::pipeline_layout_create_info();
+    info.setLayoutCount = (uint32_t)key.setLayouts.size();
+    info.pSetLayouts = key.setLayouts.data();
+    info.pushConstantRangeCount = (uint32_t)key.pushConstantRanges.size();
+    info.pPushConstantRanges = key.pushConstantRanges.data();
+
+    VkPipelineLayout layout;
+    VK_CHECK(vkCreatePipelineLayout(renderer->device, &info, nullptr, &layout));
+
+    renderer->pipelineLayoutCache[hash] = layout;
+    return layout;
+}
+
+void SK::VkRendererBackend::clearPipelineLayoutCache(Renderer* renderer)
+{
+    for(auto& [k, l] : renderer->pipelineLayoutCache)
+    {
+        vkDestroyPipelineLayout(renderer->device, l, nullptr);
+    }
+
+    renderer->pipelineLayoutCache.clear();
 }
 
 VkPipeline SK::VkRendererBackend::getOrCreatePipeline(Renderer* renderer, const PipelineKey& key)
@@ -558,6 +618,7 @@ void SK::VkRendererBackend::clearPipelineCache(Renderer* renderer)
     {
         vkDestroyPipeline(renderer->device, p, nullptr);
     }
+
     renderer->pipelineCache.clear();
 }
 

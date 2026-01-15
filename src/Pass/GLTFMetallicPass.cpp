@@ -42,13 +42,11 @@ void GLTFMetallicPass::Init(SK::VkRendererBackend::Renderer* renderer)
     VkDescriptorSetLayout layouts[] = { renderer->gpuSceneDataDescriptorLayout, materialLayout};
 
     // Mesh pipeline layout
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = vkinit::pipeline_layout_create_info();
-    pipelineLayoutInfo.pushConstantRangeCount = 1;
-    pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
-    pipelineLayoutInfo.setLayoutCount = 2;
-    pipelineLayoutInfo.pSetLayouts = layouts;
+    SK::VkRendererBackend::PipelineLayoutKey layoutKey;
+    layoutKey.setLayouts = { renderer->gpuSceneDataDescriptorLayout, materialLayout };
+    layoutKey.pushConstantRanges = { pushConstantRange };
 
-    VK_CHECK(vkCreatePipelineLayout(renderer->device, &pipelineLayoutInfo, nullptr, &PipelineLayout));
+    PipelineLayout = SK::VkRendererBackend::getOrCreatePipelineLayout(renderer, layoutKey);
 
     // Build the pipeline keys and retrieve the pipelines from the renderer backend
     size_t vertHash = std::hash<std::string>{}("../../shaders/glsl/gltf_metallic/mesh_vert.spv");
@@ -156,5 +154,4 @@ void GLTFMetallicPass::Update()
 
 void GLTFMetallicPass::ClearResources(SK::VkRendererBackend::Renderer* renderer)
 {
-    vkDestroyPipelineLayout(renderer->device, PipelineLayout, nullptr);
 }

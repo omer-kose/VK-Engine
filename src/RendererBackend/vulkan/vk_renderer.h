@@ -78,6 +78,12 @@ namespace SK::VkRendererBackend
 		}
 	};
 
+	struct PipelineLayoutKey
+	{
+		std::vector<VkDescriptorSetLayout> setLayouts;
+		std::vector<VkPushConstantRange> pushConstantRanges;
+	};
+
 	struct PipelineKey
 	{
 		size_t vertShader;
@@ -216,6 +222,9 @@ namespace SK::VkRendererBackend
 		// Shader cache
 		std::unordered_map<size_t, VkShaderModule> shaderCache;
 
+		// Pipeline Layout cache
+		std::unordered_map<size_t, VkPipelineLayout> pipelineLayoutCache;
+
 		// Pipeline cache
 		std::unordered_map<size_t, VkPipeline> pipelineCache;
 	};
@@ -256,6 +265,9 @@ namespace SK::VkRendererBackend
 
 	VkShaderModule getOrLoadShader(Renderer* renderer, const char* path);
 	void clearShaderCache(Renderer* renderer);
+
+	VkPipelineLayout getOrCreatePipelineLayout(Renderer* renderer, const PipelineLayoutKey& key);
+	void clearPipelineLayoutCache(Renderer* renderer);
 
 	VkPipeline getOrCreatePipeline(Renderer* renderer, const PipelineKey& key);
 	void clearPipelineCache(Renderer* renderer);
