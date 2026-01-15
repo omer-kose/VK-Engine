@@ -38,11 +38,9 @@ void GLTFMetallicPass::Init(SK::VkRendererBackend::Renderer* renderer)
     layoutBuilder.addBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
     VkDescriptorSetLayout materialLayout = layoutBuilder.build(renderer->device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    // 2 sets: 0 -> Scene Descriptor Set, 1 -> Material Descriptor Set
-    VkDescriptorSetLayout layouts[] = { renderer->gpuSceneDataDescriptorLayout, materialLayout};
-
     // Mesh pipeline layout
     SK::VkRendererBackend::PipelineLayoutKey layoutKey;
+    // 2 sets: 0 -> Scene Descriptor Set, 1 -> Material Descriptor Set
     layoutKey.setLayouts = { renderer->gpuSceneDataDescriptorLayout, materialLayout };
     layoutKey.pushConstantRanges = { pushConstantRange };
 
