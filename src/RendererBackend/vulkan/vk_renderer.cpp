@@ -144,9 +144,14 @@ void SK::VkRendererBackend::shutdown(RendererBackend* vkRendererBackend)
     }
 }
 
-void SK::VkRendererBackend::draw(RendererBackend* vkRendererBackend, const DrawContext& ctx, const GPUSceneData& sceneData)
+/*
+    Prepares/synchronizes internal logic and prepares the frame to be drawn.
+
+    Returns true if the frame begun successfully. In the cases like swapchain resize, it returns false.
+*/
+bool SK::VkRendererBackend::beginFrame(RendererBackend* vkRendererBackend)
 {
-    FrameData& currentFrame = fetchCurrentFrameData(vkRendererBackend);
+    FrameData& currentFrame = getCurrentFrameData(vkRendererBackend);
     // Wait until the GPU has finished rendering the last frame of the same modularity (0->1->2->3  wait on 2 for 0 and wait on 3 for 1 and so on)
     VK_CHECK(vkWaitForFences(vkRendererBackend->device, 1, &currentFrame.renderFence, true, 1000000000));
 
@@ -155,7 +160,7 @@ void SK::VkRendererBackend::draw(RendererBackend* vkRendererBackend, const DrawC
 
     // To be able to use the same fence it must be reset after use
     VK_CHECK(vkResetFences(vkRendererBackend->device, 1, &currentFrame.renderFence));
-    
+
     // Request an available image from the swapchain. swapchainSemaphore is signaled once it has finished presenting the image so it can be used again.
     // More detailed description of how vkAcquireNextImageKHR works: https://stackoverflow.com/questions/60419749/why-does-vkacquirenextimagekhr-never-block-my-thread
     uint32_t swapchainImageIndex;
@@ -163,13 +168,13 @@ void SK::VkRendererBackend::draw(RendererBackend* vkRendererBackend, const DrawC
     if(acquireResult == VK_ERROR_OUT_OF_DATE_KHR)
     {
         vkRendererBackend->resizeRequested = true;
-        return;
+        return false;
     }
 
-    // Extent of the image that we are going to draw onto
+    // Set the extent of the image that we are going to draw onto
     vkRendererBackend->drawExtent.width = std::min(vkRendererBackend->drawImage.imageExtent.width, vkRendererBackend->swapchainExtent.width) * vkRendererBackend->renderScale;
     vkRendererBackend->drawExtent.height = std::min(vkRendererBackend->drawImage.imageExtent.height, vkRendererBackend->swapchainExtent.height) * vkRendererBackend->renderScale;
-    
+
     // Vulkan handles are just a 64 bit handles/pointers, so its fine to copy them around, but remember that their actual data is handled by vulkan itself.
     VkCommandBuffer cmd = currentFrame.mainCommandBuffer;
 
@@ -184,11 +189,45 @@ void SK::VkRendererBackend::draw(RendererBackend* vkRendererBackend, const DrawC
 
     // Transition depth image to optimal depth layout
     vkutil::transitionImage(cmd, vkRendererBackend->depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-    
-    // encode main drawing commands 
-    drawMain(vkRendererBackend, cmd, ctx, sceneData);
+    // Transition draw image to optimal rendering layout
+    vkutil::transitionImage(cmd, vkRendererBackend->drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
-    // Transition the draw image and the swapchain image into their correct layouts
+    // Frame has begun successfully, fill in per-frame transient state in the renderer backend state
+    vkRendererBackend->currentCmdBuffer = currentFrame.mainCommandBuffer;
+    vkRendererBackend->currentSwapchainImageIndex = swapchainImageIndex;
+
+    return true;
+}
+
+void SK::VkRendererBackend::draw(RendererBackend* vkRendererBackend, const DrawContext& ctx, const GPUSceneData& sceneData)
+{
+    VkCommandBuffer cmd = vkRendererBackend->currentCmdBuffer;
+
+    // Begin a renderpass connected to the draw image
+    VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(vkRendererBackend->drawImage.imageView, &vkRendererBackend->colorAttachmentClearValue, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(vkRendererBackend->depthImage.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+
+    VkRenderingInfo renderInfo = vkinit::rendering_info(vkRendererBackend->drawExtent, &colorAttachment, &depthAttachment);
+    vkCmdBeginRendering(cmd, &renderInfo);
+
+    auto start = std::chrono::system_clock::now();
+
+    // Go through all the graphics passes and execute them
+    GLTFMetallicPass::Execute(vkRendererBackend, cmd, ctx);
+
+    auto end = std::chrono::system_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+    vkRendererBackend->stats.geometryDrawRecordTime = elapsed.count() / 1000.f;
+
+    vkCmdEndRendering(cmd);
+}
+
+void SK::VkRendererBackend::drawOverlays(RendererBackend* vkRendererBackend)
+{
+    VkCommandBuffer cmd = vkRendererBackend->currentCmdBuffer;
+    uint32_t swapchainImageIndex = vkRendererBackend->currentSwapchainImageIndex;
+
     vkutil::transitionImage(cmd, vkRendererBackend->drawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     vkutil::transitionImage(cmd, vkRendererBackend->swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
@@ -201,9 +240,17 @@ void SK::VkRendererBackend::draw(RendererBackend* vkRendererBackend, const DrawC
     // Execute overlay passes
     for(auto& pass : vkRendererBackend->overlayPasses)
     {
-        PassContext ctx = { cmd, vkRendererBackend->swapchainImageViews[swapchainImageIndex], vkRendererBackend->swapchainExtent };
+        PassContext ctx = { cmd, vkRendererBackend->swapchainImageViews[swapchainImageIndex], vkRendererBackend->swapchainExtent, vkRendererBackend };
         pass.draw(&ctx);
     }
+}
+
+void SK::VkRendererBackend::endFrame(RendererBackend* vkRendererBackend)
+{
+    FrameData& currentFrame = getCurrentFrameData(vkRendererBackend);
+
+    VkCommandBuffer cmd = vkRendererBackend->currentCmdBuffer;
+    uint32_t swapchainImageIndex = vkRendererBackend->currentSwapchainImageIndex;
 
     // Transition swapchain image into the presentation layout
     vkutil::transitionImage(cmd, vkRendererBackend->swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
@@ -225,7 +272,7 @@ void SK::VkRendererBackend::draw(RendererBackend* vkRendererBackend, const DrawC
 
     // Prepare the presentation
     // We will wait on the renderSemaphore so that it will be guaranteed that the rendering has been finished and the swapchain image is ready to be presented
-    VkPresentInfoKHR presentInfo = {.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, .pNext = nullptr};
+    VkPresentInfoKHR presentInfo = { .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, .pNext = nullptr };
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = &vkRendererBackend->swapchain;
     presentInfo.waitSemaphoreCount = 1;
@@ -240,38 +287,6 @@ void SK::VkRendererBackend::draw(RendererBackend* vkRendererBackend, const DrawC
 
     // Increase the number of frames drawn
     ++vkRendererBackend->frameNumber;
-}
-
-void SK::VkRendererBackend::drawMain(RendererBackend* vkRendererBackend, VkCommandBuffer cmd, const DrawContext& ctx, const GPUSceneData& sceneData)
-{
-    updateSceneBuffer(vkRendererBackend, sceneData);
-
-    // When rendering geometry we need to use COLOR_ATTACHMENT_OPTIMAL as it is the most optimal layout for rendering with graphics pipeline
-    vkutil::transitionImage(cmd, vkRendererBackend->drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-
-    // Begin a renderpass connected to the draw image
-    VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(vkRendererBackend->drawImage.imageView, &vkRendererBackend->colorAttachmentClearValue, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(vkRendererBackend->depthImage.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-
-    VkRenderingInfo renderInfo = vkinit::rendering_info(vkRendererBackend->drawExtent, &colorAttachment, &depthAttachment);
-    vkCmdBeginRendering(cmd, &renderInfo);
-
-    auto start = std::chrono::system_clock::now();
-
-    drawGeometry(vkRendererBackend, cmd, ctx);
-
-    auto end = std::chrono::system_clock::now();
-    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-
-    vkRendererBackend->stats.geometryDrawRecordTime = elapsed.count() / 1000.f;
-
-    vkCmdEndRendering(cmd);
-}
-
-void SK::VkRendererBackend::drawGeometry(RendererBackend* vkRendererBackend, VkCommandBuffer cmd, const DrawContext& ctx)
-{
-    // Go through all the graphics passes and execute them
-    GLTFMetallicPass::Execute(vkRendererBackend, cmd, ctx);
 }
 
 void SK::VkRendererBackend::immediateSubmit(RendererBackend* vkRendererBackend, std::function<void(VkCommandBuffer cmd)>&& function)
@@ -450,7 +465,7 @@ GPUMeshBuffers SK::VkRendererBackend::uploadMesh(RendererBackend* vkRendererBack
 
 /*
     Both update and bind scene buffer functions must be called after the frame fence waits as it will be guaranteed that the frame is done being used by GPU. Otherwise, the data can be corrupted. 
-    (calling in drawMain() will suffice)
+    So, it can be safely called after frameBegin function
 */
 void SK::VkRendererBackend::updateSceneBuffer(RendererBackend* vkRendererBackend, const GPUSceneData& sceneData)
 {
@@ -486,9 +501,24 @@ void SK::VkRendererBackend::setScissor(RendererBackend* vkRendererBackend, VkCom
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 }
 
-SK::VkRendererBackend::FrameData& SK::VkRendererBackend::fetchCurrentFrameData(RendererBackend* vkRendererBackend)
+SK::VkRendererBackend::FrameData& SK::VkRendererBackend::getCurrentFrameData(RendererBackend* vkRendererBackend)
 {
     return vkRendererBackend->frames[vkRendererBackend->frameNumber % FRAME_OVERLAP];
+}
+
+VkExtent2D SK::VkRendererBackend::getDrawExtent(RendererBackend* vkRendererBackend)
+{
+    return vkRendererBackend->drawExtent;
+}
+
+uint32_t SK::VkRendererBackend::getCurrentSwapchainImageIndex(RendererBackend* vkRendererBackend)
+{
+    return vkRendererBackend->currentSwapchainImageIndex;
+}
+
+VkCommandBuffer SK::VkRendererBackend::getCurrentCmdBuffer(RendererBackend* vkRendererBackend)
+{
+    return vkRendererBackend->currentCmdBuffer;
 }
 
 void SK::VkRendererBackend::registerOverlayPass(RendererBackend* vkRendererBackend, OverlayPass pass)

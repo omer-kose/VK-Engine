@@ -107,7 +107,13 @@ int main(int argc, char* argv[])
 
         updateSceneTemp(&vkRendererBackend, application.mainCamera);
 
-        SK::VkRendererBackend::draw(&vkRendererBackend, drawContext, gpuSceneData);
+        if(SK::VkRendererBackend::beginFrame(&vkRendererBackend))
+        {
+            SK::VkRendererBackend::updateSceneBuffer(&vkRendererBackend, gpuSceneData);
+            SK::VkRendererBackend::draw(&vkRendererBackend, drawContext, gpuSceneData);
+            SK::VkRendererBackend::drawOverlays(&vkRendererBackend);
+            SK::VkRendererBackend::endFrame(&vkRendererBackend);
+        }
         
         // TODO: To be moved out to a proper place
         // After drawing clear out the DrawContext

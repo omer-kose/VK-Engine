@@ -17,6 +17,7 @@ class Camera;
 
 namespace SK::VkRendererBackend
 {
+	// Persistent resources that rotate and reused per frame
 	struct FrameData
 	{
 		VkCommandPool commandPool;
@@ -225,6 +226,11 @@ namespace SK::VkRendererBackend
 
 		// Pipeline cache
 		std::unordered_map<size_t, VkPipeline> pipelineCache;
+
+		// Per-Frame Transient State (Filled by beginFrame function)
+		uint32_t currentSwapchainImageIndex;
+		VkCommandBuffer currentCmdBuffer;
+		
 	};
 
 
@@ -234,10 +240,11 @@ namespace SK::VkRendererBackend
 	// shuts down the renderer backend
 	void shutdown(RendererBackend* vkRendererBackend);
 
-	// draw functionality
+	// begin/end frames and some internal common draw functionalities
+	bool beginFrame(RendererBackend* vkRendererBackend);
 	void draw(RendererBackend* vkRendererBackend, const DrawContext& ctx, const GPUSceneData& gpuSceneData); // core draw loop
-	void drawMain(RendererBackend* vkRendererBackend, VkCommandBuffer cmd, const DrawContext& ctx, const GPUSceneData& gpuSceneData); // function to simplify the main draw function. It handles some transitions, attachments and calls to actualy drawing functionality below
-	void drawGeometry(RendererBackend* vkRendererBackend, VkCommandBuffer cmd, const DrawContext& ctx);
+	void drawOverlays(RendererBackend* vkRendererBackend);
+	void endFrame(RendererBackend* vkRendererBackend);
 
 	void immediateSubmit(RendererBackend* vkRendererBackend, std::function<void(VkCommandBuffer cmd)>&& function);
 
@@ -256,8 +263,6 @@ namespace SK::VkRendererBackend
 	void setViewport(RendererBackend* vkRendererBackend, VkCommandBuffer cmd);
 	void setScissor(RendererBackend* vkRendererBackend, VkCommandBuffer cmd);
 
-	FrameData& fetchCurrentFrameData(RendererBackend* vkRendererBackend);
-
 	void registerOverlayPass(RendererBackend* vkRendererBackend, OverlayPass pass);
 
 	VkShaderModule getOrLoadShader(RendererBackend* vkRendererBackend, const char* path);
@@ -268,6 +273,12 @@ namespace SK::VkRendererBackend
 
 	VkPipeline getOrCreatePipeline(RendererBackend* vkRendererBackend, const PipelineKey& key);
 	void clearPipelineCache(RendererBackend* vkRendererBackend);
+
+	// Getters
+	FrameData& getCurrentFrameData(RendererBackend* vkRendererBackend);
+	VkExtent2D getDrawExtent(RendererBackend* vkRendererBackend);
+	uint32_t getCurrentSwapchainImageIndex(RendererBackend* vkRendererBackend);
+	VkCommandBuffer getCurrentCmdBuffer(RendererBackend* vkRendererBackend);
 
 	/*
 		Internal Helpers
