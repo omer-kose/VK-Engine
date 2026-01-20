@@ -506,16 +506,6 @@ SK::VkRendererBackend::FrameData& SK::VkRendererBackend::getCurrentFrameData(Ren
     return vkRendererBackend->frames[vkRendererBackend->frameNumber % FRAME_OVERLAP];
 }
 
-uint32_t SK::VkRendererBackend::getCurrentSwapchainImageIndex(RendererBackend* vkRendererBackend)
-{
-    return vkRendererBackend->currentSwapchainImageIndex;
-}
-
-VkCommandBuffer SK::VkRendererBackend::getCurrentCmdBuffer(RendererBackend* vkRendererBackend)
-{
-    return vkRendererBackend->currentCmdBuffer;
-}
-
 void SK::VkRendererBackend::registerOverlayPass(RendererBackend* vkRendererBackend, OverlayPass pass)
 {
     vkRendererBackend->overlayPasses.push_back(pass);

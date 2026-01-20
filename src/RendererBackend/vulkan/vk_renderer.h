@@ -275,8 +275,6 @@ namespace SK::VkRendererBackend
 	void clearPipelineCache(RendererBackend* vkRendererBackend);
 
 	FrameData& getCurrentFrameData(RendererBackend* vkRendererBackend);
-	uint32_t getCurrentSwapchainImageIndex(RendererBackend* vkRendererBackend);
-	VkCommandBuffer getCurrentCmdBuffer(RendererBackend* vkRendererBackend);
 
 	/*
 		Internal Helpers
