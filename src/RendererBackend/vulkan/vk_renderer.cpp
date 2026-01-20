@@ -506,11 +506,6 @@ SK::VkRendererBackend::FrameData& SK::VkRendererBackend::getCurrentFrameData(Ren
     return vkRendererBackend->frames[vkRendererBackend->frameNumber % FRAME_OVERLAP];
 }
 
-VkExtent2D SK::VkRendererBackend::getDrawExtent(RendererBackend* vkRendererBackend)
-{
-    return vkRendererBackend->drawExtent;
-}
-
 uint32_t SK::VkRendererBackend::getCurrentSwapchainImageIndex(RendererBackend* vkRendererBackend)
 {
     return vkRendererBackend->currentSwapchainImageIndex;

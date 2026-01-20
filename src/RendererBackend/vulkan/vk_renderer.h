@@ -274,9 +274,7 @@ namespace SK::VkRendererBackend
 	VkPipeline getOrCreatePipeline(RendererBackend* vkRendererBackend, const PipelineKey& key);
 	void clearPipelineCache(RendererBackend* vkRendererBackend);
 
-	// Getters
 	FrameData& getCurrentFrameData(RendererBackend* vkRendererBackend);
-	VkExtent2D getDrawExtent(RendererBackend* vkRendererBackend);
 	uint32_t getCurrentSwapchainImageIndex(RendererBackend* vkRendererBackend);
 	VkCommandBuffer getCurrentCmdBuffer(RendererBackend* vkRendererBackend);
 
