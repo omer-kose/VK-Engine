@@ -5,7 +5,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-void vkutil::transitionImage(VkCommandBuffer cmd, VkImage image, VkImageLayout currentLayout, VkImageLayout newLayout)
+void SK::VkUtil::transitionImage(VkCommandBuffer cmd, VkImage image, VkImageLayout currentLayout, VkImageLayout newLayout)
 {
 	VkImageMemoryBarrier2 imageBarrier{.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2, .pNext = nullptr};
 	
@@ -18,7 +18,7 @@ void vkutil::transitionImage(VkCommandBuffer cmd, VkImage image, VkImageLayout c
 	imageBarrier.newLayout = newLayout;
 
 	VkImageAspectFlags aspectMask = (newLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
-	imageBarrier.subresourceRange = vkinit::image_subresource_range(aspectMask);
+	imageBarrier.subresourceRange = SK::VkInit::image_subresource_range(aspectMask);
 	imageBarrier.image = image;
 
 	VkDependencyInfo depInfo{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO, .pNext = nullptr};
@@ -28,7 +28,7 @@ void vkutil::transitionImage(VkCommandBuffer cmd, VkImage image, VkImageLayout c
 	vkCmdPipelineBarrier2(cmd, &depInfo);
 }
 
-void vkutil::copyImageToImage(VkCommandBuffer cmd, VkImage source, VkImage destination, VkExtent2D srcSize, VkExtent2D destSize)
+void SK::VkUtil::copyImageToImage(VkCommandBuffer cmd, VkImage source, VkImage destination, VkExtent2D srcSize, VkExtent2D destSize)
 {
 	VkImageBlit2 blitRegion = {.sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2, .pNext = nullptr};
 
@@ -62,7 +62,7 @@ void vkutil::copyImageToImage(VkCommandBuffer cmd, VkImage source, VkImage desti
 	vkCmdBlitImage2(cmd, &blitInfo);
 }
 
-void vkutil::generateMipmaps(VkCommandBuffer cmd, VkImage image, VkExtent2D imageSize)
+void SK::VkUtil::generateMipmaps(VkCommandBuffer cmd, VkImage image, VkExtent2D imageSize)
 {
     int mipLevels = int(std::floor(std::log2(std::max(imageSize.width, imageSize.height)))) + 1;
     for(int mip = 0; mip < mipLevels; ++mip) 
@@ -82,7 +82,7 @@ void vkutil::generateMipmaps(VkCommandBuffer cmd, VkImage image, VkExtent2D imag
         imageBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 
         VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        imageBarrier.subresourceRange = vkinit::image_subresource_range(aspectMask);
+        imageBarrier.subresourceRange = SK::VkInit::image_subresource_range(aspectMask);
         imageBarrier.subresourceRange.levelCount = 1;
         imageBarrier.subresourceRange.baseMipLevel = mip;
         imageBarrier.image = image;

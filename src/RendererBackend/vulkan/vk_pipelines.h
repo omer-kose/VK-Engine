@@ -33,7 +33,7 @@ public:
     VkFormat colorAttachmentformat;
 };
 
-namespace vkutil 
+namespace SK::VkUtil 
 {
 	bool loadShaderModule(VkDevice device, const char* filePath, VkShaderModule* outShaderModule);
 };

@@ -2,7 +2,7 @@
 
 #include <RendererBackend/vulkan/vk_types.h>
 
-namespace vkinit 
+namespace SK::VkInit 
 {
     //> init_cmd
     VkCommandPoolCreateInfo command_pool_create_info(uint32_t queueFamilyIndex, VkCommandPoolCreateFlags flags = 0);

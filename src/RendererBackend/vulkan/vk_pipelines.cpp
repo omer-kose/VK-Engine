@@ -3,7 +3,7 @@
 #include <fstream>
 #include <RendererBackend/vulkan/vk_initializers.h>
 
-bool vkutil::loadShaderModule(VkDevice device, const char* filePath, VkShaderModule* outShaderModule)
+bool SK::VkUtil::loadShaderModule(VkDevice device, const char* filePath, VkShaderModule* outShaderModule)
 {
 	// Open the file with the cursor at the end
 	std::ifstream file(filePath, std::ios::ate | std::ios::binary);
@@ -129,8 +129,8 @@ VkPipeline PipelineBuilder::buildPipeline(VkDevice device)
 void PipelineBuilder::setShaders(VkShaderModule vertexShader, VkShaderModule fragmentShader)
 {
 	shaderStages.clear();
-	shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, vertexShader));
-	shaderStages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, fragmentShader));
+	shaderStages.push_back(SK::VkInit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, vertexShader));
+	shaderStages.push_back(SK::VkInit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, fragmentShader));
 }
 
 void PipelineBuilder::setInputTopology(VkPrimitiveTopology topology)

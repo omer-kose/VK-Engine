@@ -182,15 +182,15 @@ bool SK::VkRendererBackend::beginFrame(RendererBackend* vkRendererBackend)
     VK_CHECK(vkResetCommandBuffer(cmd, 0));
 
     // Begin the command buffer recording. We will submit this command buffer exactly once, so we let Vulkan know that
-    VkCommandBufferBeginInfo cmdBeginInfo = vkinit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    VkCommandBufferBeginInfo cmdBeginInfo = SK::VkInit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
     // Start the command buffer recording
     VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
 
     // Transition depth image to optimal depth layout
-    vkutil::transitionImage(cmd, vkRendererBackend->depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+    SK::VkUtil::transitionImage(cmd, vkRendererBackend->depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
     // Transition draw image to optimal rendering layout
-    vkutil::transitionImage(cmd, vkRendererBackend->drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    SK::VkUtil::transitionImage(cmd, vkRendererBackend->drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
     // Frame has begun successfully, fill in per-frame transient state in the renderer backend state
     vkRendererBackend->currentCmdBuffer = currentFrame.mainCommandBuffer;
@@ -204,10 +204,10 @@ void SK::VkRendererBackend::draw(RendererBackend* vkRendererBackend, const DrawC
     VkCommandBuffer cmd = vkRendererBackend->currentCmdBuffer;
 
     // Begin a renderpass connected to the draw image
-    VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(vkRendererBackend->drawImage.imageView, &vkRendererBackend->colorAttachmentClearValue, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(vkRendererBackend->depthImage.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+    VkRenderingAttachmentInfo colorAttachment = SK::VkInit::attachment_info(vkRendererBackend->drawImage.imageView, &vkRendererBackend->colorAttachmentClearValue, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    VkRenderingAttachmentInfo depthAttachment = SK::VkInit::depth_attachment_info(vkRendererBackend->depthImage.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
-    VkRenderingInfo renderInfo = vkinit::rendering_info(vkRendererBackend->drawExtent, &colorAttachment, &depthAttachment);
+    VkRenderingInfo renderInfo = SK::VkInit::rendering_info(vkRendererBackend->drawExtent, &colorAttachment, &depthAttachment);
     vkCmdBeginRendering(cmd, &renderInfo);
 
     auto start = std::chrono::system_clock::now();
@@ -228,14 +228,14 @@ void SK::VkRendererBackend::drawOverlays(RendererBackend* vkRendererBackend)
     VkCommandBuffer cmd = vkRendererBackend->currentCmdBuffer;
     uint32_t swapchainImageIndex = vkRendererBackend->currentSwapchainImageIndex;
 
-    vkutil::transitionImage(cmd, vkRendererBackend->drawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-    vkutil::transitionImage(cmd, vkRendererBackend->swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    SK::VkUtil::transitionImage(cmd, vkRendererBackend->drawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    SK::VkUtil::transitionImage(cmd, vkRendererBackend->swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     // Execute a copy operation from the draw image into the swapchain image
-    vkutil::copyImageToImage(cmd, vkRendererBackend->drawImage.image, vkRendererBackend->swapchainImages[swapchainImageIndex], vkRendererBackend->drawExtent, vkRendererBackend->swapchainExtent);
+    SK::VkUtil::copyImageToImage(cmd, vkRendererBackend->drawImage.image, vkRendererBackend->swapchainImages[swapchainImageIndex], vkRendererBackend->drawExtent, vkRendererBackend->swapchainExtent);
 
     // After drawing, we need to draw overlays on top of the swapchain image, so transition the swapchain image into optimal drawing layout
-    vkutil::transitionImage(cmd, vkRendererBackend->swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    SK::VkUtil::transitionImage(cmd, vkRendererBackend->swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
     // Execute overlay passes
     for(auto& pass : vkRendererBackend->overlayPasses)
@@ -253,7 +253,7 @@ void SK::VkRendererBackend::endFrame(RendererBackend* vkRendererBackend)
     uint32_t swapchainImageIndex = vkRendererBackend->currentSwapchainImageIndex;
 
     // Transition swapchain image into the presentation layout
-    vkutil::transitionImage(cmd, vkRendererBackend->swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+    SK::VkUtil::transitionImage(cmd, vkRendererBackend->swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
     // Finalize the command buffer
     VK_CHECK(vkEndCommandBuffer(cmd));
@@ -261,10 +261,10 @@ void SK::VkRendererBackend::endFrame(RendererBackend* vkRendererBackend)
     // Prepare the submission
     // We will wait on the swapchainSemaphore before executing the commands as that semaphore is signaled once swapchain is done presenting that image
     // We will signal renderSemaphore to signal that rendering has finished
-    VkCommandBufferSubmitInfo cmdSubmitInfo = vkinit::command_buffer_submit_info(cmd);
-    VkSemaphoreSubmitInfo waitInfo = vkinit::semaphore_submit_info(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, currentFrame.swapchainSemaphore);
-    VkSemaphoreSubmitInfo signalInfo = vkinit::semaphore_submit_info(VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, currentFrame.renderSemaphore);
-    VkSubmitInfo2 submit = vkinit::submit_info(&cmdSubmitInfo, &signalInfo, &waitInfo);
+    VkCommandBufferSubmitInfo cmdSubmitInfo = SK::VkInit::command_buffer_submit_info(cmd);
+    VkSemaphoreSubmitInfo waitInfo = SK::VkInit::semaphore_submit_info(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, currentFrame.swapchainSemaphore);
+    VkSemaphoreSubmitInfo signalInfo = SK::VkInit::semaphore_submit_info(VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, currentFrame.renderSemaphore);
+    VkSubmitInfo2 submit = SK::VkInit::submit_info(&cmdSubmitInfo, &signalInfo, &waitInfo);
 
     // Submit command buffer to the queue and execute it
     // renderFence will be signaled once the submitted command buffer has completed execution.
@@ -296,14 +296,14 @@ void SK::VkRendererBackend::immediateSubmit(RendererBackend* vkRendererBackend, 
     VK_CHECK(vkResetCommandBuffer(vkRendererBackend->immediateCommandBuffer, 0));
     // Prepare the immediate command buffer for executing function given as the param
     VkCommandBuffer cmd = vkRendererBackend->immediateCommandBuffer;
-    VkCommandBufferBeginInfo cmdBeginInfo = vkinit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    VkCommandBufferBeginInfo cmdBeginInfo = SK::VkInit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
     function(cmd);
     VK_CHECK(vkEndCommandBuffer(cmd));
 
     // Submit
-    VkCommandBufferSubmitInfo cmdSubmitInfo = vkinit::command_buffer_submit_info(cmd);
-    VkSubmitInfo2 submitInfo = vkinit::submit_info(&cmdSubmitInfo, nullptr, nullptr);
+    VkCommandBufferSubmitInfo cmdSubmitInfo = SK::VkInit::command_buffer_submit_info(cmd);
+    VkSubmitInfo2 submitInfo = SK::VkInit::submit_info(&cmdSubmitInfo, nullptr, nullptr);
     VK_CHECK(vkQueueSubmit2(vkRendererBackend->graphicsQueue, 1, &submitInfo, vkRendererBackend->immeadiateFence));
 
     // Wait on the fence until the command buffer finished executing
@@ -338,7 +338,7 @@ AllocatedImage SK::VkRendererBackend::createImage(RendererBackend* vkRendererBac
     newImage.imageFormat = format;
     newImage.imageExtent = imageExtent;
 
-    VkImageCreateInfo imgInfo = vkinit::image_create_info(format, usage, imageExtent);
+    VkImageCreateInfo imgInfo = SK::VkInit::image_create_info(format, usage, imageExtent);
     if(mipMapped)
     {
         imgInfo.mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(imageExtent.width, imageExtent.height)))) + 1;
@@ -360,7 +360,7 @@ AllocatedImage SK::VkRendererBackend::createImage(RendererBackend* vkRendererBac
     }
 
     // Create the image-view for the image
-    VkImageViewCreateInfo viewInfo = vkinit::imageview_create_info(format, newImage.image, aspectFlag);
+    VkImageViewCreateInfo viewInfo = SK::VkInit::imageview_create_info(format, newImage.image, aspectFlag);
     viewInfo.subresourceRange.levelCount = imgInfo.mipLevels;
 
     VK_CHECK(vkCreateImageView(vkRendererBackend->device, &viewInfo, nullptr, &newImage.imageView));
@@ -381,7 +381,7 @@ AllocatedImage SK::VkRendererBackend::createImage(RendererBackend* vkRendererBac
 
     // Perform a buffer to image copy.
     immediateSubmit(vkRendererBackend, [&](VkCommandBuffer cmd) {
-        vkutil::transitionImage(cmd, newImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        SK::VkUtil::transitionImage(cmd, newImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
         VkBufferImageCopy copyRegion{};
         copyRegion.bufferOffset = 0;
@@ -399,11 +399,11 @@ AllocatedImage SK::VkRendererBackend::createImage(RendererBackend* vkRendererBac
 
         if(mipMapped)
         {
-            vkutil::generateMipmaps(cmd, newImage.image, VkExtent2D{ newImage.imageExtent.width, newImage.imageExtent.height });
+            SK::VkUtil::generateMipmaps(cmd, newImage.image, VkExtent2D{ newImage.imageExtent.width, newImage.imageExtent.height });
         }
         else
         {
-            vkutil::transitionImage(cmd, newImage.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            SK::VkUtil::transitionImage(cmd, newImage.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
 
     });
@@ -522,7 +522,7 @@ VkShaderModule SK::VkRendererBackend::getOrLoadShader(RendererBackend* vkRendere
     }
 
     VkShaderModule shaderModule;
-    if(!vkutil::loadShaderModule(vkRendererBackend->device, path, &shaderModule))
+    if(!SK::VkUtil::loadShaderModule(vkRendererBackend->device, path, &shaderModule))
     {
         return VK_NULL_HANDLE;
     }
@@ -551,7 +551,7 @@ VkPipelineLayout SK::VkRendererBackend::getOrCreatePipelineLayout(RendererBacken
         return it->second;
     }
 
-    VkPipelineLayoutCreateInfo info = vkinit::pipeline_layout_create_info();
+    VkPipelineLayoutCreateInfo info = SK::VkInit::pipeline_layout_create_info();
     info.setLayoutCount = (uint32_t)key.setLayouts.size();
     info.pSetLayouts = key.setLayouts.data();
     info.pushConstantRangeCount = (uint32_t)key.pushConstantRanges.size();
@@ -722,7 +722,7 @@ void SK::VkRendererBackend::m_initSwapchain(RendererBackend* vkRendererBackend)
     drawImageUsageFlags |= VK_IMAGE_USAGE_STORAGE_BIT;
     drawImageUsageFlags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-    VkImageCreateInfo drawImageInfo = vkinit::image_create_info(vkRendererBackend->drawImage.imageFormat, drawImageUsageFlags, vkRendererBackend->drawImage.imageExtent);
+    VkImageCreateInfo drawImageInfo = SK::VkInit::image_create_info(vkRendererBackend->drawImage.imageFormat, drawImageUsageFlags, vkRendererBackend->drawImage.imageExtent);
 
     // For the draw image, we want to allocate it from the gpu local memory
     VmaAllocationCreateInfo imageAllocInfo = {};
@@ -733,7 +733,7 @@ void SK::VkRendererBackend::m_initSwapchain(RendererBackend* vkRendererBackend)
     vmaCreateImage(vkRendererBackend->vmaAllocator, &drawImageInfo, &imageAllocInfo, &vkRendererBackend->drawImage.image, &vkRendererBackend->drawImage.allocation, nullptr);
 
     // Build an image-view for the draw image to use for rendering
-    VkImageViewCreateInfo drawImageViewInfo = vkinit::imageview_create_info(vkRendererBackend->drawImage.imageFormat, vkRendererBackend->drawImage.image, VK_IMAGE_ASPECT_COLOR_BIT);
+    VkImageViewCreateInfo drawImageViewInfo = SK::VkInit::imageview_create_info(vkRendererBackend->drawImage.imageFormat, vkRendererBackend->drawImage.image, VK_IMAGE_ASPECT_COLOR_BIT);
 
     VK_CHECK(vkCreateImageView(vkRendererBackend->device, &drawImageViewInfo, nullptr, &vkRendererBackend->drawImage.imageView));
 
@@ -742,9 +742,9 @@ void SK::VkRendererBackend::m_initSwapchain(RendererBackend* vkRendererBackend)
     vkRendererBackend->depthImage.imageExtent = drawImageExtent;
     VkImageUsageFlags depthImageUsages{};
     depthImageUsages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-    VkImageCreateInfo depthImageInfo = vkinit::image_create_info(vkRendererBackend->depthImage.imageFormat, depthImageUsages, vkRendererBackend->depthImage.imageExtent);
+    VkImageCreateInfo depthImageInfo = SK::VkInit::image_create_info(vkRendererBackend->depthImage.imageFormat, depthImageUsages, vkRendererBackend->depthImage.imageExtent);
     vmaCreateImage(vkRendererBackend->vmaAllocator, &depthImageInfo, &imageAllocInfo, &vkRendererBackend->depthImage.image, &vkRendererBackend->depthImage.allocation, nullptr);
-    VkImageViewCreateInfo depthViewInfo = vkinit::imageview_create_info(vkRendererBackend->depthImage.imageFormat, vkRendererBackend->depthImage.image, VK_IMAGE_ASPECT_DEPTH_BIT);
+    VkImageViewCreateInfo depthViewInfo = SK::VkInit::imageview_create_info(vkRendererBackend->depthImage.imageFormat, vkRendererBackend->depthImage.image, VK_IMAGE_ASPECT_DEPTH_BIT);
     VK_CHECK(vkCreateImageView(vkRendererBackend->device, &depthViewInfo, nullptr, &vkRendererBackend->depthImage.imageView));
 
     // Add the resources to the deletion queue
@@ -761,13 +761,13 @@ void SK::VkRendererBackend::m_initSwapchain(RendererBackend* vkRendererBackend)
 void SK::VkRendererBackend::m_initCommands(RendererBackend* vkRendererBackend)
 {
     // Create the command pool and allow for resetting of individual command buffers
-    VkCommandPoolCreateInfo commandPoolInfo = vkinit::command_pool_create_info(vkRendererBackend->graphicsQueueFamily, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+    VkCommandPoolCreateInfo commandPoolInfo = SK::VkInit::command_pool_create_info(vkRendererBackend->graphicsQueueFamily, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 
     for(int i = 0; i < FRAME_OVERLAP; ++i)
     {
         VK_CHECK(vkCreateCommandPool(vkRendererBackend->device, &commandPoolInfo, nullptr, &vkRendererBackend->frames[i].commandPool));
         // Allocate the default command buffer that will be used for rendering
-        VkCommandBufferAllocateInfo cmdAllocInfo = vkinit::command_buffer_allocate_info(vkRendererBackend->frames[i].commandPool, 1);
+        VkCommandBufferAllocateInfo cmdAllocInfo = SK::VkInit::command_buffer_allocate_info(vkRendererBackend->frames[i].commandPool, 1);
         VK_CHECK(vkAllocateCommandBuffers(vkRendererBackend->device, &cmdAllocInfo, &vkRendererBackend->frames[i].mainCommandBuffer));
     }
 
@@ -775,7 +775,7 @@ void SK::VkRendererBackend::m_initCommands(RendererBackend* vkRendererBackend)
     VK_CHECK(vkCreateCommandPool(vkRendererBackend->device, &commandPoolInfo, nullptr, &vkRendererBackend->immediateCommandPool));
 
     // Allocate a command buffer for immediate submits
-    VkCommandBufferAllocateInfo cmdAllocInfo = vkinit::command_buffer_allocate_info(vkRendererBackend->immediateCommandPool, 1);
+    VkCommandBufferAllocateInfo cmdAllocInfo = SK::VkInit::command_buffer_allocate_info(vkRendererBackend->immediateCommandPool, 1);
 
     VK_CHECK(vkAllocateCommandBuffers(vkRendererBackend->device, &cmdAllocInfo, &vkRendererBackend->immediateCommandBuffer));
 
@@ -790,8 +790,8 @@ void SK::VkRendererBackend::m_initSyncStructures(RendererBackend* vkRendererBack
     //one fence to control when the gpu has finished rendering the frame,
     //and 2 semaphores to syncronize rendering with swapchain
     //we want the fence to start signalled so we can wait on it on the first frame
-    VkFenceCreateInfo fenceCreateInfo = vkinit::fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);
-    VkSemaphoreCreateInfo semaphoreCreateInfo = vkinit::semaphore_create_info();
+    VkFenceCreateInfo fenceCreateInfo = SK::VkInit::fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);
+    VkSemaphoreCreateInfo semaphoreCreateInfo = SK::VkInit::semaphore_create_info();
 
     for(int i = 0; i < FRAME_OVERLAP; ++i)
     {

@@ -97,8 +97,8 @@ void SK::UI::endFrame()
 
 void SK::UI::draw(SK::VkRendererBackend::PassContext* ctx)
 {
-    VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(ctx->targetImageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    VkRenderingInfo renderInfo = vkinit::rendering_info(ctx->imageExtent, &colorAttachment, nullptr);
+    VkRenderingAttachmentInfo colorAttachment = SK::VkInit::attachment_info(ctx->targetImageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    VkRenderingInfo renderInfo = SK::VkInit::rendering_info(ctx->imageExtent, &colorAttachment, nullptr);
 
     vkCmdBeginRendering(ctx->cmd, &renderInfo);
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), ctx->cmd);
