@@ -85,9 +85,9 @@ int main(int argc, char* argv[])
         }
 
         // RendererBackend checks for a resize requirement every frame internally
-        if(vkRendererBackend.resizeRequested)
+        if(vkRendererBackend.windowResizeRequested)
         {
-            SK::VkRendererBackend::m_resizeSwapchain(&vkRendererBackend);
+            SK::VkRendererBackend::handleWindowResize(&vkRendererBackend);
         }
 
         // --- UI FRAME BEGIN ---

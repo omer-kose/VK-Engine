@@ -87,6 +87,8 @@ void SK::VkRendererBackend::init(RendererBackend* vkRendererBackend, struct SDL_
     m_initCommands(vkRendererBackend);
     m_initSyncStructures(vkRendererBackend);
 
+    createDrawAndDepthImages(vkRendererBackend);
+
     m_initDescriptors(vkRendererBackend);
 
     m_initMaterialLayouts(vkRendererBackend);
@@ -127,6 +129,9 @@ void SK::VkRendererBackend::shutdown(RendererBackend* vkRendererBackend)
 
         m_clearPassResources(vkRendererBackend);
 
+        destroyDrawAndDepthImages(vkRendererBackend);
+
+        // destroying the vma allocator is also inside the mainDeletionQueue, so any resource allocation must be freed before flushing the queue
         vkRendererBackend->mainDeletionQueue.flush();
 
         m_destroySwapchain(vkRendererBackend);
@@ -167,7 +172,7 @@ bool SK::VkRendererBackend::beginFrame(RendererBackend* vkRendererBackend)
     VkResult acquireResult = vkAcquireNextImageKHR(vkRendererBackend->device, vkRendererBackend->swapchain, 1000000000, currentFrame.swapchainSemaphore, nullptr, &swapchainImageIndex);
     if(acquireResult == VK_ERROR_OUT_OF_DATE_KHR)
     {
-        vkRendererBackend->resizeRequested = true;
+        vkRendererBackend->windowResizeRequested = true;
         return false;
     }
 
@@ -282,7 +287,7 @@ void SK::VkRendererBackend::endFrame(RendererBackend* vkRendererBackend)
     VkResult presentResult = vkQueuePresentKHR(vkRendererBackend->graphicsQueue, &presentInfo);
     if(presentResult == VK_ERROR_OUT_OF_DATE_KHR)
     {
-        vkRendererBackend->resizeRequested = true;
+        vkRendererBackend->windowResizeRequested = true;
     }
 
     // Increase the number of frames drawn
@@ -501,6 +506,31 @@ void SK::VkRendererBackend::setScissor(RendererBackend* vkRendererBackend, VkCom
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 }
 
+void SK::VkRendererBackend::createDrawAndDepthImages(RendererBackend* vkRendererBackend)
+{
+    // draw image size will match the window
+    VkExtent3D drawImageExtent = {
+        vkRendererBackend->windowExtent.width,
+        vkRendererBackend->windowExtent.height,
+        1
+    };
+
+    // Initialize the draw image
+    vkRendererBackend->drawImage = createImage(vkRendererBackend, drawImageExtent, VK_FORMAT_R16G16B16A16_SFLOAT, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    // Initialize the depth image
+    vkRendererBackend->depthImage = createImage(vkRendererBackend, drawImageExtent, VK_FORMAT_D32_SFLOAT, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+}
+
+void SK::VkRendererBackend::destroyDrawAndDepthImages(RendererBackend* vkRendererBackend)
+{
+    // Destroy the Draw Image
+    vmaDestroyImage(vkRendererBackend->vmaAllocator, vkRendererBackend->drawImage.image, vkRendererBackend->drawImage.allocation);
+    vkDestroyImageView(vkRendererBackend->device, vkRendererBackend->drawImage.imageView, nullptr);
+    // Destroy the Depth Image
+    vmaDestroyImage(vkRendererBackend->vmaAllocator, vkRendererBackend->depthImage.image, vkRendererBackend->depthImage.allocation);
+    vkDestroyImageView(vkRendererBackend->device, vkRendererBackend->depthImage.imageView, nullptr);
+}
+
 SK::VkRendererBackend::FrameData& SK::VkRendererBackend::getCurrentFrameData(RendererBackend* vkRendererBackend)
 {
     return vkRendererBackend->frames[vkRendererBackend->frameNumber % FRAME_OVERLAP];
@@ -703,59 +733,6 @@ void SK::VkRendererBackend::m_initVulkan(RendererBackend* vkRendererBackend)
 void SK::VkRendererBackend::m_initSwapchain(RendererBackend* vkRendererBackend)
 {
     m_createSwapchain(vkRendererBackend, vkRendererBackend->windowExtent.width, vkRendererBackend->windowExtent.height);
-
-    // draw image size will match the window
-    VkExtent3D drawImageExtent = {
-        vkRendererBackend->windowExtent.width,
-        vkRendererBackend->windowExtent.height,
-        1
-    };
-
-    vkRendererBackend->drawImage.imageExtent = drawImageExtent;
-
-    // Hardcoding the draw format to 16 bit float
-    vkRendererBackend->drawImage.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
-
-    VkImageUsageFlags drawImageUsageFlags{};
-    drawImageUsageFlags |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-    drawImageUsageFlags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    drawImageUsageFlags |= VK_IMAGE_USAGE_STORAGE_BIT;
-    drawImageUsageFlags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-    VkImageCreateInfo drawImageInfo = SK::VkInit::image_create_info(vkRendererBackend->drawImage.imageFormat, drawImageUsageFlags, vkRendererBackend->drawImage.imageExtent);
-
-    // For the draw image, we want to allocate it from the gpu local memory
-    VmaAllocationCreateInfo imageAllocInfo = {};
-    imageAllocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-    imageAllocInfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-    // Allocate and create the image
-    vmaCreateImage(vkRendererBackend->vmaAllocator, &drawImageInfo, &imageAllocInfo, &vkRendererBackend->drawImage.image, &vkRendererBackend->drawImage.allocation, nullptr);
-
-    // Build an image-view for the draw image to use for rendering
-    VkImageViewCreateInfo drawImageViewInfo = SK::VkInit::imageview_create_info(vkRendererBackend->drawImage.imageFormat, vkRendererBackend->drawImage.image, VK_IMAGE_ASPECT_COLOR_BIT);
-
-    VK_CHECK(vkCreateImageView(vkRendererBackend->device, &drawImageViewInfo, nullptr, &vkRendererBackend->drawImage.imageView));
-
-    // Initialize the depth image
-    vkRendererBackend->depthImage.imageFormat = VK_FORMAT_D32_SFLOAT; // one-component, 32-bit signed floating-point format that has 32 bits in the depth component
-    vkRendererBackend->depthImage.imageExtent = drawImageExtent;
-    VkImageUsageFlags depthImageUsages{};
-    depthImageUsages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-    VkImageCreateInfo depthImageInfo = SK::VkInit::image_create_info(vkRendererBackend->depthImage.imageFormat, depthImageUsages, vkRendererBackend->depthImage.imageExtent);
-    vmaCreateImage(vkRendererBackend->vmaAllocator, &depthImageInfo, &imageAllocInfo, &vkRendererBackend->depthImage.image, &vkRendererBackend->depthImage.allocation, nullptr);
-    VkImageViewCreateInfo depthViewInfo = SK::VkInit::imageview_create_info(vkRendererBackend->depthImage.imageFormat, vkRendererBackend->depthImage.image, VK_IMAGE_ASPECT_DEPTH_BIT);
-    VK_CHECK(vkCreateImageView(vkRendererBackend->device, &depthViewInfo, nullptr, &vkRendererBackend->depthImage.imageView));
-
-    // Add the resources to the deletion queue
-    vkRendererBackend->mainDeletionQueue.pushFunction([=](){
-        // Destroy the Draw Image
-        vmaDestroyImage(vkRendererBackend->vmaAllocator, vkRendererBackend->drawImage.image, vkRendererBackend->drawImage.allocation);
-        vkDestroyImageView(vkRendererBackend->device, vkRendererBackend->drawImage.imageView, nullptr);
-        // Destroy the Depth Image
-        vmaDestroyImage(vkRendererBackend->vmaAllocator, vkRendererBackend->depthImage.image, vkRendererBackend->depthImage.allocation);
-        vkDestroyImageView(vkRendererBackend->device, vkRendererBackend->depthImage.imageView, nullptr);
-    });
 }
 
 void SK::VkRendererBackend::m_initCommands(RendererBackend* vkRendererBackend)
@@ -845,21 +822,23 @@ void SK::VkRendererBackend::m_destroySwapchain(RendererBackend* vkRendererBacken
     vkRendererBackend->swapchainImageViews.clear();
 }
 
-void SK::VkRendererBackend::m_resizeSwapchain(RendererBackend* vkRendererBackend)
+void SK::VkRendererBackend::handleWindowResize(RendererBackend* vkRendererBackend)
 {
     // Don't change the images and views while the gpu is still handling them
     vkDeviceWaitIdle(vkRendererBackend->device);
-
-    m_destroySwapchain(vkRendererBackend);
 
     int w, h;
     SDL_GetWindowSize(vkRendererBackend->window, &w, &h);
     vkRendererBackend->windowExtent.width = w;
     vkRendererBackend->windowExtent.height = h;
 
+    // Recreate swapchain and draw, depth images.
+    m_destroySwapchain(vkRendererBackend);
     m_createSwapchain(vkRendererBackend, vkRendererBackend->windowExtent.width, vkRendererBackend->windowExtent.height);
+    destroyDrawAndDepthImages(vkRendererBackend);
+    createDrawAndDepthImages(vkRendererBackend);
 
-    vkRendererBackend->resizeRequested = false;
+    vkRendererBackend->windowResizeRequested = false;
 }
 
 void SK::VkRendererBackend::m_initDescriptors(RendererBackend* vkRendererBackend)

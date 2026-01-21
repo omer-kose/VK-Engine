@@ -5,6 +5,12 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+/*
+    Image layout transitions in Vulkan done via a pipeline barrier. Barriers are quite precise. This function is overly general and blocks the whole pipeline and thus should never be used in the middle of rendering logic.
+
+    It should only be used before and after rendering operations as there will be no operations to block during the execution of the command buffer. 
+    I only use this to in the beginning and end of the frame so it doesn't create any bottlenecks but any other transitions needed during rendering should be done with proper and precise pipeline barriers.
+*/
 void SK::VkUtil::transitionImage(VkCommandBuffer cmd, VkImage image, VkImageLayout currentLayout, VkImageLayout newLayout)
 {
 	VkImageMemoryBarrier2 imageBarrier{.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2, .pNext = nullptr};

@@ -144,7 +144,7 @@ namespace SK::VkRendererBackend
 
 		bool isInitialized{ false };
 		uint32_t frameNumber{ 0 };
-		bool resizeRequested{ false };
+		bool windowResizeRequested{ false };
 		float renderScale{ 1.0f };
 		// Vulkan Context
 		VkInstance instance; // Vulkan library handle
@@ -276,9 +276,15 @@ namespace SK::VkRendererBackend
 
 	FrameData& getCurrentFrameData(RendererBackend* vkRendererBackend);
 
+	void handleWindowResize(RendererBackend* vkRendererBackend);
+
+
+	void createDrawAndDepthImages(RendererBackend* vkRendererBackend);
+	void destroyDrawAndDepthImages(RendererBackend* vkRendererBackend);
+
 	/*
 		Internal Helpers
-		TODO: Rename these?
+		TODO: Rename these
 	*/
 	// Vulkan Context
 	void m_initVulkan(RendererBackend* vkRendererBackend);
@@ -288,7 +294,6 @@ namespace SK::VkRendererBackend
 	// Swapchain
 	void m_createSwapchain(RendererBackend* vkRendererBackend, uint32_t width, uint32_t height);
 	void m_destroySwapchain(RendererBackend* vkRendererBackend);
-	void m_resizeSwapchain(RendererBackend* vkRendererBackend);
 	// Descriptors
 	void m_initDescriptors(RendererBackend* vkRendererBackend);
 
