@@ -1,6 +1,7 @@
 #include <Application/Application.h>
 #include <RendererBackend/vulkan/vk_renderer.h>
 #include <UI/UI.h>
+#include <Renderers/ForwardRenderer.h>
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
@@ -34,7 +35,6 @@ void loadScene(SK::VkRendererBackend::RendererBackend* vkRendererBackend)
 void updateSceneTemp(SK::VkRendererBackend::RendererBackend* vkRendererBackend, Camera& camera)
 {
     // TODO: Update timings are missing here but Engine Stats should be reconsidered too. Not sure if they should be in vkRendererBackend.
-
     camera.update();
 
     loadedScenes["structure"]->registerDraw(glm::mat4(1.0f), drawContext);
@@ -65,6 +65,10 @@ int main(int argc, char* argv[])
 
     SK::UI::UI ui;
     SK::UI::init(&ui, &vkRendererBackend);
+
+    // Renderer frontends
+    SK::ForwardRenderer::ForwardRenderer forwardRenderer;
+    SK::ForwardRenderer::init(&forwardRenderer, &vkRendererBackend);
 
     loadScene(&vkRendererBackend);
 
@@ -110,7 +114,7 @@ int main(int argc, char* argv[])
         if(SK::VkRendererBackend::beginFrame(&vkRendererBackend))
         {
             SK::VkRendererBackend::updateSceneBuffer(&vkRendererBackend, gpuSceneData);
-            SK::VkRendererBackend::draw(&vkRendererBackend, drawContext, gpuSceneData);
+            SK::ForwardRenderer::draw(&forwardRenderer, &vkRendererBackend, drawContext);
             SK::VkRendererBackend::drawOverlays(&vkRendererBackend);
             SK::VkRendererBackend::endFrame(&vkRendererBackend);
         }
@@ -131,8 +135,10 @@ int main(int argc, char* argv[])
 
     // TODO: To be moved out to a proper place
     loadedScenes.clear();
-
+    
     // Once everything is safe to delete shut the systems down.
+    SK::ForwardRenderer::shutdown(&forwardRenderer, &vkRendererBackend);
+
     SK::UI::shutdown(&ui);
 
     SK::VkRendererBackend::shutdown(&vkRendererBackend);

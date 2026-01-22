@@ -7,8 +7,6 @@
 #include <RendererBackend/vulkan/vk_descriptors.h>
 #include <RendererBackend/vulkan/vk_loader.h>
 
-#include <Pass/GLTFMetallicPass.h>
-
 #include <Util/DeletionQueue.h>
 
 // Forward declarations
@@ -242,7 +240,6 @@ namespace SK::VkRendererBackend
 
 	// begin/end frames and some internal common draw functionalities
 	bool beginFrame(RendererBackend* vkRendererBackend);
-	void draw(RendererBackend* vkRendererBackend, const DrawContext& ctx, const GPUSceneData& gpuSceneData); // core draw loop
 	void drawOverlays(RendererBackend* vkRendererBackend);
 	void endFrame(RendererBackend* vkRendererBackend);
 
@@ -296,10 +293,6 @@ namespace SK::VkRendererBackend
 	void m_destroySwapchain(RendererBackend* vkRendererBackend);
 	// Descriptors
 	void m_initDescriptors(RendererBackend* vkRendererBackend);
-
-	// Passes
-	void m_initPasses(RendererBackend* vkRendererBackend);
-	void m_clearPassResources(RendererBackend* vkRendererBackend);
 
 	// Material Layouts
 	void m_initMaterialLayouts(RendererBackend* vkRendererBackend);

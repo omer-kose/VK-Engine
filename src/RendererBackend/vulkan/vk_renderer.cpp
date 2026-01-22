@@ -93,8 +93,6 @@ void SK::VkRendererBackend::init(RendererBackend* vkRendererBackend, struct SDL_
 
     m_initMaterialLayouts(vkRendererBackend);
 
-    m_initPasses(vkRendererBackend);
-
     m_initDefaultData(vkRendererBackend);
 
     m_initGlobalSceneBuffer(vkRendererBackend);
@@ -126,8 +124,6 @@ void SK::VkRendererBackend::shutdown(RendererBackend* vkRendererBackend)
         clearPipelineCache(vkRendererBackend);
 
         m_clearMaterialLayouts(vkRendererBackend);
-
-        m_clearPassResources(vkRendererBackend);
 
         destroyDrawAndDepthImages(vkRendererBackend);
 
@@ -202,30 +198,6 @@ bool SK::VkRendererBackend::beginFrame(RendererBackend* vkRendererBackend)
     vkRendererBackend->currentSwapchainImageIndex = swapchainImageIndex;
 
     return true;
-}
-
-void SK::VkRendererBackend::draw(RendererBackend* vkRendererBackend, const DrawContext& ctx, const GPUSceneData& sceneData)
-{
-    VkCommandBuffer cmd = vkRendererBackend->currentCmdBuffer;
-
-    // Begin a renderpass connected to the draw image
-    VkRenderingAttachmentInfo colorAttachment = SK::VkInit::attachment_info(vkRendererBackend->drawImage.imageView, &vkRendererBackend->colorAttachmentClearValue, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    VkRenderingAttachmentInfo depthAttachment = SK::VkInit::depth_attachment_info(vkRendererBackend->depthImage.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-
-    VkRenderingInfo renderInfo = SK::VkInit::rendering_info(vkRendererBackend->drawExtent, &colorAttachment, &depthAttachment);
-    vkCmdBeginRendering(cmd, &renderInfo);
-
-    auto start = std::chrono::system_clock::now();
-
-    // Go through all the graphics passes and execute them
-    GLTFMetallicPass::Execute(vkRendererBackend, cmd, ctx);
-
-    auto end = std::chrono::system_clock::now();
-    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-
-    vkRendererBackend->stats.geometryDrawRecordTime = elapsed.count() / 1000.f;
-
-    vkCmdEndRendering(cmd);
 }
 
 void SK::VkRendererBackend::drawOverlays(RendererBackend* vkRendererBackend)
@@ -908,16 +880,6 @@ void SK::VkRendererBackend::m_initDescriptors(RendererBackend* vkRendererBackend
             vkRendererBackend->frames[i].frameDescriptorAllocator.destroyPools(vkRendererBackend->device);
         });
     }
-}
-
-void SK::VkRendererBackend::m_initPasses(RendererBackend* vkRendererBackend)
-{
-    GLTFMetallicPass::Init(vkRendererBackend);
-}
-
-void SK::VkRendererBackend::m_clearPassResources(RendererBackend* vkRendererBackend)
-{
-    GLTFMetallicPass::ClearResources(vkRendererBackend);
 }
 
 void SK::VkRendererBackend::m_initMaterialLayouts(RendererBackend* vkRendererBackend)

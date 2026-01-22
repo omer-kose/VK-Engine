@@ -1,15 +1,11 @@
-#include "GLTFMetallicPass.h"
+#include "ForwardRenderer.h"
 
 #include <RendererBackend/vulkan/vk_renderer.h>
 #include <RendererBackend/vulkan/vk_pipelines.h>
 #include <RendererBackend/vulkan/vk_initializers.h>
 
-// Define the static members
-VkPipeline GLTFMetallicPass::OpaquePipeline = VK_NULL_HANDLE;
-VkPipeline GLTFMetallicPass::TransparentPipeline = VK_NULL_HANDLE;
-VkPipelineLayout GLTFMetallicPass::PipelineLayout = VK_NULL_HANDLE;
 
-void GLTFMetallicPass::Init(SK::VkRendererBackend::RendererBackend* vkRendererBackend)
+void SK::ForwardRenderer::init(ForwardRenderer* forwardRenderer, SK::VkRendererBackend::RendererBackend* vkRendererBackend)
 {
     // Load the shaders
     VkShaderModule meshVertexShader = SK::VkRendererBackend::getOrLoadShader(vkRendererBackend, "../../shaders/glsl/gltf_metallic/mesh_vert.spv");
@@ -44,7 +40,7 @@ void GLTFMetallicPass::Init(SK::VkRendererBackend::RendererBackend* vkRendererBa
     layoutKey.setLayouts = { vkRendererBackend->gpuSceneDataDescriptorLayout, materialLayout };
     layoutKey.pushConstantRanges = { pushConstantRange };
 
-    PipelineLayout = SK::VkRendererBackend::getOrCreatePipelineLayout(vkRendererBackend, layoutKey);
+    forwardRenderer->pipelineLayout = SK::VkRendererBackend::getOrCreatePipelineLayout(vkRendererBackend, layoutKey);
 
     // Build the pipeline keys and retrieve the pipelines from the vkRendererBackend backend
     size_t vertHash = std::hash<std::string>{}("../../shaders/glsl/gltf_metallic/mesh_vert.spv");
@@ -63,23 +59,34 @@ void GLTFMetallicPass::Init(SK::VkRendererBackend::RendererBackend* vkRendererBa
     opaqueKey.blending = false;
     opaqueKey.colorFormat = vkRendererBackend->drawImage.imageFormat;
     opaqueKey.depthFormat = vkRendererBackend->depthImage.imageFormat;
-    opaqueKey.layout = PipelineLayout;
+    opaqueKey.layout = forwardRenderer->pipelineLayout;
 
-    OpaquePipeline = SK::VkRendererBackend::getOrCreatePipeline(vkRendererBackend, opaqueKey);
+    forwardRenderer->opaquePipeline = SK::VkRendererBackend::getOrCreatePipeline(vkRendererBackend, opaqueKey);
 
     SK::VkRendererBackend::PipelineKey transparentKey = opaqueKey;
     transparentKey.blending = true;
     transparentKey.depthWrite = false;
     transparentKey.depthTest = false;
 
-    TransparentPipeline = SK::VkRendererBackend::getOrCreatePipeline(vkRendererBackend, transparentKey);
+    forwardRenderer->transparentPipeline = SK::VkRendererBackend::getOrCreatePipeline(vkRendererBackend, transparentKey);
 
     // Descriptor Set Layout is not needed as Material descriptors will be created while getting instanced.
     vkDestroyDescriptorSetLayout(vkRendererBackend->device, materialLayout, nullptr);
 }
 
-void GLTFMetallicPass::Execute(SK::VkRendererBackend::RendererBackend* vkRendererBackend, VkCommandBuffer& cmd, const SK::VkRendererBackend::DrawContext& ctx)
+void SK::ForwardRenderer::draw(ForwardRenderer* forwardRenderer, SK::VkRendererBackend::RendererBackend* vkRendererBackend, const SK::VkRendererBackend::DrawContext& ctx)
 {
+    VkCommandBuffer cmd = vkRendererBackend->currentCmdBuffer;
+
+    // Begin a renderpass connected to the draw image
+    VkRenderingAttachmentInfo colorAttachment = SK::VkInit::attachment_info(vkRendererBackend->drawImage.imageView, &vkRendererBackend->colorAttachmentClearValue, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    VkRenderingAttachmentInfo depthAttachment = SK::VkInit::depth_attachment_info(vkRendererBackend->depthImage.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+
+    VkRenderingInfo renderInfo = SK::VkInit::rendering_info(vkRendererBackend->drawExtent, &colorAttachment, &depthAttachment);
+    vkCmdBeginRendering(cmd, &renderInfo);
+
+    auto start = std::chrono::system_clock::now();
+
     std::vector<uint32_t> opaqueDraws;
     opaqueDraws.reserve(ctx.opaqueGLTFSurfaces.size());
 
@@ -112,19 +119,19 @@ void GLTFMetallicPass::Execute(SK::VkRendererBackend::RendererBackend* vkRendere
             lastMaterial = robj.materialInstance;
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
             VkDescriptorSet gpuSceneDescriptorSet = SK::VkRendererBackend::fetchCurrentSceneBufferDescriptorSet(vkRendererBackend);;
-            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &gpuSceneDescriptorSet, 0, nullptr);
+            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, forwardRenderer->pipelineLayout, 0, 1, &gpuSceneDescriptorSet, 0, nullptr);
 
             // Set dynamic viewport and scissor again in case of an override (all of the material pipelines use dynamic states so setting them once after a bind is actually enough)
             SK::VkRendererBackend::setViewport(vkRendererBackend, cmd);
             SK::VkRendererBackend::setScissor(vkRendererBackend, cmd);
 
-            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 1, 1, &robj.materialInstance->materialSet, 0, nullptr);
+            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, forwardRenderer->pipelineLayout, 1, 1, &robj.materialInstance->materialSet, 0, nullptr);
         }
 
         GPUDrawPushConstants pushConstants;
         pushConstants.vertexBufferAddress = robj.vertexBufferAddress;
         pushConstants.worldMatrix = robj.transform;
-        vkCmdPushConstants(cmd, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &pushConstants);
+        vkCmdPushConstants(cmd, forwardRenderer->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &pushConstants);
 
         if(lastIndexBuffer != robj.indexBuffer)
         {
@@ -137,19 +144,23 @@ void GLTFMetallicPass::Execute(SK::VkRendererBackend::RendererBackend* vkRendere
 
     for(uint32_t idx : opaqueDraws)
     {
-        draw(ctx.opaqueGLTFSurfaces[idx], OpaquePipeline);
+        draw(ctx.opaqueGLTFSurfaces[idx], forwardRenderer->opaquePipeline);
     }
 
     for(const SK::VkRendererBackend::RenderObject& robj : ctx.transparentGLTFSurfaces)
     {
-        draw(robj, TransparentPipeline);
+        draw(robj, forwardRenderer->transparentPipeline);
     }
+
+    auto end = std::chrono::system_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+    vkRendererBackend->stats.geometryDrawRecordTime = elapsed.count() / 1000.f;
+
+    vkCmdEndRendering(cmd);
 }
 
-void GLTFMetallicPass::Update()
+void SK::ForwardRenderer::shutdown(ForwardRenderer* forwardRenderer, SK::VkRendererBackend::RendererBackend* vkRendererBackend)
 {
-}
 
-void GLTFMetallicPass::ClearResources(SK::VkRendererBackend::RendererBackend* vkRendererBackend)
-{
 }
