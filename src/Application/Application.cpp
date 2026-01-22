@@ -4,7 +4,7 @@
 
 #include <UI/UI.h>
 
-void SK::Application::init(Application* application, uint32_t windowWidth, uint32_t windowHeight)
+void SK::Application::init(State* application, uint32_t windowWidth, uint32_t windowHeight)
 {
     assert(application->isInitialized == false);
 
@@ -30,7 +30,7 @@ void SK::Application::init(Application* application, uint32_t windowWidth, uint3
     application->isInitialized = true;
 }
 
-void SK::Application::handleSDLEvents(Application* application)
+void SK::Application::handleSDLEvents(State* application)
 {
     SDL_Event e;
 
@@ -58,11 +58,11 @@ void SK::Application::handleSDLEvents(Application* application)
         application->mainCamera.processSDLEvent(e);
         
         // send SDL event to ImGui for processing
-        UI::processSDLEvents(e);
+        SK::UI::processSDLEvents(e);
     }
 }
 
-void SK::Application::initCamera(Application* application, glm::vec3 position, float pitch, float yaw)
+void SK::Application::initCamera(State* application, glm::vec3 position, float pitch, float yaw)
 {
     application->mainCamera.velocity = glm::vec3(0.0f);
     application->mainCamera.position = position;
@@ -70,7 +70,7 @@ void SK::Application::initCamera(Application* application, glm::vec3 position, f
     application->mainCamera.yaw = yaw;
 }
 
-void SK::Application::shutdown(Application* application)
+void SK::Application::shutdown(State* application)
 {
     if(application->isInitialized)
     {

@@ -9,7 +9,7 @@
 
 #include "SDL_events.h"
 
-void SK::UI::init(UI* ui, SK::VkRendererBackend::RendererBackend* vkRendererBackend)
+void SK::UI::init(State* ui, SK::VkRendererBackend::State* vkRendererBackend)
 {
     // 1: create descriptor pool for IMGUI
     // the size of the pool is very oversize, but it's copied from imgui demo  itself.
@@ -105,7 +105,7 @@ void SK::UI::draw(SK::VkRendererBackend::PassContext* ctx)
     vkCmdEndRendering(ctx->cmd);
 }
 
-void SK::UI::shutdown(UI* ui)
+void SK::UI::shutdown(State* ui)
 {
     if(ui->isInitialized)
     {

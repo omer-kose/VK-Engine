@@ -4,20 +4,20 @@
 // Forward declare with the namespace
 namespace SK::VkRendererBackend
 {
-	struct RendererBackend;
+	struct State;
 	struct DrawContext;
 };
 
 namespace SK::ForwardRenderer
 {
-	struct ForwardRenderer
+	struct State
 	{
 		VkPipelineLayout pipelineLayout; // both transparent and opaque objects use the same pipeline layout
 		VkPipeline opaquePipeline;
 		VkPipeline transparentPipeline;
 	};
 
-	void init(ForwardRenderer* forwardRenderer, SK::VkRendererBackend::RendererBackend* vkRendererBackend);
-	void draw(ForwardRenderer* forwardRenderer, SK::VkRendererBackend::RendererBackend* vkRendererBackend, const SK::VkRendererBackend::DrawContext& ctx);
-	void shutdown(ForwardRenderer* forwardRenderer, SK::VkRendererBackend::RendererBackend* vkRendererBackend);
+	void init(State* forwardRenderer, SK::VkRendererBackend::State* vkRendererBackend);
+	void draw(State* forwardRenderer, SK::VkRendererBackend::State* vkRendererBackend, const SK::VkRendererBackend::DrawContext& ctx);
+	void shutdown(State* forwardRenderer, SK::VkRendererBackend::State* vkRendererBackend);
 };

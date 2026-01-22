@@ -117,7 +117,7 @@ namespace SK::VkRendererBackend
 		// Optional fields not all the passes needs them
 		VkImageView targetImageView;
 		VkExtent2D imageExtent;
-		RendererBackend* vkRendererBackend; 
+		State* vkRendererBackend; 
 	};
 
 	// TODO: Subject to change
@@ -134,7 +134,7 @@ namespace SK::VkRendererBackend
 	};
 
 
-	struct RendererBackend
+	struct State
 	{
 		// Window related data stored (Window and other related params are owned by the App)
 		SDL_Window* window{ nullptr }; // A non-owning ptr pointing to the window created by the App.
@@ -233,74 +233,74 @@ namespace SK::VkRendererBackend
 
 
 	// initializes everything in the renderer backend
-	void init(RendererBackend* vkRendererBackend, struct SDL_Window* window, uint32_t windowWidth, uint32_t windowHeight);
+	void init(State* vkRendererBackend, struct SDL_Window* window, uint32_t windowWidth, uint32_t windowHeight);
 
 	// shuts down the renderer backend
-	void shutdown(RendererBackend* vkRendererBackend);
+	void shutdown(State* vkRendererBackend);
 
 	// begin/end frames and some internal common draw functionalities
-	bool beginFrame(RendererBackend* vkRendererBackend);
-	void drawOverlays(RendererBackend* vkRendererBackend);
-	void endFrame(RendererBackend* vkRendererBackend);
+	bool beginFrame(State* vkRendererBackend);
+	void drawOverlays(State* vkRendererBackend);
+	void endFrame(State* vkRendererBackend);
 
-	void immediateSubmit(RendererBackend* vkRendererBackend, std::function<void(VkCommandBuffer cmd)>&& function);
+	void immediateSubmit(State* vkRendererBackend, std::function<void(VkCommandBuffer cmd)>&& function);
 
-	AllocatedBuffer createBuffer(RendererBackend* vkRendererBackend, size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
-	void destroyBuffer(RendererBackend* vkRendererBackend, const AllocatedBuffer& buffer);
+	AllocatedBuffer createBuffer(State* vkRendererBackend, size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+	void destroyBuffer(State* vkRendererBackend, const AllocatedBuffer& buffer);
 
-	AllocatedImage createImage(RendererBackend* vkRendererBackend, VkExtent3D imageExtent, VkFormat format, VkImageUsageFlags usage, bool mipMapped = false);
-	AllocatedImage createImage(RendererBackend* vkRendererBackend, void* data, VkExtent3D imageExtent, VkFormat format, VkImageUsageFlags usage, bool mipMapped = false);
-	void destroyImage(RendererBackend* vkRendererBackend, const AllocatedImage& img);
+	AllocatedImage createImage(State* vkRendererBackend, VkExtent3D imageExtent, VkFormat format, VkImageUsageFlags usage, bool mipMapped = false);
+	AllocatedImage createImage(State* vkRendererBackend, void* data, VkExtent3D imageExtent, VkFormat format, VkImageUsageFlags usage, bool mipMapped = false);
+	void destroyImage(State* vkRendererBackend, const AllocatedImage& img);
 
-	GPUMeshBuffers uploadMesh(RendererBackend* vkRendererBackend, std::span<Vertex> vertices, std::span<uint32_t> indices);
+	GPUMeshBuffers uploadMesh(State* vkRendererBackend, std::span<Vertex> vertices, std::span<uint32_t> indices);
 
-	void updateSceneBuffer(RendererBackend* vkRendererBackend, const GPUSceneData& gpuSceneData);
-	VkDescriptorSet fetchCurrentSceneBufferDescriptorSet(RendererBackend* vkRendererBackend);
+	void updateSceneBuffer(State* vkRendererBackend, const GPUSceneData& gpuSceneData);
+	VkDescriptorSet fetchCurrentSceneBufferDescriptorSet(State* vkRendererBackend);
 
-	void setViewport(RendererBackend* vkRendererBackend, VkCommandBuffer cmd);
-	void setScissor(RendererBackend* vkRendererBackend, VkCommandBuffer cmd);
+	void setViewport(State* vkRendererBackend, VkCommandBuffer cmd);
+	void setScissor(State* vkRendererBackend, VkCommandBuffer cmd);
 
-	void registerOverlayPass(RendererBackend* vkRendererBackend, OverlayPass pass);
+	void registerOverlayPass(State* vkRendererBackend, OverlayPass pass);
 
-	VkShaderModule getOrLoadShader(RendererBackend* vkRendererBackend, const char* path);
-	void clearShaderCache(RendererBackend* vkRendererBackend);
+	VkShaderModule getOrLoadShader(State* vkRendererBackend, const char* path);
+	void clearShaderCache(State* vkRendererBackend);
 
-	VkPipelineLayout getOrCreatePipelineLayout(RendererBackend* vkRendererBackend, const PipelineLayoutKey& key);
-	void clearPipelineLayoutCache(RendererBackend* vkRendererBackend);
+	VkPipelineLayout getOrCreatePipelineLayout(State* vkRendererBackend, const PipelineLayoutKey& key);
+	void clearPipelineLayoutCache(State* vkRendererBackend);
 
-	VkPipeline getOrCreatePipeline(RendererBackend* vkRendererBackend, const PipelineKey& key);
-	void clearPipelineCache(RendererBackend* vkRendererBackend);
+	VkPipeline getOrCreatePipeline(State* vkRendererBackend, const PipelineKey& key);
+	void clearPipelineCache(State* vkRendererBackend);
 
-	FrameData& getCurrentFrameData(RendererBackend* vkRendererBackend);
+	FrameData& getCurrentFrameData(State* vkRendererBackend);
 
-	void handleWindowResize(RendererBackend* vkRendererBackend);
+	void handleWindowResize(State* vkRendererBackend);
 
 
-	void createDrawAndDepthImages(RendererBackend* vkRendererBackend);
-	void destroyDrawAndDepthImages(RendererBackend* vkRendererBackend);
+	void createDrawAndDepthImages(State* vkRendererBackend);
+	void destroyDrawAndDepthImages(State* vkRendererBackend);
 
 	/*
 		Internal Helpers
 		TODO: Rename these
 	*/
 	// Vulkan Context
-	void m_initVulkan(RendererBackend* vkRendererBackend);
-	void m_initSwapchain(RendererBackend* vkRendererBackend);
-	void m_initCommands(RendererBackend* vkRendererBackend);
-	void m_initSyncStructures(RendererBackend* vkRendererBackend);
+	void m_initVulkan(State* vkRendererBackend);
+	void m_initSwapchain(State* vkRendererBackend);
+	void m_initCommands(State* vkRendererBackend);
+	void m_initSyncStructures(State* vkRendererBackend);
 	// Swapchain
-	void m_createSwapchain(RendererBackend* vkRendererBackend, uint32_t width, uint32_t height);
-	void m_destroySwapchain(RendererBackend* vkRendererBackend);
+	void m_createSwapchain(State* vkRendererBackend, uint32_t width, uint32_t height);
+	void m_destroySwapchain(State* vkRendererBackend);
 	// Descriptors
-	void m_initDescriptors(RendererBackend* vkRendererBackend);
+	void m_initDescriptors(State* vkRendererBackend);
 
 	// Material Layouts
-	void m_initMaterialLayouts(RendererBackend* vkRendererBackend);
-	void m_clearMaterialLayouts(RendererBackend* vkRendererBackend);
+	void m_initMaterialLayouts(State* vkRendererBackend);
+	void m_clearMaterialLayouts(State* vkRendererBackend);
 
 	// Default Engine Data
-	void m_initDefaultData(RendererBackend* vkRendererBackend);
+	void m_initDefaultData(State* vkRendererBackend);
 
 	// Init Scene Buffer
-	void m_initGlobalSceneBuffer(RendererBackend* vkRendererBackend);
+	void m_initGlobalSceneBuffer(State* vkRendererBackend);
 };

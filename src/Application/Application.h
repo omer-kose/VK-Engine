@@ -14,7 +14,7 @@ struct SDL_Window;
 
 namespace SK::Application
 {
-	struct Application
+	struct State
 	{
 		SDL_Window* window;
 		uint32_t windowWidth = 1920;
@@ -28,9 +28,9 @@ namespace SK::Application
 		bool isInitialized = false;
 	};
 
-	void init(Application* application, uint32_t windowWidth = 1920, uint32_t windowHeight = 1080);
-	void handleSDLEvents(Application* application);
-	void initCamera(Application* application, glm::vec3 position, float pitch, float yaw);
+	void init(State* application, uint32_t windowWidth = 1920, uint32_t windowHeight = 1080);
+	void handleSDLEvents(State* application);
+	void initCamera(State* application, glm::vec3 position, float pitch, float yaw);
 
-	void shutdown(Application* application);
+	void shutdown(State* application);
 };

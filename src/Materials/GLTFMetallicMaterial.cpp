@@ -5,7 +5,7 @@
 VkDescriptorSetLayout GLTFMetallicRoughnessMaterial::MaterialLayout = VK_NULL_HANDLE;
 DescriptorWriter GLTFMetallicRoughnessMaterial::Writer = {};
 
-void GLTFMetallicRoughnessMaterial::BuildMaterialLayout(SK::VkRendererBackend::RendererBackend* vkRendererBackend)
+void GLTFMetallicRoughnessMaterial::BuildMaterialLayout(SK::VkRendererBackend::State* vkRendererBackend)
 {
     // Layout of the GLTF Metallic Roughness Material set
     DescriptorLayoutBuilder layoutBuilder;

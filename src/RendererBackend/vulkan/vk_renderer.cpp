@@ -72,7 +72,7 @@ static size_t hashPipelineKey(const SK::VkRendererBackend::PipelineKey& k)
 }
 
 
-void SK::VkRendererBackend::init(RendererBackend* vkRendererBackend, struct SDL_Window* window, uint32_t windowWidth, uint32_t windowHeight)
+void SK::VkRendererBackend::init(State* vkRendererBackend, struct SDL_Window* window, uint32_t windowWidth, uint32_t windowHeight)
 {
     // only one vkRendererBackend initialization is allowed with the application.
     assert(vkRendererBackend->isInitialized == false);
@@ -101,7 +101,7 @@ void SK::VkRendererBackend::init(RendererBackend* vkRendererBackend, struct SDL_
     vkRendererBackend->isInitialized = true;
 }
 
-void SK::VkRendererBackend::shutdown(RendererBackend* vkRendererBackend)
+void SK::VkRendererBackend::shutdown(State* vkRendererBackend)
 {
     if(vkRendererBackend->isInitialized) 
     {
@@ -150,7 +150,7 @@ void SK::VkRendererBackend::shutdown(RendererBackend* vkRendererBackend)
 
     Returns true if the frame begun successfully. In the cases like swapchain resize, it returns false.
 */
-bool SK::VkRendererBackend::beginFrame(RendererBackend* vkRendererBackend)
+bool SK::VkRendererBackend::beginFrame(State* vkRendererBackend)
 {
     FrameData& currentFrame = getCurrentFrameData(vkRendererBackend);
     // Wait until the GPU has finished rendering the last frame of the same modularity (0->1->2->3  wait on 2 for 0 and wait on 3 for 1 and so on)
@@ -200,7 +200,7 @@ bool SK::VkRendererBackend::beginFrame(RendererBackend* vkRendererBackend)
     return true;
 }
 
-void SK::VkRendererBackend::drawOverlays(RendererBackend* vkRendererBackend)
+void SK::VkRendererBackend::drawOverlays(State* vkRendererBackend)
 {
     VkCommandBuffer cmd = vkRendererBackend->currentCmdBuffer;
     uint32_t swapchainImageIndex = vkRendererBackend->currentSwapchainImageIndex;
@@ -222,7 +222,7 @@ void SK::VkRendererBackend::drawOverlays(RendererBackend* vkRendererBackend)
     }
 }
 
-void SK::VkRendererBackend::endFrame(RendererBackend* vkRendererBackend)
+void SK::VkRendererBackend::endFrame(State* vkRendererBackend)
 {
     FrameData& currentFrame = getCurrentFrameData(vkRendererBackend);
 
@@ -266,7 +266,7 @@ void SK::VkRendererBackend::endFrame(RendererBackend* vkRendererBackend)
     ++vkRendererBackend->frameNumber;
 }
 
-void SK::VkRendererBackend::immediateSubmit(RendererBackend* vkRendererBackend, std::function<void(VkCommandBuffer cmd)>&& function)
+void SK::VkRendererBackend::immediateSubmit(State* vkRendererBackend, std::function<void(VkCommandBuffer cmd)>&& function)
 {
     // Before starting submitting and waiting on the fence reset them
     VK_CHECK(vkResetFences(vkRendererBackend->device, 1, &vkRendererBackend->immeadiateFence));
@@ -287,7 +287,7 @@ void SK::VkRendererBackend::immediateSubmit(RendererBackend* vkRendererBackend, 
     VK_CHECK(vkWaitForFences(vkRendererBackend->device, 1, &vkRendererBackend->immeadiateFence, true, 9999999999));
 }
 
-AllocatedBuffer SK::VkRendererBackend::createBuffer(RendererBackend* vkRendererBackend, size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage)
+AllocatedBuffer SK::VkRendererBackend::createBuffer(State* vkRendererBackend, size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage)
 {
     // Allocate buffer
     VkBufferCreateInfo bufferInfo = { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, .pNext = nullptr };
@@ -304,12 +304,12 @@ AllocatedBuffer SK::VkRendererBackend::createBuffer(RendererBackend* vkRendererB
     return newBuffer;
 }
 
-void SK::VkRendererBackend::destroyBuffer(RendererBackend* vkRendererBackend, const AllocatedBuffer& buffer)
+void SK::VkRendererBackend::destroyBuffer(State* vkRendererBackend, const AllocatedBuffer& buffer)
 {
     vmaDestroyBuffer(vkRendererBackend->vmaAllocator, buffer.buffer, buffer.allocation);
 }
 
-AllocatedImage SK::VkRendererBackend::createImage(RendererBackend* vkRendererBackend, VkExtent3D imageExtent, VkFormat format, VkImageUsageFlags usage, bool mipMapped)
+AllocatedImage SK::VkRendererBackend::createImage(State* vkRendererBackend, VkExtent3D imageExtent, VkFormat format, VkImageUsageFlags usage, bool mipMapped)
 {
     AllocatedImage newImage;
     newImage.imageFormat = format;
@@ -345,7 +345,7 @@ AllocatedImage SK::VkRendererBackend::createImage(RendererBackend* vkRendererBac
     return newImage;
 }
 
-AllocatedImage SK::VkRendererBackend::createImage(RendererBackend* vkRendererBackend, void* data, VkExtent3D imageExtent, VkFormat format, VkImageUsageFlags usage, bool mipMapped)
+AllocatedImage SK::VkRendererBackend::createImage(State* vkRendererBackend, void* data, VkExtent3D imageExtent, VkFormat format, VkImageUsageFlags usage, bool mipMapped)
 {
     // Hardcoding the textures to be RGBA 8 bit format. This should be sufficient as most of the textures are in that format.
     size_t dataSize = imageExtent.depth * imageExtent.width * imageExtent.height * 4;
@@ -390,13 +390,13 @@ AllocatedImage SK::VkRendererBackend::createImage(RendererBackend* vkRendererBac
     return newImage;
 }
 
-void SK::VkRendererBackend::destroyImage(RendererBackend* vkRendererBackend, const AllocatedImage& img)
+void SK::VkRendererBackend::destroyImage(State* vkRendererBackend, const AllocatedImage& img)
 {
     vkDestroyImageView(vkRendererBackend->device, img.imageView, nullptr);
     vmaDestroyImage(vkRendererBackend->vmaAllocator, img.image, img.allocation);
 }
 
-GPUMeshBuffers SK::VkRendererBackend::uploadMesh(RendererBackend* vkRendererBackend, std::span<Vertex> vertices, std::span<uint32_t> indices)
+GPUMeshBuffers SK::VkRendererBackend::uploadMesh(State* vkRendererBackend, std::span<Vertex> vertices, std::span<uint32_t> indices)
 {
     const size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
     const size_t indexBufferSize = indices.size() * sizeof(uint32_t);
@@ -444,19 +444,19 @@ GPUMeshBuffers SK::VkRendererBackend::uploadMesh(RendererBackend* vkRendererBack
     Both update and bind scene buffer functions must be called after the frame fence waits as it will be guaranteed that the frame is done being used by GPU. Otherwise, the data can be corrupted. 
     So, it can be safely called after frameBegin function
 */
-void SK::VkRendererBackend::updateSceneBuffer(RendererBackend* vkRendererBackend, const GPUSceneData& sceneData)
+void SK::VkRendererBackend::updateSceneBuffer(State* vkRendererBackend, const GPUSceneData& sceneData)
 {
     // Update the scene buffer
     GPUSceneData* pGpuSceneDataBuffer = (GPUSceneData*)vkRendererBackend->gpuSceneDataBuffer[vkRendererBackend->frameNumber % FRAME_OVERLAP].allocation->GetMappedData();
     *pGpuSceneDataBuffer = sceneData;
 }
 
-VkDescriptorSet SK::VkRendererBackend::fetchCurrentSceneBufferDescriptorSet(RendererBackend* vkRendererBackend)
+VkDescriptorSet SK::VkRendererBackend::fetchCurrentSceneBufferDescriptorSet(State* vkRendererBackend)
 {
     return vkRendererBackend->gpuSceneDescriptorSet[vkRendererBackend->frameNumber % FRAME_OVERLAP];
 }
 
-void SK::VkRendererBackend::setViewport(RendererBackend* vkRendererBackend, VkCommandBuffer cmd)
+void SK::VkRendererBackend::setViewport(State* vkRendererBackend, VkCommandBuffer cmd)
 {
     VkViewport viewport = {};
     viewport.x = 0;
@@ -468,7 +468,7 @@ void SK::VkRendererBackend::setViewport(RendererBackend* vkRendererBackend, VkCo
     vkCmdSetViewport(cmd, 0, 1, &viewport);
 }
 
-void SK::VkRendererBackend::setScissor(RendererBackend* vkRendererBackend, VkCommandBuffer cmd)
+void SK::VkRendererBackend::setScissor(State* vkRendererBackend, VkCommandBuffer cmd)
 {
     VkRect2D scissor = {};
     scissor.offset.x = 0;
@@ -478,7 +478,7 @@ void SK::VkRendererBackend::setScissor(RendererBackend* vkRendererBackend, VkCom
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 }
 
-void SK::VkRendererBackend::createDrawAndDepthImages(RendererBackend* vkRendererBackend)
+void SK::VkRendererBackend::createDrawAndDepthImages(State* vkRendererBackend)
 {
     // draw image size will match the window
     VkExtent3D drawImageExtent = {
@@ -493,7 +493,7 @@ void SK::VkRendererBackend::createDrawAndDepthImages(RendererBackend* vkRenderer
     vkRendererBackend->depthImage = createImage(vkRendererBackend, drawImageExtent, VK_FORMAT_D32_SFLOAT, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
 }
 
-void SK::VkRendererBackend::destroyDrawAndDepthImages(RendererBackend* vkRendererBackend)
+void SK::VkRendererBackend::destroyDrawAndDepthImages(State* vkRendererBackend)
 {
     // Destroy the Draw Image
     vmaDestroyImage(vkRendererBackend->vmaAllocator, vkRendererBackend->drawImage.image, vkRendererBackend->drawImage.allocation);
@@ -503,17 +503,17 @@ void SK::VkRendererBackend::destroyDrawAndDepthImages(RendererBackend* vkRendere
     vkDestroyImageView(vkRendererBackend->device, vkRendererBackend->depthImage.imageView, nullptr);
 }
 
-SK::VkRendererBackend::FrameData& SK::VkRendererBackend::getCurrentFrameData(RendererBackend* vkRendererBackend)
+SK::VkRendererBackend::FrameData& SK::VkRendererBackend::getCurrentFrameData(State* vkRendererBackend)
 {
     return vkRendererBackend->frames[vkRendererBackend->frameNumber % FRAME_OVERLAP];
 }
 
-void SK::VkRendererBackend::registerOverlayPass(RendererBackend* vkRendererBackend, OverlayPass pass)
+void SK::VkRendererBackend::registerOverlayPass(State* vkRendererBackend, OverlayPass pass)
 {
     vkRendererBackend->overlayPasses.push_back(pass);
 }
 
-VkShaderModule SK::VkRendererBackend::getOrLoadShader(RendererBackend* vkRendererBackend, const char* path)
+VkShaderModule SK::VkRendererBackend::getOrLoadShader(State* vkRendererBackend, const char* path)
 {
     size_t hash = std::hash<std::string>{}(path);
 
@@ -533,7 +533,7 @@ VkShaderModule SK::VkRendererBackend::getOrLoadShader(RendererBackend* vkRendere
     return shaderModule;
 }
     
-void SK::VkRendererBackend::clearShaderCache(RendererBackend* vkRendererBackend)
+void SK::VkRendererBackend::clearShaderCache(State* vkRendererBackend)
 {
     for(auto& [k, s] : vkRendererBackend->shaderCache)
     {
@@ -543,7 +543,7 @@ void SK::VkRendererBackend::clearShaderCache(RendererBackend* vkRendererBackend)
     vkRendererBackend->shaderCache.clear();
 }
 
-VkPipelineLayout SK::VkRendererBackend::getOrCreatePipelineLayout(RendererBackend* vkRendererBackend, const PipelineLayoutKey& key)
+VkPipelineLayout SK::VkRendererBackend::getOrCreatePipelineLayout(State* vkRendererBackend, const PipelineLayoutKey& key)
 {
     size_t hash = hashPipelineLayoutKey(key);
 
@@ -566,7 +566,7 @@ VkPipelineLayout SK::VkRendererBackend::getOrCreatePipelineLayout(RendererBacken
     return layout;
 }
 
-void SK::VkRendererBackend::clearPipelineLayoutCache(RendererBackend* vkRendererBackend)
+void SK::VkRendererBackend::clearPipelineLayoutCache(State* vkRendererBackend)
 {
     for(auto& [k, l] : vkRendererBackend->pipelineLayoutCache)
     {
@@ -576,7 +576,7 @@ void SK::VkRendererBackend::clearPipelineLayoutCache(RendererBackend* vkRenderer
     vkRendererBackend->pipelineLayoutCache.clear();
 }
 
-VkPipeline SK::VkRendererBackend::getOrCreatePipeline(RendererBackend* vkRendererBackend, const PipelineKey& key)
+VkPipeline SK::VkRendererBackend::getOrCreatePipeline(State* vkRendererBackend, const PipelineKey& key)
 {
     size_t hash = hashPipelineKey(key);
 
@@ -629,7 +629,7 @@ VkPipeline SK::VkRendererBackend::getOrCreatePipeline(RendererBackend* vkRendere
     return pipeline;
 }
 
-void SK::VkRendererBackend::clearPipelineCache(RendererBackend* vkRendererBackend)
+void SK::VkRendererBackend::clearPipelineCache(State* vkRendererBackend)
 {
     for(auto& [k, p] : vkRendererBackend->pipelineCache)
     {
@@ -639,7 +639,7 @@ void SK::VkRendererBackend::clearPipelineCache(RendererBackend* vkRendererBacken
     vkRendererBackend->pipelineCache.clear();
 }
 
-void SK::VkRendererBackend::m_initVulkan(RendererBackend* vkRendererBackend)
+void SK::VkRendererBackend::m_initVulkan(State* vkRendererBackend)
 {
     vkb::InstanceBuilder builder;
 
@@ -702,12 +702,12 @@ void SK::VkRendererBackend::m_initVulkan(RendererBackend* vkRendererBackend)
     });
 }
 
-void SK::VkRendererBackend::m_initSwapchain(RendererBackend* vkRendererBackend)
+void SK::VkRendererBackend::m_initSwapchain(State* vkRendererBackend)
 {
     m_createSwapchain(vkRendererBackend, vkRendererBackend->windowExtent.width, vkRendererBackend->windowExtent.height);
 }
 
-void SK::VkRendererBackend::m_initCommands(RendererBackend* vkRendererBackend)
+void SK::VkRendererBackend::m_initCommands(State* vkRendererBackend)
 {
     // Create the command pool and allow for resetting of individual command buffers
     VkCommandPoolCreateInfo commandPoolInfo = SK::VkInit::command_pool_create_info(vkRendererBackend->graphicsQueueFamily, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
@@ -733,7 +733,7 @@ void SK::VkRendererBackend::m_initCommands(RendererBackend* vkRendererBackend)
     });
 }
 
-void SK::VkRendererBackend::m_initSyncStructures(RendererBackend* vkRendererBackend)
+void SK::VkRendererBackend::m_initSyncStructures(State* vkRendererBackend)
 {
     //create syncronization structures
     //one fence to control when the gpu has finished rendering the frame,
@@ -757,7 +757,7 @@ void SK::VkRendererBackend::m_initSyncStructures(RendererBackend* vkRendererBack
     });
 }
 
-void SK::VkRendererBackend::m_createSwapchain(RendererBackend* vkRendererBackend, uint32_t width, uint32_t height)
+void SK::VkRendererBackend::m_createSwapchain(State* vkRendererBackend, uint32_t width, uint32_t height)
 {
     vkb::SwapchainBuilder swapchainBuilder{ vkRendererBackend->chosenGPU, vkRendererBackend->device, vkRendererBackend->surface};
 
@@ -779,7 +779,7 @@ void SK::VkRendererBackend::m_createSwapchain(RendererBackend* vkRendererBackend
     vkRendererBackend->swapchainImageViews = vkbSwapchain.get_image_views().value();
 }
 
-void SK::VkRendererBackend::m_destroySwapchain(RendererBackend* vkRendererBackend)
+void SK::VkRendererBackend::m_destroySwapchain(State* vkRendererBackend)
 {
     // Deleting the swapchain deletes the images it holds internally.
     vkDestroySwapchainKHR(vkRendererBackend->device, vkRendererBackend->swapchain, nullptr);
@@ -794,7 +794,7 @@ void SK::VkRendererBackend::m_destroySwapchain(RendererBackend* vkRendererBacken
     vkRendererBackend->swapchainImageViews.clear();
 }
 
-void SK::VkRendererBackend::handleWindowResize(RendererBackend* vkRendererBackend)
+void SK::VkRendererBackend::handleWindowResize(State* vkRendererBackend)
 {
     // Don't change the images and views while the gpu is still handling them
     vkDeviceWaitIdle(vkRendererBackend->device);
@@ -813,7 +813,7 @@ void SK::VkRendererBackend::handleWindowResize(RendererBackend* vkRendererBacken
     vkRendererBackend->windowResizeRequested = false;
 }
 
-void SK::VkRendererBackend::m_initDescriptors(RendererBackend* vkRendererBackend)
+void SK::VkRendererBackend::m_initDescriptors(State* vkRendererBackend)
 {
     // Create the global growable descriptor allocator 
     std::vector<DescriptorAllocatorGrowable::PoolSize> sizes = {
@@ -882,17 +882,17 @@ void SK::VkRendererBackend::m_initDescriptors(RendererBackend* vkRendererBackend
     }
 }
 
-void SK::VkRendererBackend::m_initMaterialLayouts(RendererBackend* vkRendererBackend)
+void SK::VkRendererBackend::m_initMaterialLayouts(State* vkRendererBackend)
 {
     GLTFMetallicRoughnessMaterial::BuildMaterialLayout(vkRendererBackend);
 }
 
-void SK::VkRendererBackend::m_clearMaterialLayouts(RendererBackend* vkRendererBackend)
+void SK::VkRendererBackend::m_clearMaterialLayouts(State* vkRendererBackend)
 {
     GLTFMetallicRoughnessMaterial::ClearMaterialLayout(vkRendererBackend->device);
 }
 
-void SK::VkRendererBackend::m_initDefaultData(RendererBackend* vkRendererBackend)
+void SK::VkRendererBackend::m_initDefaultData(State* vkRendererBackend)
 {
     // Default textures
     // 3 default textures 1 pixel each
@@ -962,7 +962,7 @@ void SK::VkRendererBackend::m_initDefaultData(RendererBackend* vkRendererBackend
     vkRendererBackend->defaultMaterialInstance = GLTFMetallicRoughnessMaterial::CreateInstance(vkRendererBackend->device, MaterialPass::Opaque, defaultMaterialResources, vkRendererBackend->globalDescriptorAllocator);
 }
 
-void SK::VkRendererBackend::m_initGlobalSceneBuffer(RendererBackend* vkRendererBackend)
+void SK::VkRendererBackend::m_initGlobalSceneBuffer(State* vkRendererBackend)
 {
     for(int i = 0; i < FRAME_OVERLAP; ++i)
     {

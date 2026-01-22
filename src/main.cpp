@@ -19,7 +19,7 @@ SK::VkRendererBackend::DrawContext drawContext;
 // GPU Scene Data
 GPUSceneData gpuSceneData;
 
-void loadSceneData(SK::VkRendererBackend::RendererBackend* vkRendererBackend)
+void loadSceneData(SK::VkRendererBackend::State* vkRendererBackend)
 {
     std::string structurePath = "../../assets/structure.glb";
     auto loadedStructureScene = loadGltf(vkRendererBackend, structurePath);
@@ -27,12 +27,12 @@ void loadSceneData(SK::VkRendererBackend::RendererBackend* vkRendererBackend)
     loadedScenes["structure"] = loadedStructureScene.value();
 }
 
-void loadScene(SK::VkRendererBackend::RendererBackend* vkRendererBackend)
+void loadScene(SK::VkRendererBackend::State* vkRendererBackend)
 {
     loadSceneData(vkRendererBackend);
 }
 
-void updateSceneTemp(SK::VkRendererBackend::RendererBackend* vkRendererBackend, Camera& camera)
+void updateSceneTemp(SK::VkRendererBackend::State* vkRendererBackend, Camera& camera)
 {
     // TODO: Update timings are missing here but Engine Stats should be reconsidered too. Not sure if they should be in vkRendererBackend.
     camera.update();
@@ -57,17 +57,17 @@ void updateSceneTemp(SK::VkRendererBackend::RendererBackend* vkRendererBackend, 
 
 int main(int argc, char* argv[])
 {
-	SK::Application::Application application;
+	SK::Application::State application;
 	SK::Application::init(&application, 1920, 1080);
 
-	SK::VkRendererBackend::RendererBackend vkRendererBackend;
+	SK::VkRendererBackend::State vkRendererBackend;
 	SK::VkRendererBackend::init(&vkRendererBackend, application.window, application.windowWidth, application.windowHeight);
 
-    SK::UI::UI ui;
+    SK::UI::State ui;
     SK::UI::init(&ui, &vkRendererBackend);
 
     // Renderer frontends
-    SK::ForwardRenderer::ForwardRenderer forwardRenderer;
+    SK::ForwardRenderer::State forwardRenderer;
     SK::ForwardRenderer::init(&forwardRenderer, &vkRendererBackend);
 
     loadScene(&vkRendererBackend);

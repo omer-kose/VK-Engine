@@ -13,7 +13,7 @@
 #include <fastgltf/tools.hpp>
 
 
-std::optional<AllocatedImage> loadImage(SK::VkRendererBackend::RendererBackend* vkRendererBackend, fastgltf::Asset& asset, fastgltf::Image& image)
+std::optional<AllocatedImage> loadImage(SK::VkRendererBackend::State* vkRendererBackend, fastgltf::Asset& asset, fastgltf::Image& image)
 {
 	AllocatedImage newImage = {};
 
@@ -123,7 +123,7 @@ VkSamplerMipmapMode extractMipmapMode(fastgltf::Filter filter)
 }
 
 
-std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(SK::VkRendererBackend::RendererBackend* vkRendererBackend, std::string_view filePath)
+std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(SK::VkRendererBackend::State* vkRendererBackend, std::string_view filePath)
 {
 	fmt::print("Loading GLTF: {}", filePath);
 
@@ -457,7 +457,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(SK::VkRendererBackend::Rende
 	return scene;
 }
 
-std::optional<std::vector<std::shared_ptr<GLTFMeshAsset>>> loadGltfMeshes(SK::VkRendererBackend::RendererBackend* vkRendererBackend, std::filesystem::path filePath)
+std::optional<std::vector<std::shared_ptr<GLTFMeshAsset>>> loadGltfMeshes(SK::VkRendererBackend::State* vkRendererBackend, std::filesystem::path filePath)
 {
 	std::cout << "Loading GLTF: " << filePath << std::endl;
 

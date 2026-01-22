@@ -5,7 +5,7 @@
 #include <RendererBackend/vulkan/vk_initializers.h>
 
 
-void SK::ForwardRenderer::init(ForwardRenderer* forwardRenderer, SK::VkRendererBackend::RendererBackend* vkRendererBackend)
+void SK::ForwardRenderer::init(State* forwardRenderer, SK::VkRendererBackend::State* vkRendererBackend)
 {
     // Load the shaders
     VkShaderModule meshVertexShader = SK::VkRendererBackend::getOrLoadShader(vkRendererBackend, "../../shaders/glsl/gltf_metallic/mesh_vert.spv");
@@ -74,7 +74,7 @@ void SK::ForwardRenderer::init(ForwardRenderer* forwardRenderer, SK::VkRendererB
     vkDestroyDescriptorSetLayout(vkRendererBackend->device, materialLayout, nullptr);
 }
 
-void SK::ForwardRenderer::draw(ForwardRenderer* forwardRenderer, SK::VkRendererBackend::RendererBackend* vkRendererBackend, const SK::VkRendererBackend::DrawContext& ctx)
+void SK::ForwardRenderer::draw(State* forwardRenderer, SK::VkRendererBackend::State* vkRendererBackend, const SK::VkRendererBackend::DrawContext& ctx)
 {
     VkCommandBuffer cmd = vkRendererBackend->currentCmdBuffer;
 
@@ -160,7 +160,7 @@ void SK::ForwardRenderer::draw(ForwardRenderer* forwardRenderer, SK::VkRendererB
     vkCmdEndRendering(cmd);
 }
 
-void SK::ForwardRenderer::shutdown(ForwardRenderer* forwardRenderer, SK::VkRendererBackend::RendererBackend* vkRendererBackend)
+void SK::ForwardRenderer::shutdown(State* forwardRenderer, SK::VkRendererBackend::State* vkRendererBackend)
 {
 
 }
