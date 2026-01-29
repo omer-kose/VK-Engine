@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <thread>
+#include <array>
 
 #include <SDL_vulkan.h>
 

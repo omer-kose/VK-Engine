@@ -1,5 +1,8 @@
 ﻿#pragma once
 
+#include <deque>
+#include <span>
+
 #include <RendererBackend/vulkan/vk_types.h>
 
 struct DescriptorLayoutBuilder

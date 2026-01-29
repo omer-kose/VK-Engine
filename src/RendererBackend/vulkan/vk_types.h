@@ -1,15 +1,5 @@
 ﻿#pragma once
 
-#include <memory>
-#include <optional>
-#include <string>
-#include <vector>
-#include <span>
-#include <array>
-// TODO: Can be deleted now Deletion Queue moved to its own file?
-#include <functional>
-#include <deque>
-
 #include <vulkan/vulkan.h>
 #include <vulkan/vk_enum_string_helper.h>
 #include <vk_mem_alloc.h>

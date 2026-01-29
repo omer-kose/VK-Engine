@@ -2,6 +2,7 @@
 	Vulkan Renderer Backend
 */
 #pragma once
+#include <span>
 
 #include <RendererBackend/vulkan/vk_types.h>
 #include <RendererBackend/vulkan/vk_descriptors.h>
