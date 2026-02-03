@@ -11,6 +11,8 @@
 
 void SK::UI::init(State* ui, SK::VkRendererBackend::State* vkRendererBackend)
 {
+    assert(ui->isInitialized == false);
+
     // 1: create descriptor pool for IMGUI
     // the size of the pool is very oversize, but it's copied from imgui demo  itself.
     VkDescriptorPoolSize poolSizes[] = {

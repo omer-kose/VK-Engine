@@ -125,7 +125,7 @@ VkSamplerMipmapMode extractMipmapMode(fastgltf::Filter filter)
 
 std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(SK::VkRendererBackend::State* vkRendererBackend, std::string_view filePath)
 {
-	fmt::print("Loading GLTF: {}", filePath);
+	fmt::println("Loading GLTF: {}", filePath);
 
 	std::shared_ptr<LoadedGLTF> scene = std::make_shared<LoadedGLTF>();
 	scene->vkRendererBackend = vkRendererBackend;
