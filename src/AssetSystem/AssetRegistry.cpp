@@ -2,36 +2,50 @@
 
 #include <RendererBackend/vulkan/vk_renderer.h>
 
-void SK::Asset::clearAssetRegistry(SK::VkRendererBackend::State* vkRendererBackend, SK::Asset::AssetRegistry* assetRegistry)
+void SK::Asset::registerImported(AssetRegistry* assetRegistry, ImportedAsset& importedAsset)
 {
-	// Clear the meshes
-	for(Mesh& mesh : assetRegistry->meshes)
-	{
-		SK::VkRendererBackend::destroyBuffer(vkRendererBackend, mesh.meshBuffers.vertexBuffer);
-		SK::VkRendererBackend::destroyBuffer(vkRendererBackend, mesh.meshBuffers.indexBuffer);
-	}
+    for(auto& mesh : importedAsset.meshes)
+    {
+        uint32_t idx = static_cast<uint32_t>(assetRegistry->meshes.size());
+        assetRegistry->meshIndexByName[mesh.name] = idx;
+        assetRegistry->meshes.push_back(std::move(mesh));
+    }
 
-	// Clear the texture images
-	for(Texture& texture : assetRegistry->textures)
-	{
-		// If a texture cannot be loaded for some reason, it is defaulted to error image from the backend. In that case, don't destroy backend owned resource
-		if(texture.image.image != vkRendererBackend->errorCheckerboardImage.image)
-		{
-			SK::VkRendererBackend::destroyImage(vkRendererBackend, texture.image);
-		}
-	}
+    for(auto& tex : importedAsset.textures)
+    {
+        uint32_t idx = static_cast<uint32_t>(assetRegistry->textures.size());
+        assetRegistry->textureIndexByName[tex.name] = idx;
+        assetRegistry->textures.push_back(std::move(tex));
+    }
+}
 
-	// Clear the samplers
-	for(VkSampler& sampler : assetRegistry->samplers)
-	{
-		vkDestroySampler(vkRendererBackend->device, sampler, nullptr);
-	}
+void SK::Asset::discardCPUMeshData(AssetRegistry* assetRegistry)
+{
+    for(auto& mesh : assetRegistry->meshes)
+    {
+        if(mesh.retention == CPURetention::DropAfterUpload)
+        {
+            mesh.vertices.clear();
+            mesh.indices.clear();
+            mesh.vertices.shrink_to_fit();
+            mesh.indices.shrink_to_fit();
+        }
+    }
+}
 
-	// Clear all the containers
-	assetRegistry->meshes.clear();
-	assetRegistry->textures.clear();
-	assetRegistry->samplers.clear();
+void SK::Asset::discardCPUTextureData(AssetRegistry* assetRegistry)
+{
+    for(auto& tex : assetRegistry->textures)
+    {
+        if(tex.retention == CPURetention::DropAfterUpload)
+        {
+            tex.image.data.clear();
+            tex.image.data.shrink_to_fit();
+        }
+    }
+}
 
-	assetRegistry->meshIndexByName.clear();
-	assetRegistry->textureIndexByName.clear();
+void SK::Asset::clearAssetRegistry(SK::Asset::AssetRegistry* assetRegistry)
+{
+
 }
