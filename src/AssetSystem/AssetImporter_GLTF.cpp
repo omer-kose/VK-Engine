@@ -14,8 +14,7 @@
 #include <glm/vec4.hpp>
 #include <glm/gtx/quaternion.hpp>
 
-// TODO: Rename this back once I get rid of vk_loader
-VkFilter extractFilterTemp(fastgltf::Filter filter)
+static SK::Asset::TextureFilter extractTextureFilter(fastgltf::Filter filter)
 {
 	switch(filter)
 	{
@@ -23,30 +22,29 @@ VkFilter extractFilterTemp(fastgltf::Filter filter)
 		case fastgltf::Filter::Nearest:
 		case fastgltf::Filter::NearestMipMapNearest:
 		case fastgltf::Filter::NearestMipMapLinear:
-			return VK_FILTER_NEAREST;
+			return SK::Asset::TextureFilter::NEAREST;
 
 		//linear samplers
 		case fastgltf::Filter::Linear:
 		case fastgltf::Filter::LinearMipMapNearest:
 		case fastgltf::Filter::LinearMipMapLinear:
 		default:
-			return VK_FILTER_LINEAR;
+            return SK::Asset::TextureFilter::LINEAR;
 	}
 }
 
-// TODO: Rename this back once I get rid of vk_loader
-VkSamplerMipmapMode extractMipmapModeTemp(fastgltf::Filter filter)
+static SK::Asset::TextureMipmapMode extractTextureMipmapMode(fastgltf::Filter filter)
 {
 	switch(filter)
 	{
 		case fastgltf::Filter::NearestMipMapNearest:
 		case fastgltf::Filter::LinearMipMapNearest:
-			return VK_SAMPLER_MIPMAP_MODE_NEAREST;
+			return SK::Asset::TextureMipmapMode::NEAREST;
 
 		case fastgltf::Filter::NearestMipMapLinear:
 		case fastgltf::Filter::LinearMipMapLinear:
 		default:
-			return VK_SAMPLER_MIPMAP_MODE_LINEAR;
+			return SK::Asset::TextureMipmapMode::LINEAR;
 	}
 }
 
@@ -196,8 +194,18 @@ bool SK::Asset::importGLTF(std::string_view filePath, ImportedAsset* outAsset)
             const fastgltf::Sampler& sampler = asset.samplers[gltfTexture.samplerIndex.value()];
             if(sampler.minFilter.has_value())
             {
-                texture.description.mipMapped = hasMipmapFilter(sampler.minFilter.value());
+                texture.description.mipmapped = hasMipmapFilter(sampler.minFilter.value());
             }
+        }
+
+        // Sampler info (if not provided default values will be used for sampler creation)
+        if(gltfTexture.samplerIndex.has_value())
+        {
+            fastgltf::Sampler& gltfSampler = asset.samplers[gltfTexture.samplerIndex.value()];
+            texture.description.minFilter = extractTextureFilter(gltfSampler.minFilter.value_or(fastgltf::Filter::Nearest));
+            texture.description.magFilter = extractTextureFilter(gltfSampler.magFilter.value_or(fastgltf::Filter::Nearest));
+            
+            texture.description.mipmapMode = extractTextureMipmapMode(gltfSampler.minFilter.value_or(fastgltf::Filter::Nearest));
         }
 
         if(gltfTexture.imageIndex.has_value())

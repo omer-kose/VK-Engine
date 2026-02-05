@@ -397,6 +397,26 @@ void SK::VkRendererBackend::destroyImage(State* vkRendererBackend, const Allocat
     vmaDestroyImage(vkRendererBackend->vmaAllocator, img.image, img.allocation);
 }
 
+VkSampler SK::VkRendererBackend::createSampler(State* vkRendererBackend, VkFilter minFilter, VkFilter magFilter, VkSamplerMipmapMode mipmapMode, VkSamplerAddressMode addressMode)
+{
+    VkSamplerCreateInfo createInfo = { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+
+    createInfo.minFilter = minFilter;
+    createInfo.magFilter = magFilter;
+    createInfo.mipmapMode = mipmapMode;
+    createInfo.addressModeU = addressMode;
+    createInfo.addressModeV = addressMode;
+    createInfo.addressModeW = addressMode;
+    createInfo.minLod = 0.0f;
+    createInfo.maxLod = 16.0f;
+    createInfo.anisotropyEnable = mipmapMode == VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    createInfo.maxAnisotropy = mipmapMode == VK_SAMPLER_MIPMAP_MODE_LINEAR ? 4.0f : 1.0f;
+
+    VkSampler sampler;
+    VK_CHECK(vkCreateSampler(vkRendererBackend->device, &createInfo, 0, &sampler));
+    return sampler;
+}
+
 GPUMeshBuffers SK::VkRendererBackend::uploadMesh(State* vkRendererBackend, std::span<Vertex> vertices, std::span<uint32_t> indices)
 {
     const size_t vertexBufferSize = vertices.size() * sizeof(Vertex);

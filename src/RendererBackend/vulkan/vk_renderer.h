@@ -253,6 +253,8 @@ namespace SK::VkRendererBackend
 	AllocatedImage createImage(State* vkRendererBackend, void* data, VkExtent3D imageExtent, VkFormat format, VkImageUsageFlags usage, bool mipMapped = false);
 	void destroyImage(State* vkRendererBackend, const AllocatedImage& img);
 
+	VkSampler createSampler(State* vkRendererBackend, VkFilter minFilter, VkFilter magFilter, VkSamplerMipmapMode mipmapMode, VkSamplerAddressMode addressMode);
+
 	GPUMeshBuffers uploadMesh(State* vkRendererBackend, std::span<Vertex> vertices, std::span<uint32_t> indices);
 
 	void updateSceneBuffer(State* vkRendererBackend, const GPUSceneData& gpuSceneData);

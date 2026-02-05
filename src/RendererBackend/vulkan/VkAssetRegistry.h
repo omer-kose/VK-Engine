@@ -21,6 +21,7 @@ namespace SK::VkRendererBackend
 			AllocatedImage image;
 			VkSampler sampler;
 			std::string name;
+			bool ownsImage; // false when fallback error image is used in the absence of image data
 		};
 
 		std::vector<GPUMesh> meshes;

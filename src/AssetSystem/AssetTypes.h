@@ -19,6 +19,24 @@ namespace SK::Asset
 		KeepOnCPU
 	};
 
+	enum class TextureFilter : uint8_t
+	{
+		NEAREST = 0,
+		LINEAR
+	};
+
+	enum class TextureMipmapMode : uint8_t
+	{
+		NEAREST = 0,
+		LINEAR
+	};
+
+	enum class TextureAddressMode : uint8_t
+	{
+		REPEAT = 0, // wrap
+		CLAMP_TO_EDGE = 1
+	};
+
 	struct RawImage
 	{
 		std::vector<uint8_t> data;
@@ -29,7 +47,11 @@ namespace SK::Asset
 
 	struct TextureDescription
 	{
-		bool mipMapped = false;
+		bool mipmapped = false;
+		TextureFilter minFilter = TextureFilter::LINEAR;
+		TextureFilter magFilter = TextureFilter::LINEAR;
+		TextureMipmapMode mipmapMode = TextureMipmapMode::LINEAR;
+		TextureAddressMode addressMode = TextureAddressMode::REPEAT;
 	};
 
 	struct RawTexture
