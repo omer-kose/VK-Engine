@@ -8,7 +8,7 @@
 
 namespace SK::Asset
 {
-	// Temporary staging container used by importers.
+	// Temporary staging container used by importers. Registrating it to the Asset Registry will move its resources to the Asset Registry.
 	struct ImportedAsset
 	{
 		std::vector<RawMesh> meshes;

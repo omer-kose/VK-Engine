@@ -2,7 +2,7 @@
 
 #include <RendererBackend/vulkan/vk_renderer.h>
 
-void SK::Asset::registerImported(AssetRegistry* assetRegistry, ImportedAsset& importedAsset)
+void SK::Asset::registerImported(AssetRegistry* assetRegistry, ImportedAsset&& importedAsset)
 {
     for(auto& mesh : importedAsset.meshes)
     {
