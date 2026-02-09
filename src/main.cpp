@@ -21,6 +21,8 @@ GPUSceneData gpuSceneData;
 
 #include <AssetSystem/AssetRegistry.h>
 #include <AssetSystem/AssetImporter_GLTF.h>
+#include <RendererBackend/vulkan/VkAssetRegistry.h>
+#include <RendererBackend/vulkan/VkAssetBuilder.h>
 
 void loadSceneData(SK::VkRendererBackend::State* vkRendererBackend)
 {
@@ -75,10 +77,13 @@ int main(int argc, char* argv[])
 
     // TODO: Asset System test
     SK::Asset::AssetRegistry assetRegistry;
+    SK::VkRendererBackend::VkAssetRegistry vkAssetRegistry;
     SK::Asset::ImportedAsset structureScene;
     if(SK::Asset::importGLTF("../../assets/structure.glb", &structureScene))
     {
         SK::Asset::registerImported(&assetRegistry, std::move(structureScene));
+        SK::VkRendererBackend::buildGPUAssets(&vkRendererBackend, &assetRegistry, &vkAssetRegistry);
+        SK::VkRendererBackend::clearGPUAssets(&vkRendererBackend, &vkAssetRegistry);
     }
 
     loadScene(&vkRendererBackend);

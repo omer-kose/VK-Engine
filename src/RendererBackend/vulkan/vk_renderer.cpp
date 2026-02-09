@@ -689,12 +689,17 @@ void SK::VkRendererBackend::m_initVulkan(State* vkRendererBackend)
     features12.bufferDeviceAddress = true;
     features12.descriptorIndexing = true;
 
+    // Vulkan 1.0 features
+    VkPhysicalDeviceFeatures features10{};
+    features10.samplerAnisotropy = true;
+
     // Use vkbootstrap to select a gpu with Vulkan 1.3 and necessary features
     vkb::PhysicalDeviceSelector selector{vkbInstance};
     vkb::PhysicalDevice physicalDevice = selector
         .set_minimum_version(1, 3)
         .set_required_features_13(features13)
         .set_required_features_12(features12)
+        .set_required_features(features10)
         .set_surface(vkRendererBackend->surface)
         .select()
         .value();
