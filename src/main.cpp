@@ -19,6 +19,9 @@ SK::VkRendererBackend::DrawContext drawContext;
 // GPU Scene Data
 GPUSceneData gpuSceneData;
 
+#include <AssetSystem/AssetRegistry.h>
+#include <AssetSystem/AssetImporter_GLTF.h>
+
 void loadSceneData(SK::VkRendererBackend::State* vkRendererBackend)
 {
     std::string structurePath = "../../assets/structure.glb";
@@ -69,6 +72,14 @@ int main(int argc, char* argv[])
     // Renderer frontends
     SK::ForwardRenderer::State forwardRenderer;
     SK::ForwardRenderer::init(&forwardRenderer, &vkRendererBackend);
+
+    // TODO: Asset System test
+    SK::Asset::AssetRegistry assetRegistry;
+    SK::Asset::ImportedAsset structureScene;
+    if(SK::Asset::importGLTF("../../assets/structure.glb", &structureScene))
+    {
+        SK::Asset::registerImported(&assetRegistry, std::move(structureScene));
+    }
 
     loadScene(&vkRendererBackend);
 
