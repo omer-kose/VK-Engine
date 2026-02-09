@@ -68,5 +68,10 @@ void SK::Asset::discardCPUTextureData(AssetRegistry* assetRegistry)
 
 void SK::Asset::clearAssetRegistry(SK::Asset::AssetRegistry* assetRegistry)
 {
-
+    assetRegistry->meshes.clear();
+    assetRegistry->textures.clear();
+    assetRegistry->gltfScenes.clear();
+    assetRegistry->meshIndexByName.clear();
+    assetRegistry->textureIndexByName.clear();
+    assetRegistry->gltfSceneIndexByName.clear();
 }
