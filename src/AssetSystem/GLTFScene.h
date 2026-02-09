@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <string>
 #include <glm/mat4x4.hpp>
 
 namespace SK::Asset
@@ -17,5 +18,6 @@ namespace SK::Asset
 	{
 		std::vector<GLTFSceneNode> nodes;
 		std::vector<int> rootNodes;
+		std::string name;
 	};
 }

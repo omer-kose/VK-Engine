@@ -14,10 +14,12 @@ namespace SK::Asset
 	{
 		std::vector<RawMesh> meshes;
 		std::vector<RawTexture> textures;
+		std::vector<GLTFScene> gltfScenes;
 
 		// String index mapping into the actual buffers
 		std::unordered_map<std::string, uint32_t> meshIndexByName;
 		std::unordered_map<std::string, uint32_t> textureIndexByName;
+		std::unordered_map<std::string, uint32_t> gltfSceneIndexByName;
 	};
 
 	void registerImported(AssetRegistry* assetRegistry, ImportedAsset&& importedAsset);

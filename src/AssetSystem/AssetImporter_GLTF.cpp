@@ -357,6 +357,7 @@ bool SK::Asset::importGLTF(std::string_view filePath, ImportedAsset* outAsset)
     {
         outAsset->gltfScene.emplace();
         GLTFScene& scene = outAsset->gltfScene.value();
+        scene.name = gltfFileName;
 
         scene.nodes.resize(asset.nodes.size());
 

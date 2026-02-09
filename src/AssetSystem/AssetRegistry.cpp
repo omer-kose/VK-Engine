@@ -4,6 +4,8 @@
 
 void SK::Asset::registerImported(AssetRegistry* assetRegistry, ImportedAsset&& importedAsset)
 {
+    const uint32_t meshBaseIndex = static_cast<uint32_t>(assetRegistry->meshes.size());
+
     for(auto& mesh : importedAsset.meshes)
     {
         uint32_t idx = static_cast<uint32_t>(assetRegistry->meshes.size());
@@ -16,6 +18,25 @@ void SK::Asset::registerImported(AssetRegistry* assetRegistry, ImportedAsset&& i
         uint32_t idx = static_cast<uint32_t>(assetRegistry->textures.size());
         assetRegistry->textureIndexByName[tex.name] = idx;
         assetRegistry->textures.push_back(std::move(tex));
+    }
+
+    // Register GLTF scene (if any) and remap local mesh indices to global
+    if(importedAsset.gltfScene.has_value())
+    {
+        GLTFScene scene = std::move(importedAsset.gltfScene.value());
+
+        for(auto& node : scene.nodes)
+        {
+            // Remap local mesh indices to global
+            if(node.meshIndex >= 0)
+            {
+                node.meshIndex = static_cast<int>(meshBaseIndex) + node.meshIndex;
+            }
+        }
+
+        uint32_t idx = static_cast<uint32_t>(assetRegistry->gltfScenes.size());
+        assetRegistry->gltfSceneIndexByName[scene.name] = idx;
+        assetRegistry->gltfScenes.push_back(std::move(scene));
     }
 }
 
