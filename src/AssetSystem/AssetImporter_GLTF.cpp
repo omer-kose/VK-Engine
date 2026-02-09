@@ -257,7 +257,7 @@ bool SK::Asset::importGLTF(std::string_view filePath, ImportedAsset* outAsset)
             if(primitive.indicesAccessor.has_value())
             {
                 fastgltf::Accessor& indexAccessor = asset.accessors[primitive.indicesAccessor.value()];
-                subMesh.count = static_cast<uint32_t>(indexAccessor.count);
+                subMesh.indexCount = static_cast<uint32_t>(indexAccessor.count);
 
                 indices.reserve(indices.size() + indexAccessor.count);
 

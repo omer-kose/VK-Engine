@@ -74,7 +74,7 @@ namespace SK::Asset
 	{
 		// starting index and count into the index buffer
 		uint32_t startIndex = 0;
-		uint32_t count = 0;
+		uint32_t indexCount = 0;
 		MeshBounds bounds;
 		uint32_t materialIndex = UINT32_MAX; // optional, filled later
 	};

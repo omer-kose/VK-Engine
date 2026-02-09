@@ -6,15 +6,21 @@ file(GLOB_RECURSE SRC_RENDERER_BACKEND
 )
 
 file(GLOB_RECURSE SRC_RENDERERS
-	"Renderers/*.h"
-	"Renderers/*.hpp"
-	"Renderers/*.cpp"
+	"Renderer/*.h"
+	"Renderer/*.hpp"
+	"Renderer/*.cpp"
 )
 
 file(GLOB_RECURSE SRC_ASSETSYSTEM
 	"AssetSystem/*.h"
 	"AssetSystem/*.hpp"
 	"AssetSystem/*.cpp"
+)
+
+file(GLOB_RECURSE SRC_SCENE
+	"Scene/*.h"
+	"Scene/*.hpp"
+	"Scene/*.cpp"
 )
 
 file(GLOB_RECURSE SRC_APP
@@ -49,10 +55,10 @@ file(GLOB SRC
 )
 
 # Create executable with all found sources
-add_executable(engine ${SRC} ${SRC_RENDERER_BACKEND} ${SRC_RENDERERS} ${SRC_ASSETSYSTEM} ${SRC_APP} ${SRC_UI} ${SRC_UTIL} ${SRC_MATERIALS})
+add_executable(engine ${SRC} ${SRC_RENDERER_BACKEND} ${SRC_RENDERERS} ${SRC_ASSETSYSTEM} ${SRC_SCENE} ${SRC_APP} ${SRC_UI} ${SRC_UTIL} ${SRC_MATERIALS})
 
 # Add filters for the solution
-source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SRC_RENDERER_BACKEND} ${SRC_RENDERERS} ${SRC_ASSETSYSTEM} ${SRC_APP} ${SRC_UI} ${SRC_UTIL} ${SRC_MATERIALS})
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SRC_RENDERER_BACKEND} ${SRC_RENDERERS} ${SRC_ASSETSYSTEM} ${SRC_SCENE} ${SRC_APP} ${SRC_UI} ${SRC_UTIL} ${SRC_MATERIALS})
 
 set_property(TARGET engine PROPERTY CXX_STANDARD 20)
 target_compile_definitions(engine PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)

@@ -1,7 +1,7 @@
 #include <Application/Application.h>
 #include <RendererBackend/vulkan/vk_renderer.h>
 #include <UI/UI.h>
-#include <Renderers/ForwardRenderer.h>
+#include <Renderer/ForwardRenderer.h>
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
@@ -19,10 +19,15 @@ SK::VkRendererBackend::DrawContext drawContext;
 // GPU Scene Data
 GPUSceneData gpuSceneData;
 
+// TODO: Asset System Test
 #include <AssetSystem/AssetRegistry.h>
 #include <AssetSystem/AssetImporter_GLTF.h>
 #include <RendererBackend/vulkan/VkAssetRegistry.h>
 #include <RendererBackend/vulkan/VkAssetBuilder.h>
+#include <Scene/MeshInstance.h>
+#include <Scene/GLTFInstanceBuilder.h>
+#include <Renderer/DrawContext.h>
+#include <Renderer/DrawPacketBuilder.h>
 
 void loadSceneData(SK::VkRendererBackend::State* vkRendererBackend)
 {
@@ -75,15 +80,31 @@ int main(int argc, char* argv[])
     SK::ForwardRenderer::State forwardRenderer;
     SK::ForwardRenderer::init(&forwardRenderer, &vkRendererBackend);
 
-    // TODO: Asset System test
+    // TODO: Asset System and Mesh Instancing test
     SK::Asset::AssetRegistry assetRegistry;
     SK::VkRendererBackend::VkAssetRegistry vkAssetRegistry;
     SK::Asset::ImportedAsset structureScene;
+    // Load and register the gltf scene
     if(SK::Asset::importGLTF("../../assets/structure.glb", &structureScene))
     {
-        SK::Asset::registerImported(&assetRegistry, std::move(structureScene));
-        SK::VkRendererBackend::buildGPUAssets(&vkRendererBackend, &assetRegistry, &vkAssetRegistry);
-        SK::VkRendererBackend::clearGPUAssets(&vkRendererBackend, &vkAssetRegistry);
+        if(structureScene.gltfScene.has_value())
+        {
+            std::string gltfName = structureScene.gltfScene.value().name;
+            SK::Asset::registerImported(&assetRegistry, std::move(structureScene));
+            SK::VkRendererBackend::buildGPUAssets(&vkRendererBackend, &assetRegistry, &vkAssetRegistry);
+            SK::Asset::discardCPUMeshData(&assetRegistry);
+            SK::Asset::discardCPUTextureData(&assetRegistry);
+
+            // Instance the scene
+            std::vector<SK::Scene::MeshInstance> meshInstances;
+            SK::Scene::buildMeshInstancesFromGLTFScene(&assetRegistry, gltfName, glm::mat4(1.0f), meshInstances);
+            // Create draw packets out of instances
+            SK::Renderer::DrawContext drawCtx;
+            SK::Renderer::buildDrawPacketsFromMeshInstances(&assetRegistry, meshInstances, &drawCtx);
+
+            SK::VkRendererBackend::clearGPUAssets(&vkRendererBackend, &vkAssetRegistry);
+            SK::Asset::clearAssetRegistry(&assetRegistry);
+        }
     }
 
     loadScene(&vkRendererBackend);
