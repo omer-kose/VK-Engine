@@ -85,7 +85,7 @@ void SK::VkRendererBackend::buildGPUAssets(State* vkRendererBackend, SK::Asset::
             mapAddressMode(texture.description.addressMode)
         );
 
-        uint32_t idx = static_cast<uint32_t>(assetRegistry->textures.size());
+        uint32_t idx = static_cast<uint32_t>(vkAssetRegistry->textures.size());
         vkAssetRegistry->textureIndexByName[gpuTexture.name] = idx;
         vkAssetRegistry->textures.push_back(std::move(gpuTexture));
     }

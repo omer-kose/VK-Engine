@@ -11,7 +11,7 @@ void SK::Renderer::buildDrawPacketsFromMeshInstances(SK::Asset::AssetRegistry* a
 		for(const auto& subMesh : mesh.subMeshes)
 		{
 			DrawPacket packet{};
-			packet.meshName = mesh.name;
+			packet.meshIndex = inst.meshIndex;
 			packet.startIndex = subMesh.startIndex;
 			packet.indexCount = subMesh.indexCount;
 			packet.bounds = subMesh.bounds;

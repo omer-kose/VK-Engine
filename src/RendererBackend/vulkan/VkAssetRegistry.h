@@ -24,9 +24,11 @@ namespace SK::VkRendererBackend
 			bool ownsImage; // false when fallback error image is used in the absence of image data
 		};
 
+		// This is a 1-to-1 mapping to Asset Registry. This is ensured while building GPU assets via VkAssetBuilder. This exact mapping is utilized for efficient indexing in runtime hot draw path.
 		std::vector<GPUMesh> meshes;
 		std::vector<GPUTexture> textures;
 
+		// Only for debug purposes
 		std::unordered_map<std::string, uint32_t> meshIndexByName;
 		std::unordered_map<std::string, uint32_t> textureIndexByName;
 	};
