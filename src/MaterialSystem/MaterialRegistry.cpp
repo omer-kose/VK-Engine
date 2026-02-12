@@ -7,7 +7,7 @@ uint32_t SK::Material::registerInstance(MaterialRegistry* materialRegistry, Inst
     return idx;
 }
 
-uint32_t SK::Material::clearMaterialRegistry(MaterialRegistry* materialRegistry)
+void SK::Material::clearMaterialRegistry(MaterialRegistry* materialRegistry)
 {
     materialRegistry->instances.clear();
 }

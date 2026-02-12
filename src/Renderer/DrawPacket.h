@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include <AssetSystem/AssetTypes.h>
+#include <MaterialSystem/MaterialTypes.h>
 
 namespace SK::Renderer
 {
@@ -15,5 +16,6 @@ namespace SK::Renderer
 		uint32_t startIndex;
 		uint32_t indexCount;
 		SK::Asset::MeshBounds bounds;
+		uint32_t materialIndex = SK::Material::INVALID_MATERIAL;
 	};
 }

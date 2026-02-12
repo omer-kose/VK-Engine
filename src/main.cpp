@@ -22,6 +22,7 @@ GPUSceneData gpuSceneData;
 // TODO: Asset System Test
 #include <AssetSystem/AssetRegistry.h>
 #include <AssetSystem/AssetImporter_GLTF.h>
+#include <MaterialSystem/MaterialRegistry.h>
 #include <RendererBackend/vulkan/VkAssetRegistry.h>
 #include <RendererBackend/vulkan/VkAssetBuilder.h>
 #include <Scene/MeshInstance.h>
@@ -82,6 +83,7 @@ int main(int argc, char* argv[])
 
     // TODO: Asset System and Mesh Instancing test
     SK::Asset::AssetRegistry assetRegistry;
+    SK::Material::MaterialRegistry materialRegistry;
     SK::VkRendererBackend::VkAssetRegistry vkAssetRegistry;
     SK::Asset::ImportedAsset structureScene;
     // Load and register the gltf scene
@@ -90,7 +92,7 @@ int main(int argc, char* argv[])
         if(structureScene.gltfScene.has_value())
         {
             std::string gltfName = structureScene.gltfScene.value().name;
-            SK::Asset::registerImported(&assetRegistry, std::move(structureScene));
+            SK::Asset::registerImported(&assetRegistry, &materialRegistry, std::move(structureScene));
             SK::VkRendererBackend::buildGPUAssets(&vkRendererBackend, &assetRegistry, &vkAssetRegistry);
             SK::Asset::discardCPUMeshData(&assetRegistry);
             SK::Asset::discardCPUTextureData(&assetRegistry);
@@ -100,9 +102,10 @@ int main(int argc, char* argv[])
             SK::Scene::buildMeshInstancesFromGLTFScene(&assetRegistry, gltfName, glm::mat4(1.0f), meshInstances);
             // Create draw packets out of instances
             SK::Renderer::DrawContext drawCtx;
-            SK::Renderer::buildDrawPacketsFromMeshInstances(&assetRegistry, meshInstances, &drawCtx);
+            SK::Renderer::buildDrawPacketsFromMeshInstances(&assetRegistry, &materialRegistry, meshInstances, &drawCtx);
 
             SK::VkRendererBackend::clearGPUAssets(&vkRendererBackend, &vkAssetRegistry);
+            SK::Material::clearMaterialRegistry(&materialRegistry);
             SK::Asset::clearAssetRegistry(&assetRegistry);
         }
     }

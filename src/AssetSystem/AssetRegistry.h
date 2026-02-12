@@ -6,6 +6,7 @@
 #include <cstdint>
 
 #include "AssetTypes.h"
+#include <MaterialSystem/MaterialRegistry.h>
 #include "ImportedAsset.h"
 
 namespace SK::Asset
@@ -22,7 +23,7 @@ namespace SK::Asset
 		std::unordered_map<std::string, uint32_t> gltfSceneIndexByName;
 	};
 
-	void registerImported(AssetRegistry* assetRegistry, ImportedAsset&& importedAsset);
+	void registerImported(AssetRegistry* assetRegistry, SK::Material::MaterialRegistry* materialRegistry, ImportedAsset&& importedAsset);
 
 	void discardCPUMeshData(AssetRegistry* assetRegistry);
 	void discardCPUTextureData(AssetRegistry* assetRegistry);

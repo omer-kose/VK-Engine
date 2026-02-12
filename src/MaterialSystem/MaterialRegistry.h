@@ -12,5 +12,5 @@ namespace SK::Material
 
 	uint32_t registerInstance(MaterialRegistry* materialRegistry, Instance&& instance);
 
-	uint32_t clearMaterialRegistry(MaterialRegistry* materialRegistry);
+	void clearMaterialRegistry(MaterialRegistry* materialRegistry);
 }

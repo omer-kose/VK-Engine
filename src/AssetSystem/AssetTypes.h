@@ -76,7 +76,7 @@ namespace SK::Asset
 		uint32_t startIndex = 0;
 		uint32_t indexCount = 0;
 		MeshBounds bounds;
-		uint32_t materialIndex = UINT32_MAX; // optional, filled later
+		uint32_t materialIndex = UINT32_MAX;
 	};
 
 	struct RawMesh

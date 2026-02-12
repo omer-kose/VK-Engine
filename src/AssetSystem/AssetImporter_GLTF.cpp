@@ -135,6 +135,7 @@ bool SK::Asset::importGLTF(std::string_view filePath, ImportedAsset* outAsset)
 
     outAsset->meshes.clear();
     outAsset->textures.clear();
+    outAsset->materials.clear();
     outAsset->gltfScene.reset();
 
     fmt::println("Loading GLTF: {}", filePath);
@@ -227,6 +228,42 @@ bool SK::Asset::importGLTF(std::string_view filePath, ImportedAsset* outAsset)
         }
 
         outAsset->textures.push_back(std::move(texture));
+    }
+
+    // Materials
+    outAsset->materials.reserve(asset.materials.size());
+    for(size_t i = 0; i < asset.materials.size(); ++i)
+    {
+        const fastgltf::Material& gltfMat = asset.materials[i];
+
+        SK::Material::Instance mat{};
+        mat.type = SK::Material::Type::PBR;
+        mat.alphaMode = SK::Material::AlphaMode::Opaque;
+        if(gltfMat.alphaMode == fastgltf::AlphaMode::Blend)
+        {
+            mat.alphaMode = SK::Material::AlphaMode::Transparent;
+        }
+
+        SK::Material::PBRData pbrData{};
+        pbrData.baseColorFactor[0] = gltfMat.pbrData.baseColorFactor[0];
+        pbrData.baseColorFactor[1] = gltfMat.pbrData.baseColorFactor[1];
+        pbrData.baseColorFactor[2] = gltfMat.pbrData.baseColorFactor[2];
+        pbrData.baseColorFactor[3] = gltfMat.pbrData.baseColorFactor[3];
+        pbrData.metallicFactor = gltfMat.pbrData.metallicFactor;
+        pbrData.roughnessFactor = gltfMat.pbrData.roughnessFactor;
+        mat.params = pbrData;
+
+        if(gltfMat.pbrData.baseColorTexture.has_value())
+        {
+            mat.textureIndices[static_cast<size_t>(SK::Material::TextureSlot::BaseColor)] = static_cast<uint32_t>(gltfMat.pbrData.baseColorTexture->textureIndex);
+        }
+
+        if(gltfMat.pbrData.metallicRoughnessTexture.has_value())
+        {
+            mat.textureIndices[static_cast<size_t>(SK::Material::TextureSlot::MetallicRoughness)] = static_cast<uint32_t>(gltfMat.pbrData.metallicRoughnessTexture->textureIndex);
+        }
+
+        outAsset->materials.push_back(std::move(mat));
     }
 
     // Meshes
@@ -342,6 +379,18 @@ bool SK::Asset::importGLTF(std::string_view filePath, ImportedAsset* outAsset)
             subMesh.bounds.origin = (minPos + maxPos) * 0.5f;
             subMesh.bounds.extents = (maxPos - minPos) * 0.5f;
             subMesh.bounds.sphereRadius = glm::length(subMesh.bounds.extents);
+
+            // Material
+            if(primitive.materialIndex.has_value())
+            {
+                subMesh.materialIndex = static_cast<uint32_t>(primitive.materialIndex.value());
+            }
+            else
+            {
+                subMesh.materialIndex = SK::Material::INVALID_MATERIAL;
+                size_t idx = &primitive - gltfMesh.primitives.data();
+                fmt::println("Mesh {} Submesh {} has no material assigned", mesh.name, idx);
+            }
 
             mesh.subMeshes.push_back(subMesh);
         }

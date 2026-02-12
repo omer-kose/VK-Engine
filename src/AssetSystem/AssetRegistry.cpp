@@ -2,12 +2,37 @@
 
 #include <RendererBackend/vulkan/vk_renderer.h>
 
-void SK::Asset::registerImported(AssetRegistry* assetRegistry, ImportedAsset&& importedAsset)
+void SK::Asset::registerImported(AssetRegistry* assetRegistry, SK::Material::MaterialRegistry* materialRegistry, ImportedAsset&& importedAsset)
 {
     const uint32_t meshBaseIndex = static_cast<uint32_t>(assetRegistry->meshes.size());
+    const uint32_t textureBaseIndex = static_cast<uint32_t>(assetRegistry->textures.size());
+    const uint32_t materialBaseIndex = static_cast<uint32_t>(materialRegistry->instances.size());
 
+    // Remap imported material texture indices (local -> global texture indices) and register to the MaterialRegistry
+    for(auto& mat : importedAsset.materials)
+    {
+        for(uint32_t& texIdx : mat.textureIndices)
+        {
+            if(texIdx != SK::Material::INVALID_TEXTURE)
+            {
+                texIdx += textureBaseIndex;
+            }
+        }
+
+        SK::Material::registerInstance(materialRegistry, std::move(mat));
+    }
+
+    // Remap submesh material indices (local -> global material indices) and register the meshes to the AssetRegistry
     for(auto& mesh : importedAsset.meshes)
     {
+        for(auto& subMesh : mesh.subMeshes)
+        {
+            if(subMesh.materialIndex != SK::Material::INVALID_MATERIAL)
+            {
+                subMesh.materialIndex += materialBaseIndex;
+            }
+        }
+
         uint32_t idx = static_cast<uint32_t>(assetRegistry->meshes.size());
         assetRegistry->meshIndexByName[mesh.name] = idx;
         assetRegistry->meshes.push_back(std::move(mesh));
@@ -23,14 +48,14 @@ void SK::Asset::registerImported(AssetRegistry* assetRegistry, ImportedAsset&& i
     // Register GLTF scene (if any) and remap local mesh indices to global
     if(importedAsset.gltfScene.has_value())
     {
-        GLTFScene scene = std::move(importedAsset.gltfScene.value());
+        GLTFScene& scene = importedAsset.gltfScene.value();
 
         for(auto& node : scene.nodes)
         {
             // Remap local mesh indices to global
             if(node.meshIndex >= 0)
             {
-                node.meshIndex = static_cast<int>(meshBaseIndex) + node.meshIndex;
+                node.meshIndex += static_cast<int>(meshBaseIndex);
             }
         }
 
