@@ -7,7 +7,7 @@
 #include <filesystem>
 
 // Material types
-#include <Materials/GLTFMetallicMaterial.h>
+#include <MaterialSystem/GLTFMetallicMaterial.h>
 
 // Forward declare with the namespace
 namespace SK::VkRendererBackend

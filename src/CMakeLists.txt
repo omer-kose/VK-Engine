@@ -41,10 +41,10 @@ file(GLOB_RECURSE SRC_UTIL
 	"UTIL/*.cpp"
 )
 
-file(GLOB_RECURSE SRC_MATERIALS
-	"Materials/*.h"
-	"Materials/*.hpp"
-	"Materials/*.cpp"
+file(GLOB_RECURSE SRC_MATERIALSYSTEM
+	"MaterialSystem/*.h"
+	"MaterialSystem/*.hpp"
+	"MaterialSystem/*.cpp"
 )
 
 # Add the rest of the source files in the src folder
@@ -55,10 +55,10 @@ file(GLOB SRC
 )
 
 # Create executable with all found sources
-add_executable(engine ${SRC} ${SRC_RENDERER_BACKEND} ${SRC_RENDERERS} ${SRC_ASSETSYSTEM} ${SRC_SCENE} ${SRC_APP} ${SRC_UI} ${SRC_UTIL} ${SRC_MATERIALS})
+add_executable(engine ${SRC} ${SRC_RENDERER_BACKEND} ${SRC_RENDERERS} ${SRC_ASSETSYSTEM} ${SRC_SCENE} ${SRC_APP} ${SRC_UI} ${SRC_UTIL} ${SRC_MATERIALSYSTEM})
 
 # Add filters for the solution
-source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SRC_RENDERER_BACKEND} ${SRC_RENDERERS} ${SRC_ASSETSYSTEM} ${SRC_SCENE} ${SRC_APP} ${SRC_UI} ${SRC_UTIL} ${SRC_MATERIALS})
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SRC_RENDERER_BACKEND} ${SRC_RENDERERS} ${SRC_ASSETSYSTEM} ${SRC_SCENE} ${SRC_APP} ${SRC_UI} ${SRC_UTIL} ${SRC_MATERIALSYSTEM})
 
 set_property(TARGET engine PROPERTY CXX_STANDARD 20)
 target_compile_definitions(engine PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)
