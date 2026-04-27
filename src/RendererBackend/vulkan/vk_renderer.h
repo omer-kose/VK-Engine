@@ -22,7 +22,7 @@ namespace SK::VkRendererBackend
 		VkCommandPool commandPool;
 		VkCommandBuffer mainCommandBuffer;
 
-		VkSemaphore swapchainSemaphore, renderSemaphore;
+		VkSemaphore swapchainAcquireSemaphore;
 		VkFence renderFence;
 
 		DescriptorAllocatorGrowable frameDescriptorAllocator;
@@ -155,9 +155,13 @@ namespace SK::VkRendererBackend
 		// Swapchain 
 		VkSwapchainKHR swapchain;
 		VkFormat swapchainImageFormat;
+		uint32_t numSwapchainImages;
 		std::vector<VkImage> swapchainImages;
 		std::vector<VkImageView> swapchainImageViews;
 		VkExtent2D swapchainExtent;
+
+		// Synchronization Structures
+		std::vector<VkSemaphore> submitSemaphores; 
 
 		// Queues
 		VkQueue graphicsQueue;
@@ -166,7 +170,7 @@ namespace SK::VkRendererBackend
 		// Allocator
 		VmaAllocator vmaAllocator;
 
-		// Frame Data and Queues
+		// Frame Data
 		FrameData frames[FRAME_OVERLAP];
 
 		// Global Resource Deletion Queue

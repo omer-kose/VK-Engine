@@ -86,6 +86,7 @@ void SK::VkRendererBackend::init(State* vkRendererBackend, struct SDL_Window* wi
     m_initVulkan(vkRendererBackend);
     m_initSwapchain(vkRendererBackend);
     m_initCommands(vkRendererBackend);
+    // initSwapchain sets the number of swapchain images which is needed to create correct amount of submitSemaphores. So, it needs to be called before initSyncStructures.
     m_initSyncStructures(vkRendererBackend);
 
     createDrawAndDepthImages(vkRendererBackend);
@@ -110,14 +111,19 @@ void SK::VkRendererBackend::shutdown(State* vkRendererBackend)
         {
             // Destroy sync objects
             vkDestroyFence(vkRendererBackend->device, vkRendererBackend->frames[i].renderFence, nullptr);
-            vkDestroySemaphore(vkRendererBackend->device, vkRendererBackend->frames[i].swapchainSemaphore, nullptr);
-            vkDestroySemaphore(vkRendererBackend->device, vkRendererBackend->frames[i].renderSemaphore, nullptr);
+            vkDestroySemaphore(vkRendererBackend->device, vkRendererBackend->frames[i].swapchainAcquireSemaphore, nullptr);
 
             // It’s not possible to individually destroy VkCommandBuffer, destroying their parent pool will destroy all of the command buffers allocated from it.
             vkDestroyCommandPool(vkRendererBackend->device, vkRendererBackend->frames[i].commandPool, nullptr);
 
             vkRendererBackend->frames[i].deletionQueue.flush();
         }
+
+        for (int i = 0; i < vkRendererBackend->numSwapchainImages; ++i)
+        {
+            vkDestroySemaphore(vkRendererBackend->device, vkRendererBackend->submitSemaphores[i], nullptr);
+        }
+        vkRendererBackend->submitSemaphores.clear();
 
         // Clear out the caches
         clearShaderCache(vkRendererBackend);
@@ -163,10 +169,10 @@ bool SK::VkRendererBackend::beginFrame(State* vkRendererBackend)
     // To be able to use the same fence it must be reset after use
     VK_CHECK(vkResetFences(vkRendererBackend->device, 1, &currentFrame.renderFence));
 
-    // Request an available image from the swapchain. swapchainSemaphore is signaled once it has finished presenting the image so it can be used again.
+    // Request an available image from the swapchain. swapchainAcquireSemaphore is signaled once it has finished presenting the image so it can be used again.
     // More detailed description of how vkAcquireNextImageKHR works: https://stackoverflow.com/questions/60419749/why-does-vkacquirenextimagekhr-never-block-my-thread
     uint32_t swapchainImageIndex;
-    VkResult acquireResult = vkAcquireNextImageKHR(vkRendererBackend->device, vkRendererBackend->swapchain, 1000000000, currentFrame.swapchainSemaphore, nullptr, &swapchainImageIndex);
+    VkResult acquireResult = vkAcquireNextImageKHR(vkRendererBackend->device, vkRendererBackend->swapchain, 1000000000, currentFrame.swapchainAcquireSemaphore, nullptr, &swapchainImageIndex);
     if(acquireResult == VK_ERROR_OUT_OF_DATE_KHR)
     {
         vkRendererBackend->windowResizeRequested = true;
@@ -237,11 +243,11 @@ void SK::VkRendererBackend::endFrame(State* vkRendererBackend)
     VK_CHECK(vkEndCommandBuffer(cmd));
 
     // Prepare the submission
-    // We will wait on the swapchainSemaphore before executing the commands as that semaphore is signaled once swapchain is done presenting that image
-    // We will signal renderSemaphore to signal that rendering has finished
+    // GPU will wait on the swapchainAcquireSemaphore before outputting the final colors. swapchainAcquireSemaphore is set to be signalled in vkAcquireSwapchainImage once the swapchain is done presenting that image.
+    // GPU will signal submitSemaphore to signal that rendering has finished
     VkCommandBufferSubmitInfo cmdSubmitInfo = SK::VkInit::command_buffer_submit_info(cmd);
-    VkSemaphoreSubmitInfo waitInfo = SK::VkInit::semaphore_submit_info(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, currentFrame.swapchainSemaphore);
-    VkSemaphoreSubmitInfo signalInfo = SK::VkInit::semaphore_submit_info(VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, currentFrame.renderSemaphore);
+    VkSemaphoreSubmitInfo waitInfo = SK::VkInit::semaphore_submit_info(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, currentFrame.swapchainAcquireSemaphore);
+    VkSemaphoreSubmitInfo signalInfo = SK::VkInit::semaphore_submit_info(VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, vkRendererBackend->submitSemaphores[swapchainImageIndex]);
     VkSubmitInfo2 submit = SK::VkInit::submit_info(&cmdSubmitInfo, &signalInfo, &waitInfo);
 
     // Submit command buffer to the queue and execute it
@@ -249,12 +255,12 @@ void SK::VkRendererBackend::endFrame(State* vkRendererBackend)
     VK_CHECK(vkQueueSubmit2(vkRendererBackend->graphicsQueue, 1, &submit, currentFrame.renderFence));
 
     // Prepare the presentation
-    // We will wait on the renderSemaphore so that it will be guaranteed that the rendering has been finished and the swapchain image is ready to be presented
+    // GPU will wait on the submitSemaphore so that it will be guaranteed that the rendering has been finished and the swapchain image is ready to be presented
     VkPresentInfoKHR presentInfo = { .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, .pNext = nullptr };
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = &vkRendererBackend->swapchain;
     presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = &currentFrame.renderSemaphore;
+    presentInfo.pWaitSemaphores = &vkRendererBackend->submitSemaphores[swapchainImageIndex];
     presentInfo.pImageIndices = &swapchainImageIndex;
 
     VkResult presentResult = vkQueuePresentKHR(vkRendererBackend->graphicsQueue, &presentInfo);
@@ -761,10 +767,11 @@ void SK::VkRendererBackend::m_initCommands(State* vkRendererBackend)
 
 void SK::VkRendererBackend::m_initSyncStructures(State* vkRendererBackend)
 {
-    //create syncronization structures
-    //one fence to control when the gpu has finished rendering the frame,
-    //and 2 semaphores to syncronize rendering with swapchain
-    //we want the fence to start signalled so we can wait on it on the first frame
+    // Create synchronization structures
+    // One fence to sync CPU-GPU when the gpu has finished rendering the frame,
+    // 1 per-frame semaphore to sync swapchain ready image acquiring.
+    // 1 per-swapchain image semaphore to sync swapchain image presentation. Presentation resources are per-swapchain image not per-frame. So, the synchronization should be done per-swapchain basis not frame basis.
+    // We want the fence to start signalled so we can wait on it on the first frame
     VkFenceCreateInfo fenceCreateInfo = SK::VkInit::fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);
     VkSemaphoreCreateInfo semaphoreCreateInfo = SK::VkInit::semaphore_create_info();
 
@@ -772,8 +779,13 @@ void SK::VkRendererBackend::m_initSyncStructures(State* vkRendererBackend)
     {
         VK_CHECK(vkCreateFence(vkRendererBackend->device, &fenceCreateInfo, nullptr, &vkRendererBackend->frames[i].renderFence));
 
-        VK_CHECK(vkCreateSemaphore(vkRendererBackend->device, &semaphoreCreateInfo, nullptr, &vkRendererBackend->frames[i].swapchainSemaphore));
-        VK_CHECK(vkCreateSemaphore(vkRendererBackend->device, &semaphoreCreateInfo, nullptr, &vkRendererBackend->frames[i].renderSemaphore));
+        VK_CHECK(vkCreateSemaphore(vkRendererBackend->device, &semaphoreCreateInfo, nullptr, &vkRendererBackend->frames[i].swapchainAcquireSemaphore));
+    }
+
+    vkRendererBackend->submitSemaphores.resize(vkRendererBackend->numSwapchainImages);
+    for (int i = 0; i < vkRendererBackend->numSwapchainImages; ++i)
+    {
+        VK_CHECK(vkCreateSemaphore(vkRendererBackend->device, &semaphoreCreateInfo, nullptr, &vkRendererBackend->submitSemaphores[i]));
     }
 
     // Fence for the immediate command buffers
@@ -803,6 +815,7 @@ void SK::VkRendererBackend::m_createSwapchain(State* vkRendererBackend, uint32_t
     vkRendererBackend->swapchain = vkbSwapchain.swapchain;
     vkRendererBackend->swapchainImages = vkbSwapchain.get_images().value();
     vkRendererBackend->swapchainImageViews = vkbSwapchain.get_image_views().value();
+    vkRendererBackend->numSwapchainImages = static_cast<uint32_t>(vkRendererBackend->swapchainImages.size());
 }
 
 void SK::VkRendererBackend::m_destroySwapchain(State* vkRendererBackend)
