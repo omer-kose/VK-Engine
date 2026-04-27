@@ -844,18 +844,12 @@ void SK::VkRendererBackend::m_initDescriptors(State* vkRendererBackend)
     // Create the global growable descriptor allocator 
     std::vector<DescriptorAllocatorGrowable::PoolSize> sizes = {
         { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1 },
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 },
         { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 }
     };
 
     vkRendererBackend->globalDescriptorAllocator.init(vkRendererBackend->device, 10, sizes);
     
-    // The descriptor set layout for the main draw image
-    {
-        DescriptorLayoutBuilder builder;
-        builder.addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-        vkRendererBackend->drawImageDescriptorSetLayout = builder.build(vkRendererBackend->device, VK_SHADER_STAGE_COMPUTE_BIT);
-    }
-
     // The descriptor set layout for single texture display
     {
         DescriptorLayoutBuilder builder;
@@ -870,20 +864,10 @@ void SK::VkRendererBackend::m_initDescriptors(State* vkRendererBackend)
         vkRendererBackend->gpuSceneDataDescriptorLayout = builder.build(vkRendererBackend->device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
     }
 
-    // Allocate a descriptor set for the draw image
-    vkRendererBackend->drawImageDescriptorSet = vkRendererBackend->globalDescriptorAllocator.allocate(vkRendererBackend->device, vkRendererBackend->drawImageDescriptorSetLayout);
-
-    {
-        DescriptorWriter writer;
-        writer.writeImage(0, vkRendererBackend->drawImage.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-        writer.updateSet(vkRendererBackend->device, vkRendererBackend->drawImageDescriptorSet);
-    }
-
     // Add the descriptor allocator and layout destructors to the deletion queue
     vkRendererBackend->mainDeletionQueue.pushFunction([=](){
         vkRendererBackend->globalDescriptorAllocator.destroyPools(vkRendererBackend->device);
 
-        vkDestroyDescriptorSetLayout(vkRendererBackend->device, vkRendererBackend->drawImageDescriptorSetLayout, nullptr);
         vkDestroyDescriptorSetLayout(vkRendererBackend->device, vkRendererBackend->displayTextureDescriptorSetLayout, nullptr);
         vkDestroyDescriptorSetLayout(vkRendererBackend->device, vkRendererBackend->gpuSceneDataDescriptorLayout, nullptr);
     });

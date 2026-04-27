@@ -190,9 +190,6 @@ namespace SK::VkRendererBackend
 
 		// Global Descriptors
 		DescriptorAllocatorGrowable globalDescriptorAllocator;
-		// Main draw image descriptor used as the primary render target
-		VkDescriptorSetLayout drawImageDescriptorSetLayout;
-		VkDescriptorSet drawImageDescriptorSet;
 		// Descriptor layout for single texture display
 		VkDescriptorSetLayout displayTextureDescriptorSetLayout;
 		// Scene Descriptor Layout (Global Descriptor Set 0 Layout)
