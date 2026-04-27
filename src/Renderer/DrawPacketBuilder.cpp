@@ -21,8 +21,15 @@ void SK::Renderer::buildDrawPacketsFromMeshInstances(SK::Asset::AssetRegistry* a
 			// If the submesh has no valid material assigned, it will be skipped.
 			if(packet.materialIndex != SK::Material::INVALID_MATERIAL)
 			{
-				// TODO: For now everything is going to the opaque list. Later, do alphaMode split with material registry lookup.
-				outCtx->opaque.push_back(packet);
+				const SK::Material::Instance& mat = materialRegistry->instances[packet.materialIndex];
+				if (mat.alphaMode == SK::Material::AlphaMode::Opaque)
+				{
+					outCtx->opaque.push_back(packet);
+				}
+				else
+				{
+					outCtx->transparent.push_back(packet);
+				}
 			}
 		}
 	}
