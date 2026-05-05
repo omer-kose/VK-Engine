@@ -4,7 +4,7 @@
 #include <optional>
 
 #include "AssetTypes.h"
-#include <MaterialSystem/MaterialTypes.h>
+#include <MaterialSystem/MaterialInfo.h>
 #include "GLTFScene.h" // For optional GLTF-specific scene data
 
 namespace SK::Asset

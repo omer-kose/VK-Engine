@@ -4,13 +4,12 @@
 #include <cstdint>
 #include <variant>
 
+/*
+	For now, only PBR materials are supported.
+*/
+
 namespace SK::Material
 {
-	enum class Type : uint8_t
-	{
-		PBR = 0 // metallic-roughness workflow
-	};
-
 	enum class AlphaMode : uint8_t
 	{
 		Opaque = 0,
@@ -38,16 +37,13 @@ namespace SK::Material
 		float roughnessFactor = 1.f;
 	};
 
-	using MaterialParams = std::variant<PBRData>;
-
 	struct Instance
 	{
 		// Defaulted to Opaque PBR Material
-		Type type = Type::PBR;
 		AlphaMode alphaMode = AlphaMode::Opaque;
 
 		std::array<uint32_t, static_cast<size_t>(TextureSlot::Count)> textureIndices = { INVALID_TEXTURE, INVALID_TEXTURE, INVALID_TEXTURE, INVALID_TEXTURE, INVALID_TEXTURE };
 
-		MaterialParams params = PBRData{};
+		PBRData materialData = PBRData{};
 	};
 }

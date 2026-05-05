@@ -237,7 +237,6 @@ bool SK::Asset::importGLTF(std::string_view filePath, ImportedAsset* outAsset)
         const fastgltf::Material& gltfMat = asset.materials[i];
 
         SK::Material::Instance mat{};
-        mat.type = SK::Material::Type::PBR;
         mat.alphaMode = SK::Material::AlphaMode::Opaque;
         if(gltfMat.alphaMode == fastgltf::AlphaMode::Blend)
         {
@@ -251,7 +250,7 @@ bool SK::Asset::importGLTF(std::string_view filePath, ImportedAsset* outAsset)
         pbrData.baseColorFactor[3] = gltfMat.pbrData.baseColorFactor[3];
         pbrData.metallicFactor = gltfMat.pbrData.metallicFactor;
         pbrData.roughnessFactor = gltfMat.pbrData.roughnessFactor;
-        mat.params = pbrData;
+        mat.materialData = pbrData;
 
         if(gltfMat.pbrData.baseColorTexture.has_value())
         {

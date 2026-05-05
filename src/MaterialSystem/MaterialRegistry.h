@@ -1,7 +1,7 @@
 #pragma once
 
 #include <vector>
-#include "MaterialTypes.h"
+#include "MaterialInfo.h"
 
 namespace SK::Material
 {

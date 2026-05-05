@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #include <AssetSystem/AssetTypes.h>
-#include <MaterialSystem/MaterialTypes.h>
+#include <MaterialSystem/MaterialInfo.h>
 
 namespace SK::Renderer
 {
