@@ -117,7 +117,7 @@ void DescriptorAllocator::initPool(VkDevice device, uint32_t maxSets, std::span<
 
 void DescriptorAllocator::clearDescriptors(VkDevice device)
 {
-	// Resettign descriptor pool destroys all the descriptors allocated from this pool and reset backs to pool into its initial state
+	// Resetting descriptor pool destroys all the descriptors allocated from this pool and reset backs to pool into its initial state
 	vkResetDescriptorPool(device, pool, 0);
 }
 

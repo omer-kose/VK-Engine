@@ -6,8 +6,15 @@
 
 #include <RendererBackend/vulkan/vk_types.h>
 
+namespace SK::Asset
+{
+	struct AssetRegistry;
+}
+
 namespace SK::VkRendererBackend
 {
+	struct State;
+
 	struct VkAssetRegistry
 	{
 		struct GPUMesh
@@ -32,4 +39,7 @@ namespace SK::VkRendererBackend
 		std::unordered_map<std::string, uint32_t> meshIndexByName;
 		std::unordered_map<std::string, uint32_t> textureIndexByName;
 	};
+
+	void buildGPUAssets(State* vkRendererBackend, SK::Asset::AssetRegistry* assetRegistry, VkAssetRegistry* vkAssetRegistry);
+	void clearGPUAssets(State* vkRendererBackend, VkAssetRegistry* vkAssetRegistry);
 }

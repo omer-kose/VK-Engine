@@ -24,7 +24,6 @@ GPUSceneData gpuSceneData;
 #include <AssetSystem/AssetImporter_GLTF.h>
 #include <MaterialSystem/MaterialRegistry.h>
 #include <RendererBackend/vulkan/VkAssetRegistry.h>
-#include <RendererBackend/vulkan/VkAssetBuilder.h>
 #include <Scene/MeshInstance.h>
 #include <Scene/GLTFInstanceBuilder.h>
 #include <Renderer/DrawContext.h>
