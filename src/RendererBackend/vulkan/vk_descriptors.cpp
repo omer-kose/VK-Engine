@@ -1,10 +1,10 @@
 ﻿#include <RendererBackend/vulkan/vk_descriptors.h>
 
-void DescriptorLayoutBuilder::addBinding(uint32_t bindingSlot, VkDescriptorType type)
+void DescriptorLayoutBuilder::addBinding(uint32_t bindingSlot, VkDescriptorType type, uint32_t count)
 {
 	VkDescriptorSetLayoutBinding newBinding{};
 	newBinding.binding = bindingSlot;
-	newBinding.descriptorCount = 1;
+	newBinding.descriptorCount = count;
 	newBinding.descriptorType = type;
 	
 	bindings.push_back(newBinding);
