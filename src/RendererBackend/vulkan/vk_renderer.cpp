@@ -311,6 +311,46 @@ AllocatedBuffer SK::VkRendererBackend::createBuffer(State* vkRendererBackend, si
     return newBuffer;
 }
 
+AllocatedBuffer SK::VkRendererBackend::createAndUploadGPUBuffer(State* vkRendererBackend, size_t allocSize, VkBufferUsageFlags usage, const void* data, size_t srcOffset, size_t dstOffset)
+{
+    AllocatedBuffer newBuffer = createBuffer(vkRendererBackend, allocSize, usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
+
+    AllocatedBuffer staging = createBuffer(vkRendererBackend, allocSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+    void* pStaging = staging.allocation->GetMappedData();
+
+    // Copy The Lookup Table into the staging buffer
+    memcpy(pStaging, data, allocSize);
+
+    immediateSubmit(vkRendererBackend, [&](VkCommandBuffer cmd) {
+        VkBufferCopy copy{};
+        copy.dstOffset = dstOffset;
+        copy.srcOffset = srcOffset;
+        copy.size = allocSize;
+
+        vkCmdCopyBuffer(cmd, staging.buffer, newBuffer.buffer, 1, &copy);
+    });
+
+    destroyBuffer(vkRendererBackend, staging);
+
+    return newBuffer;
+}
+
+AllocatedBuffer SK::VkRendererBackend::uploadStagingBuffer(State* vkRendererBackend, VkBuffer stagingBuffer, size_t allocSize, VkBufferUsageFlags usage, size_t srcOffset, size_t dstOffset)
+{
+    AllocatedBuffer newBuffer = createBuffer(vkRendererBackend, allocSize, usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
+
+    immediateSubmit(vkRendererBackend, [&](VkCommandBuffer cmd) {
+        VkBufferCopy copy{};
+        copy.dstOffset = dstOffset;
+        copy.srcOffset = srcOffset;
+        copy.size = allocSize;
+
+        vkCmdCopyBuffer(cmd, stagingBuffer, newBuffer.buffer, 1, &copy);
+    });
+
+    return newBuffer;
+}
+
 void SK::VkRendererBackend::destroyBuffer(State* vkRendererBackend, const AllocatedBuffer& buffer)
 {
     vmaDestroyBuffer(vkRendererBackend->vmaAllocator, buffer.buffer, buffer.allocation);

@@ -56,6 +56,7 @@ struct GPUMeshBuffers
 };
 
 // Push constants for mesh object draws
+// TODO: To be defined in the mesh renderer frontends. This push constant type is specifically for mesh rendering.
 struct GPUDrawPushConstants
 {
     glm::mat4 worldMatrix;

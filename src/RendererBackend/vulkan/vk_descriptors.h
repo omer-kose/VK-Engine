@@ -23,6 +23,8 @@ struct DescriptorWriter
 	std::vector<VkWriteDescriptorSet> writes;
 
 	void writeImage(int binding, VkImageView imageView, VkSampler sampler, VkImageLayout layout, VkDescriptorType type);
+	// Creates a write for all the images whose descriptor info given in the descriptorImageInfo
+	void writeImages(int binding, const std::vector<VkDescriptorImageInfo>& descriptorImageInfo, VkDescriptorType type);
 	void writeBuffer(int binding, VkBuffer buffer, size_t size, size_t offset, VkDescriptorType type);
 
 	void clear();

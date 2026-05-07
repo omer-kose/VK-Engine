@@ -250,17 +250,18 @@ bool SK::Asset::importGLTF(std::string_view filePath, ImportedAsset* outAsset)
         pbrData.baseColorFactor[3] = gltfMat.pbrData.baseColorFactor[3];
         pbrData.metallicFactor = gltfMat.pbrData.metallicFactor;
         pbrData.roughnessFactor = gltfMat.pbrData.roughnessFactor;
+        
+        if (gltfMat.pbrData.baseColorTexture.has_value())
+        {
+            pbrData.baseColorTexture = static_cast<uint32_t>(gltfMat.pbrData.baseColorTexture->textureIndex);
+        }
+
+        if (gltfMat.pbrData.metallicRoughnessTexture.has_value())
+        {
+            pbrData.metallicRoughnessTexture = static_cast<uint32_t>(gltfMat.pbrData.metallicRoughnessTexture->textureIndex);
+        }
+
         mat.materialData = pbrData;
-
-        if(gltfMat.pbrData.baseColorTexture.has_value())
-        {
-            mat.textureIndices[static_cast<size_t>(SK::Material::TextureSlot::BaseColor)] = static_cast<uint32_t>(gltfMat.pbrData.baseColorTexture->textureIndex);
-        }
-
-        if(gltfMat.pbrData.metallicRoughnessTexture.has_value())
-        {
-            mat.textureIndices[static_cast<size_t>(SK::Material::TextureSlot::MetallicRoughness)] = static_cast<uint32_t>(gltfMat.pbrData.metallicRoughnessTexture->textureIndex);
-        }
 
         outAsset->materials.push_back(std::move(mat));
     }

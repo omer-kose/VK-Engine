@@ -57,7 +57,7 @@ void SK::VkRendererBackend::buildGPUAssets(State* vkRendererBackend, SK::Asset::
         vkAssetRegistry->meshes.push_back(std::move(gpuMesh));
     }
 
-    // Textures (placeholder)
+    // Textures
     for (const auto& texture : assetRegistry->textures)
     {
         VkAssetRegistry::GPUTexture gpuTexture{};

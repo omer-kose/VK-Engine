@@ -248,6 +248,10 @@ namespace SK::VkRendererBackend
 	void immediateSubmit(State* vkRendererBackend, std::function<void(VkCommandBuffer cmd)>&& function);
 
 	AllocatedBuffer createBuffer(State* vkRendererBackend, size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+	// Allocates a buffer on local device memory and uploads the given data using a staging buffer
+	AllocatedBuffer createAndUploadGPUBuffer(State* vkRendererBackend, size_t allocSize, VkBufferUsageFlags usage, const void* data, size_t srcOffset = 0, size_t dstOffset = 0);
+	// Allocates a buffer on local device memory and uploads an already existing staging buffer on the CPU
+	AllocatedBuffer uploadStagingBuffer(State* vkRendererBackend, VkBuffer stagingBuffer, size_t allocSize, VkBufferUsageFlags usage, size_t srcOffset = 0, size_t dstOffset = 0);
 	void destroyBuffer(State* vkRendererBackend, const AllocatedBuffer& buffer);
 
 	AllocatedImage createImage(State* vkRendererBackend, VkExtent3D imageExtent, VkFormat format, VkImageUsageFlags usage, bool mipMapped = false);

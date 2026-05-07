@@ -53,6 +53,18 @@ void DescriptorWriter::writeImage(int binding, VkImageView imageView, VkSampler 
 	writes.push_back(write);
 }
 
+void DescriptorWriter::writeImages(int binding, const std::vector<VkDescriptorImageInfo>& descriptorImageInfo, VkDescriptorType type)
+{
+	VkWriteDescriptorSet write = { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .pNext = nullptr };
+	write.dstBinding = binding;
+	write.dstSet = VK_NULL_HANDLE; // left empty for now until the actual update time comes
+	write.descriptorCount = static_cast<uint32_t>(descriptorImageInfo.size());
+	write.descriptorType = type;
+	write.pImageInfo = descriptorImageInfo.data();
+
+	writes.push_back(write);
+}
+
 void DescriptorWriter::writeBuffer(int binding, VkBuffer buffer, size_t size, size_t offset, VkDescriptorType type)
 {
 	VkDescriptorBufferInfo& info = bufferInfos.emplace_back(VkDescriptorBufferInfo{

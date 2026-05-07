@@ -16,33 +16,26 @@ namespace SK::Material
 		Transparent
 	};
 
-	enum class TextureSlot : uint8_t
-	{
-		BaseColor = 0,
-		MetallicRoughness, // metalness and roughness are packed together in a single texture
-		Normal,
-		Occlusion,
-		Emissive,
-		Count
-	};
-
 	static constexpr uint32_t INVALID_TEXTURE = UINT32_MAX;
 	static constexpr uint32_t INVALID_MATERIAL = UINT32_MAX;
 
-	// TODO: Think about the layout. Either will be aligned (alignas(16)) wrt GPU spec or I will directly use scalar layout for all the buffers.
+	// Using scalar layout for the material buffer. 1-to-1 matching with what will be stored on the GPU side. 
 	struct PBRData
 	{
 		float baseColorFactor[4] = { 1.f, 1.f, 1.f, 1.f };
 		float metallicFactor = 1.f;
 		float roughnessFactor = 1.f;
+		// Texture ids
+		uint32_t baseColorTexture;
+		uint32_t metallicRoughnessTexture;
+		uint32_t normalTexture;
+		uint32_t emissiveTexture;
 	};
 
 	struct Instance
 	{
 		// Defaulted to Opaque PBR Material
 		AlphaMode alphaMode = AlphaMode::Opaque;
-
-		std::array<uint32_t, static_cast<size_t>(TextureSlot::Count)> textureIndices = { INVALID_TEXTURE, INVALID_TEXTURE, INVALID_TEXTURE, INVALID_TEXTURE, INVALID_TEXTURE };
 
 		PBRData materialData = PBRData{};
 	};

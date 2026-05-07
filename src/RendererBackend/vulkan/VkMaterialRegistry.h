@@ -4,6 +4,8 @@
 #include <RendererBackend/vulkan/vk_types.h>
 #include <RendererBackend/vulkan/vk_descriptors.h>
 
+#include <MaterialSystem/MaterialInfo.h>
+
 namespace SK::Asset
 {
 	struct AssetRegistry;
@@ -19,14 +21,6 @@ namespace SK::VkRendererBackend
 	struct State;
 	struct VkAssetRegistry;
 
-	struct GPUPBRMaterialData
-	{
-		float baseColorFactor[4] = { 1.f, 1.f, 1.f, 1.f };
-		float metallicFactor = 1.f;
-		float roughnessFactor = 1.f;
-		uint32_t textureIndices[5] = { UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX };
-	};
-
 	struct VkMaterialRegistry
 	{
 		/*
@@ -35,7 +29,9 @@ namespace SK::VkRendererBackend
 		VkDescriptorSetLayout resourceDescriptorSetLayout = VK_NULL_HANDLE;
 		VkDescriptorSet resourceDescriptorSet = VK_NULL_HANDLE;
 		DescriptorAllocator resourceDescriptorAllocator;
-		AllocatedBuffer materialBuffer;
-		std::vector<GPUPBRMaterialData> materialData;
+		AllocatedBuffer pbrMaterialBuffer;
 	};
+
+	void buildMaterialRegistry(State* vkRendererBackend, SK::Asset::AssetRegistry* assetRegistry, SK::Material::MaterialRegistry* materialRegistry, VkAssetRegistry* vkAssetRegistry, VkMaterialRegistry* vkMaterialRegistry);
+	void clearMaterialRegistry(State* vkRendererBackend, VkMaterialRegistry* vkMaterialRegistry);
 }
