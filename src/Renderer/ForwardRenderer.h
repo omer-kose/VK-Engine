@@ -5,6 +5,12 @@
 namespace SK::VkRendererBackend
 {
 	struct State;
+	struct VkAssetRegistry;
+	struct VkMaterialRegistry;
+};
+
+namespace SK::Renderer
+{
 	struct DrawContext;
 };
 
@@ -17,7 +23,15 @@ namespace SK::ForwardRenderer
 		VkPipeline transparentPipeline;
 	};
 
-	void init(State* forwardRenderer, SK::VkRendererBackend::State* vkRendererBackend);
-	void draw(State* forwardRenderer, SK::VkRendererBackend::State* vkRendererBackend, const SK::VkRendererBackend::DrawContext& ctx);
+	// Push constants for mesh draws
+	struct PushConstants
+	{
+		glm::mat4 worldMatrix;
+		VkDeviceAddress vertexBufferAddress;
+		uint32_t materialIndex;
+	};
+
+	void init(State* forwardRenderer, SK::VkRendererBackend::State* vkRendererBackend, SK::VkRendererBackend::VkMaterialRegistry* vkMaterialRegistry);
+	void draw(State* forwardRenderer, SK::VkRendererBackend::State* vkRendererBackend, SK::VkRendererBackend::VkAssetRegistry* vkAssetRegistry, SK::VkRendererBackend::VkMaterialRegistry* vkMaterialRegistry, const SK::Renderer::DrawContext & ctx);
 	void shutdown(State* forwardRenderer, SK::VkRendererBackend::State* vkRendererBackend);
 };

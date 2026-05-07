@@ -8,14 +8,9 @@
 #include "imgui_impl_vulkan.h"
 
 #include <thread>
+#include <chrono>
 
-// TODO: For now, scene loading and building the draw context is in the main function. They will be moved out
-#include <RendererBackend/vulkan/vk_loader.h>
 #include <glm/gtx/transform.hpp>
-// Loaded scenes
-std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loadedScenes;
-// Draw Context
-SK::VkRendererBackend::DrawContext drawContext;
 // GPU Scene Data
 GPUSceneData gpuSceneData;
 
@@ -30,25 +25,10 @@ GPUSceneData gpuSceneData;
 #include <Renderer/DrawContext.h>
 #include <Renderer/DrawPacketBuilder.h>
 
-void loadSceneData(SK::VkRendererBackend::State* vkRendererBackend)
-{
-    std::string structurePath = "../../assets/structure.glb";
-    auto loadedStructureScene = loadGltf(vkRendererBackend, structurePath);
-    assert(loadedStructureScene.has_value());
-    loadedScenes["structure"] = loadedStructureScene.value();
-}
-
-void loadScene(SK::VkRendererBackend::State* vkRendererBackend)
-{
-    loadSceneData(vkRendererBackend);
-}
-
 void updateSceneTemp(SK::VkRendererBackend::State* vkRendererBackend, Camera& camera)
 {
     // TODO: Update timings are missing here but Engine Stats should be reconsidered too. Not sure if they should be in vkRendererBackend.
     camera.update();
-
-    loadedScenes["structure"]->registerDraw(glm::mat4(1.0f), drawContext);
 
     // TODO: Scene Data is directly set here. Not good!
     gpuSceneData.view = camera.getViewMatrix();
@@ -77,43 +57,41 @@ int main(int argc, char* argv[])
     SK::UI::State ui;
     SK::UI::init(&ui, &vkRendererBackend);
 
-    // Renderer frontends
-    SK::ForwardRenderer::State forwardRenderer;
-    SK::ForwardRenderer::init(&forwardRenderer, &vkRendererBackend);
-
-    // TODO: Asset System and Mesh Instancing test
+    // Asset System
     SK::Asset::AssetRegistry assetRegistry;
     SK::Material::MaterialRegistry materialRegistry;
     SK::VkRendererBackend::VkAssetRegistry vkAssetRegistry;
     SK::VkRendererBackend::VkMaterialRegistry vkMaterialRegistry;
+    // Load the structure scene
     SK::Asset::ImportedAsset structureScene;
     // Load and register the gltf scene
-    if(SK::Asset::importGLTF("../../assets/structure.glb", &structureScene))
+    // TODO: Infer the path from the name by providing the extension (glb or gltf)
+    std::string gltfName = "structure";
+    if (SK::Asset::importGLTF("../../assets/structure.glb", &structureScene))
     {
-        if(structureScene.gltfScene.has_value())
+        if (structureScene.gltfScene.has_value())
         {
-            std::string gltfName = structureScene.gltfScene.value().name;
             SK::Asset::registerImported(&assetRegistry, &materialRegistry, std::move(structureScene));
             SK::VkRendererBackend::buildGPUAssets(&vkRendererBackend, &assetRegistry, &vkAssetRegistry);
             SK::VkRendererBackend::buildMaterialRegistry(&vkRendererBackend, &assetRegistry, &materialRegistry, &vkAssetRegistry, &vkMaterialRegistry);
             SK::Asset::discardCPUMeshData(&assetRegistry);
             SK::Asset::discardCPUTextureData(&assetRegistry);
-
-            // Instance the scene
-            std::vector<SK::Scene::MeshInstance> meshInstances;
-            SK::Scene::buildMeshInstancesFromGLTFScene(&assetRegistry, gltfName, glm::mat4(1.0f), meshInstances);
-            // Create draw packets out of instances
-            SK::Renderer::DrawContext drawCtx;
-            SK::Renderer::buildDrawPacketsFromMeshInstances(&assetRegistry, &materialRegistry, meshInstances, &drawCtx);
-
-            SK::VkRendererBackend::clearMaterialRegistry(&vkRendererBackend, &vkMaterialRegistry);
-            SK::VkRendererBackend::clearGPUAssets(&vkRendererBackend, &vkAssetRegistry);
-            SK::Material::clearMaterialRegistry(&materialRegistry);
-            SK::Asset::clearAssetRegistry(&assetRegistry);
         }
     }
 
-    loadScene(&vkRendererBackend);
+    // Renderer frontends
+    SK::ForwardRenderer::State forwardRenderer;
+    // For descriptor layouts, vkRendererBackend and vkMaterialRegistry should be created before initializing renderers. 
+    // NOTE: Just knowing the number of total textures for materials is enough to create a descriptor set layout for bindless resources. So, this is a soft constraint but still number of textures is need to be known.
+    SK::ForwardRenderer::init(&forwardRenderer, &vkRendererBackend, &vkMaterialRegistry);
+    // Draw context that renderer frontends will use
+    SK::Renderer::DrawContext drawContext;
+
+    // Instance the scene and fill in the draw context
+    std::vector<SK::Scene::MeshInstance> meshInstances;
+    SK::Scene::buildMeshInstancesFromGLTFScene(&assetRegistry, gltfName, glm::mat4(1.0f), meshInstances);
+    // Create draw packets out of instances
+    SK::Renderer::buildDrawPacketsFromMeshInstances(&assetRegistry, &materialRegistry, meshInstances, &drawContext);
 
     // main loop
     while(!application.shouldQuit)
@@ -157,14 +135,10 @@ int main(int argc, char* argv[])
         if(SK::VkRendererBackend::beginFrame(&vkRendererBackend))
         {
             SK::VkRendererBackend::updateSceneBuffer(&vkRendererBackend, gpuSceneData);
-            SK::ForwardRenderer::draw(&forwardRenderer, &vkRendererBackend, drawContext);
+            SK::ForwardRenderer::draw(&forwardRenderer, &vkRendererBackend, &vkAssetRegistry, &vkMaterialRegistry, drawContext);
             SK::VkRendererBackend::drawOverlays(&vkRendererBackend);
             SK::VkRendererBackend::endFrame(&vkRendererBackend);
         }
-        
-        // TODO: To be moved out to a proper place
-        // After drawing clear out the DrawContext
-        drawContext.clear();
 
         auto end = std::chrono::system_clock::now();
         // Convert to microseconds (integer), then come back to miliseconds
@@ -176,8 +150,10 @@ int main(int argc, char* argv[])
     // Make sure that GPU finished executing every command before shutting down the systems.
     vkDeviceWaitIdle(vkRendererBackend.device);
 
-    // TODO: To be moved out to a proper place
-    loadedScenes.clear();
+    SK::VkRendererBackend::clearMaterialRegistry(&vkRendererBackend, &vkMaterialRegistry);
+    SK::VkRendererBackend::clearGPUAssets(&vkRendererBackend, &vkAssetRegistry);
+    SK::Material::clearMaterialRegistry(&materialRegistry);
+    SK::Asset::clearAssetRegistry(&assetRegistry);
     
     // Once everything is safe to delete shut the systems down.
     SK::ForwardRenderer::shutdown(&forwardRenderer, &vkRendererBackend);

@@ -93,8 +93,6 @@ void SK::VkRendererBackend::init(State* vkRendererBackend, struct SDL_Window* wi
 
     m_initDescriptors(vkRendererBackend);
 
-    m_initMaterialLayouts(vkRendererBackend);
-
     m_initDefaultData(vkRendererBackend);
 
     m_initGlobalSceneBuffer(vkRendererBackend);
@@ -129,8 +127,6 @@ void SK::VkRendererBackend::shutdown(State* vkRendererBackend)
         clearShaderCache(vkRendererBackend);
         clearPipelineLayoutCache(vkRendererBackend);
         clearPipelineCache(vkRendererBackend);
-
-        m_clearMaterialLayouts(vkRendererBackend);
 
         destroyDrawAndDepthImages(vkRendererBackend);
 
@@ -714,7 +710,7 @@ void SK::VkRendererBackend::m_initVulkan(State* vkRendererBackend)
     auto instRet = builder.set_app_name("Vulkan Engine")
         .request_validation_layers(useValidationLayers)
         .use_default_debug_messenger()
-        .require_api_version(1, 3, 0)
+        .require_api_version(1, 4, 0)
         .build();
 
     vkb::Instance vkbInstance = instRet.value();
@@ -734,6 +730,9 @@ void SK::VkRendererBackend::m_initVulkan(State* vkRendererBackend)
     VkPhysicalDeviceVulkan12Features features12{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
     features12.bufferDeviceAddress = true;
     features12.descriptorIndexing = true;
+    features12.scalarBlockLayout = true;
+    features12.runtimeDescriptorArray = true;
+    features12.shaderSampledImageArrayNonUniformIndexing = true;
 
     // Vulkan 1.0 features
     VkPhysicalDeviceFeatures features10{};
@@ -742,7 +741,7 @@ void SK::VkRendererBackend::m_initVulkan(State* vkRendererBackend)
     // Use vkbootstrap to select a gpu with Vulkan 1.3 and necessary features
     vkb::PhysicalDeviceSelector selector{vkbInstance};
     vkb::PhysicalDevice physicalDevice = selector
-        .set_minimum_version(1, 3)
+        .set_minimum_version(1, 4)
         .set_required_features_13(features13)
         .set_required_features_12(features12)
         .set_required_features(features10)
@@ -945,16 +944,6 @@ void SK::VkRendererBackend::m_initDescriptors(State* vkRendererBackend)
     }
 }
 
-void SK::VkRendererBackend::m_initMaterialLayouts(State* vkRendererBackend)
-{
-    GLTFMetallicRoughnessMaterial::BuildMaterialLayout(vkRendererBackend);
-}
-
-void SK::VkRendererBackend::m_clearMaterialLayouts(State* vkRendererBackend)
-{
-    GLTFMetallicRoughnessMaterial::ClearMaterialLayout(vkRendererBackend->device);
-}
-
 void SK::VkRendererBackend::m_initDefaultData(State* vkRendererBackend)
 {
     // Default textures
@@ -1001,28 +990,6 @@ void SK::VkRendererBackend::m_initDefaultData(State* vkRendererBackend)
         vkDestroySampler(vkRendererBackend->device, vkRendererBackend->defaultSamplerNearest, nullptr);
         vkDestroySampler(vkRendererBackend->device, vkRendererBackend->defaultSamplerLinear, nullptr);
     });
-
-    // Default material data
-    GLTFMetallicRoughnessMaterial::MaterialResources defaultMaterialResources;
-    defaultMaterialResources.colorImage = vkRendererBackend->whiteImage;
-    defaultMaterialResources.colorSampler = vkRendererBackend->defaultSamplerLinear;
-    defaultMaterialResources.metalRoughnessImage = vkRendererBackend->whiteImage;
-    defaultMaterialResources.metalRoughnessSampler = vkRendererBackend->defaultSamplerLinear;
-    
-    AllocatedBuffer materialConstantsBuffer = createBuffer(vkRendererBackend, sizeof(GLTFMetallicRoughnessMaterial::MaterialConstants), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-    // Write the buffer
-    GLTFMetallicRoughnessMaterial::MaterialConstants* pMaterialConstantsBuffer = static_cast<GLTFMetallicRoughnessMaterial::MaterialConstants*>(materialConstantsBuffer.allocation->GetMappedData());
-    pMaterialConstantsBuffer->colorFactors = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-    pMaterialConstantsBuffer->metalRoughnessFactors = glm::vec4(1.0f, 0.5f, 0.0f, 0.0f);
-
-    vkRendererBackend->mainDeletionQueue.pushFunction([=]() {
-        destroyBuffer(vkRendererBackend, materialConstantsBuffer);
-    });
-
-    defaultMaterialResources.dataBuffer = materialConstantsBuffer.buffer;
-    defaultMaterialResources.dataBufferOffset = 0;
-
-    vkRendererBackend->defaultMaterialInstance = GLTFMetallicRoughnessMaterial::CreateInstance(vkRendererBackend->device, MaterialPass::Opaque, defaultMaterialResources, vkRendererBackend->globalDescriptorAllocator);
 }
 
 void SK::VkRendererBackend::m_initGlobalSceneBuffer(State* vkRendererBackend)

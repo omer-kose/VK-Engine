@@ -4,47 +4,48 @@
 #include <RendererBackend/vulkan/vk_pipelines.h>
 #include <RendererBackend/vulkan/vk_initializers.h>
 
+#include <RendererBackend/vulkan/VkAssetRegistry.h>
+#include <RendererBackend/vulkan/VkMaterialRegistry.h>
 
-void SK::ForwardRenderer::init(State* forwardRenderer, SK::VkRendererBackend::State* vkRendererBackend)
+#include <Renderer/DrawContext.h>
+
+#include <chrono>
+#include <algorithm>
+
+void SK::ForwardRenderer::init(State* forwardRenderer, SK::VkRendererBackend::State* vkRendererBackend, SK::VkRendererBackend::VkMaterialRegistry* vkMaterialRegistry)
 {
     // Load the shaders
-    VkShaderModule meshVertexShader = SK::VkRendererBackend::getOrLoadShader(vkRendererBackend, "../../shaders/glsl/gltf_metallic/mesh_vert.spv");
-    if(!meshVertexShader)
+    const char* vertexShaderPath = "../../shaders/glsl/forward/forward_vert.spv";
+    VkShaderModule vertexShader = SK::VkRendererBackend::getOrLoadShader(vkRendererBackend, vertexShaderPath);
+    if(!vertexShader)
     {
-        fmt::println("Error when building the mesh vertex shader");
+        fmt::println("Error when building the forward vertex shader");
     }
 
-    VkShaderModule meshFragmentShader = SK::VkRendererBackend::getOrLoadShader(vkRendererBackend, "../../shaders/glsl/gltf_metallic/mesh_frag.spv");;
-    if(!meshFragmentShader)
+    const char* fragmentShaderPath = "../../shaders/glsl/forward/forward_frag.spv";
+    VkShaderModule fragmentShader = SK::VkRendererBackend::getOrLoadShader(vkRendererBackend, fragmentShaderPath);;
+    if(!fragmentShader)
     {
-        fmt::println("Error when building the mesh fragment shader");
+        fmt::println("Error when building the forward fragment shader");
     }
 
     // Set push constant range
     VkPushConstantRange pushConstantRange{};
     pushConstantRange.offset = 0;
-    pushConstantRange.size = sizeof(GPUDrawPushConstants);
-    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-    // Set descriptor sets
-    // Material set (set 1)
-    DescriptorLayoutBuilder layoutBuilder;
-    layoutBuilder.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-    layoutBuilder.addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    layoutBuilder.addBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    VkDescriptorSetLayout materialLayout = layoutBuilder.build(vkRendererBackend->device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+    pushConstantRange.size = sizeof(PushConstants);
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
     // Mesh pipeline layout
     SK::VkRendererBackend::PipelineLayoutKey layoutKey;
-    // 2 sets: 0 -> Scene Descriptor Set, 1 -> Material Descriptor Set
-    layoutKey.setLayouts = { vkRendererBackend->gpuSceneDataDescriptorLayout, materialLayout };
+    // 2 sets: 0 -> Scene Descriptor Set, 1 -> Bindless Resources Descriptor Set
+    layoutKey.setLayouts = { vkRendererBackend->gpuSceneDataDescriptorLayout, vkMaterialRegistry->resourceDescriptorSetLayout };
     layoutKey.pushConstantRanges = { pushConstantRange };
 
     forwardRenderer->pipelineLayout = SK::VkRendererBackend::getOrCreatePipelineLayout(vkRendererBackend, layoutKey);
 
     // Build the pipeline keys and retrieve the pipelines from the vkRendererBackend backend
-    size_t vertHash = std::hash<std::string>{}("../../shaders/glsl/gltf_metallic/mesh_vert.spv");
-    size_t fragHash = std::hash<std::string>{}("../../shaders/glsl/gltf_metallic/mesh_frag.spv");
+    size_t vertHash = std::hash<std::string>{}(vertexShaderPath);
+    size_t fragHash = std::hash<std::string>{}(fragmentShaderPath);
 
     SK::VkRendererBackend::PipelineKey opaqueKey = {};
     opaqueKey.vertShader = vertHash;
@@ -69,12 +70,9 @@ void SK::ForwardRenderer::init(State* forwardRenderer, SK::VkRendererBackend::St
     transparentKey.depthTest = false;
 
     forwardRenderer->transparentPipeline = SK::VkRendererBackend::getOrCreatePipeline(vkRendererBackend, transparentKey);
-
-    // Descriptor Set Layout is not needed as Material descriptors will be created while getting instanced.
-    vkDestroyDescriptorSetLayout(vkRendererBackend->device, materialLayout, nullptr);
 }
 
-void SK::ForwardRenderer::draw(State* forwardRenderer, SK::VkRendererBackend::State* vkRendererBackend, const SK::VkRendererBackend::DrawContext& ctx)
+void SK::ForwardRenderer::draw(State* forwardRenderer, SK::VkRendererBackend::State* vkRendererBackend, SK::VkRendererBackend::VkAssetRegistry* vkAssetRegistry, SK::VkRendererBackend::VkMaterialRegistry* vkMaterialRegistry, const SK::Renderer::DrawContext& ctx)
 {
     VkCommandBuffer cmd = vkRendererBackend->currentCmdBuffer;
 
@@ -88,68 +86,61 @@ void SK::ForwardRenderer::draw(State* forwardRenderer, SK::VkRendererBackend::St
     auto start = std::chrono::system_clock::now();
 
     std::vector<uint32_t> opaqueDraws;
-    opaqueDraws.reserve(ctx.opaqueGLTFSurfaces.size());
+    opaqueDraws.reserve(ctx.opaque.size());
 
-    for(uint32_t i = 0; i < ctx.opaqueGLTFSurfaces.size(); ++i)
+    for(uint32_t i = 0; i < ctx.opaque.size(); ++i)
     {
         opaqueDraws.push_back(i);
     }
 
-    // sort the opaque surfaces by material and mesh
+    // sort the opaque surfaces by mesh index to minimize index buffer bindings
     std::sort(opaqueDraws.begin(), opaqueDraws.end(), [&](const auto& iA, const auto& iB) {
-        const SK::VkRendererBackend::RenderObject& A = ctx.opaqueGLTFSurfaces[iA];
-        const SK::VkRendererBackend::RenderObject& B = ctx.opaqueGLTFSurfaces[iB];
-        if(A.materialInstance == B.materialInstance)
-        {
-            return A.indexBuffer < B.indexBuffer;
-        }
-        else
-        {
-            return A.materialInstance < B.materialInstance;
-        }
+        const SK::Renderer::DrawPacket& A = ctx.opaque[iA];
+        const SK::Renderer::DrawPacket& B = ctx.opaque[iB];
+        return A.meshIndex < B.meshIndex;
     });
 
     // Keep track of states to avoid unnecessary rebindings
-    MaterialInstance* lastMaterial = nullptr;
-    VkBuffer lastIndexBuffer = VK_NULL_HANDLE;
+    uint32_t lastMeshIndex = UINT_MAX;
 
-    auto draw = [&](const SK::VkRendererBackend::RenderObject& robj, VkPipeline pipeline) {
-        if(robj.materialInstance != lastMaterial)
-        {
-            lastMaterial = robj.materialInstance;
-            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-            VkDescriptorSet gpuSceneDescriptorSet = SK::VkRendererBackend::fetchCurrentSceneBufferDescriptorSet(vkRendererBackend);;
-            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, forwardRenderer->pipelineLayout, 0, 1, &gpuSceneDescriptorSet, 0, nullptr);
+    auto bindPipelineAndBindlessResources = [&](VkPipeline pipeline) {
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+        VkDescriptorSet gpuSceneDescriptorSet = SK::VkRendererBackend::fetchCurrentSceneBufferDescriptorSet(vkRendererBackend);;
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, forwardRenderer->pipelineLayout, 0, 1, &gpuSceneDescriptorSet, 0, nullptr);
+        // Bind the Material + Texture resource descriptors once (bindless resources)
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, forwardRenderer->pipelineLayout, 1, 1, &vkMaterialRegistry->resourceDescriptorSet, 0, nullptr);
 
-            // Set dynamic viewport and scissor again in case of an override (all of the material pipelines use dynamic states so setting them once after a bind is actually enough)
-            SK::VkRendererBackend::setViewport(vkRendererBackend, cmd);
-            SK::VkRendererBackend::setScissor(vkRendererBackend, cmd);
-
-            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, forwardRenderer->pipelineLayout, 1, 1, &robj.materialInstance->materialSet, 0, nullptr);
-        }
-
-        GPUDrawPushConstants pushConstants;
-        pushConstants.vertexBufferAddress = robj.vertexBufferAddress;
-        pushConstants.worldMatrix = robj.transform;
-        vkCmdPushConstants(cmd, forwardRenderer->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &pushConstants);
-
-        if(lastIndexBuffer != robj.indexBuffer)
-        {
-            lastIndexBuffer = robj.indexBuffer;
-            vkCmdBindIndexBuffer(cmd, robj.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-        }
-
-        vkCmdDrawIndexed(cmd, robj.indexCount, 1, robj.firstIndex, 0, 0);
+        // Set dynamic viewport and scissor again in case of an override (setting them once while binding the pipeline is enough)
+        SK::VkRendererBackend::setViewport(vkRendererBackend, cmd);
+        SK::VkRendererBackend::setScissor(vkRendererBackend, cmd);
     };
 
+    auto draw = [&](const SK::Renderer::DrawPacket& packet) {
+        PushConstants pushConstants;
+        pushConstants.vertexBufferAddress = vkAssetRegistry->meshes[packet.meshIndex].meshBuffers.vertexBufferAddress;
+        pushConstants.worldMatrix = packet.worldTransform;
+        pushConstants.materialIndex = packet.materialIndex;
+        vkCmdPushConstants(cmd, forwardRenderer->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstants), &pushConstants);
+
+        if(lastMeshIndex != packet.meshIndex)
+        {
+            lastMeshIndex = packet.meshIndex;
+            vkCmdBindIndexBuffer(cmd, vkAssetRegistry->meshes[packet.meshIndex].meshBuffers.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+        }
+
+        vkCmdDrawIndexed(cmd, packet.indexCount, 1, packet.startIndex, 0, 0);
+    };
+
+    bindPipelineAndBindlessResources(forwardRenderer->opaquePipeline);
     for(uint32_t idx : opaqueDraws)
     {
-        draw(ctx.opaqueGLTFSurfaces[idx], forwardRenderer->opaquePipeline);
+        draw(ctx.opaque[idx]);
     }
 
-    for(const SK::VkRendererBackend::RenderObject& robj : ctx.transparentGLTFSurfaces)
+    bindPipelineAndBindlessResources(forwardRenderer->transparentPipeline);
+    for(const SK::Renderer::DrawPacket& packet : ctx.transparent)
     {
-        draw(robj, forwardRenderer->transparentPipeline);
+        draw(packet);
     }
 
     auto end = std::chrono::system_clock::now();

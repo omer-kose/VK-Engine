@@ -25,6 +25,8 @@ namespace SK::VkRendererBackend
 	{
 		/*
 			For textures and materials, bindless descriptors are used. VkMaterialRegistry creates and manages a descriptor set for materials and textures of the materials.
+
+			Any other textures in the engine that are not related to materials, will be handled via their own descriptors in the renderers they used.
 		*/
 		VkDescriptorSetLayout resourceDescriptorSetLayout = VK_NULL_HANDLE;
 		VkDescriptorSet resourceDescriptorSet = VK_NULL_HANDLE;

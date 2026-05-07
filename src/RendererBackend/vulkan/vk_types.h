@@ -44,7 +44,7 @@ struct Vertex
     float uv_x;
     glm::vec3 normal;
     float uv_y;
-    glm::vec4 color;
+    glm::vec4 tangent;
 };
 
 // Holds the resources needed for a mesh
@@ -52,14 +52,6 @@ struct GPUMeshBuffers
 {
     AllocatedBuffer indexBuffer;
     AllocatedBuffer vertexBuffer;
-    VkDeviceAddress vertexBufferAddress;
-};
-
-// Push constants for mesh object draws
-// TODO: To be defined in the mesh renderer frontends. This push constant type is specifically for mesh rendering.
-struct GPUDrawPushConstants
-{
-    glm::mat4 worldMatrix;
     VkDeviceAddress vertexBufferAddress;
 };
 

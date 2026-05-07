@@ -6,7 +6,6 @@
 
 #include <RendererBackend/vulkan/vk_types.h>
 #include <RendererBackend/vulkan/vk_descriptors.h>
-#include <RendererBackend/vulkan/vk_loader.h>
 
 #include <Util/DeletionQueue.h>
 
@@ -42,42 +41,6 @@ namespace SK::VkRendererBackend
 
 	constexpr unsigned int FRAME_OVERLAP = 2;
 
-	/*
-		Represents the geometry (and a possible material instance) of an object to be drawn in that frame. Created and destroyed per-frame.
-
-		It can represent geometry from all kinds of formats.
-	*/
-	struct RenderObject
-	{
-		uint32_t indexCount;
-		uint32_t firstIndex;
-		VkBuffer indexBuffer;
-
-		MaterialInstance* materialInstance; // a non-owning pointer
-
-		Bounds bounds;
-
-		glm::mat4 transform;
-		VkDeviceAddress vertexBufferAddress;
-	};
-
-	/*
-		Holds a flat list objects to be drawn that frame. The list is filled and reset every frame.
-
-		For the time being, meshes coming from different formats are held in different lists so that the related passes can only fetch the required meshes and work with them.
-	*/
-	struct DrawContext
-	{
-		std::vector<RenderObject> opaqueGLTFSurfaces;
-		std::vector<RenderObject> transparentGLTFSurfaces;
-
-		void clear()
-		{
-			opaqueGLTFSurfaces.clear();
-			transparentGLTFSurfaces.clear();
-		}
-	};
-
 	struct PipelineLayoutKey
 	{
 		std::vector<VkDescriptorSetLayout> setLayouts;
@@ -109,7 +72,7 @@ namespace SK::VkRendererBackend
 	/*
 		Pass Context holds required information for a pass to use. It will be an opaque type for the passes.
 
-		TODO: Name is too general 
+		TODO: Refactor this and make UI draw manually. RendererBackend no longer draws stuff implicitly.
 	*/
 	struct PassContext
 	{
@@ -118,7 +81,7 @@ namespace SK::VkRendererBackend
 		// Optional fields not all the passes needs them
 		VkImageView targetImageView;
 		VkExtent2D imageExtent;
-		State* vkRendererBackend; 
+		struct State* vkRendererBackend; 
 	};
 
 	// TODO: Subject to change
@@ -213,9 +176,6 @@ namespace SK::VkRendererBackend
 		VkSampler defaultSamplerLinear;
 		VkSampler defaultSamplerNearest;
 
-		// Default materials
-		MaterialInstance defaultMaterialInstance;
-
 		std::vector<OverlayPass> overlayPasses;
 
 		// Shader cache
@@ -301,10 +261,6 @@ namespace SK::VkRendererBackend
 	void m_destroySwapchain(State* vkRendererBackend);
 	// Descriptors
 	void m_initDescriptors(State* vkRendererBackend);
-
-	// Material Layouts
-	void m_initMaterialLayouts(State* vkRendererBackend);
-	void m_clearMaterialLayouts(State* vkRendererBackend);
 
 	// Default Engine Data
 	void m_initDefaultData(State* vkRendererBackend);

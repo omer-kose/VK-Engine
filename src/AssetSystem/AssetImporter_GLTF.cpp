@@ -324,7 +324,7 @@ bool SK::Asset::importGLTF(std::string_view filePath, ImportedAsset* outAsset)
                         Vertex& out = vertices[vertexOffset + index];
                         out.position = v;
                         out.normal = { 0, 0, 0 };
-                        out.color = glm::vec4{ 0.0f };
+                        out.tangent = glm::vec4{ 0.0f };
                         out.uv_x = 0;
                         out.uv_y = 0;
                     });
@@ -356,15 +356,6 @@ bool SK::Asset::importGLTF(std::string_view filePath, ImportedAsset* outAsset)
                     });
             }
 
-            // Colors
-            if(auto it = primitive.findAttribute("COLOR_0"); it != primitive.attributes.end())
-            {
-                fastgltf::iterateAccessorWithIndex<glm::vec4>(asset, asset.accessors[it->second],
-                    [&](glm::vec4 v, size_t index) 
-                    {
-                        vertices[initialVertex + index].color = v;
-                    });
-            }
 
             // Bounds
             glm::vec3 minPos = vertices[initialVertex].position;
