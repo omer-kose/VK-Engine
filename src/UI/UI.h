@@ -11,7 +11,6 @@ union SDL_Event;
 namespace SK::VkRendererBackend
 {
 	struct State;
-	struct PassContext; // for ImGui overlay draw pass
 };
 
 namespace SK::UI
@@ -29,5 +28,5 @@ namespace SK::UI
 	void shutdown(State* ui);
 
 	// Registered to the RendererBackend's Overlay passes.
-	void draw(SK::VkRendererBackend::PassContext* ctx);
+	void draw(SK::VkRendererBackend::State* vkRendererBackend);
 };

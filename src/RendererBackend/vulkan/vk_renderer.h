@@ -69,35 +69,6 @@ namespace SK::VkRendererBackend
 		VkPipelineLayout layout;
 	};
 
-	/*
-		Pass Context holds required information for a pass to use. It will be an opaque type for the passes.
-
-		TODO: Refactor this and make UI draw manually. RendererBackend no longer draws stuff implicitly.
-	*/
-	struct PassContext
-	{
-		VkCommandBuffer cmd;
-
-		// Optional fields not all the passes needs them
-		VkImageView targetImageView;
-		VkExtent2D imageExtent;
-		struct State* vkRendererBackend; 
-	};
-
-	// TODO: Subject to change
-	/*
-		Reusable Passes that will be commonly used by all the programs like rendering UI, Gizmos etc. 
-		Programs, will and can hold their own fields for UI for example but they don't have to manually render them. RendererBackend can render those automatically.
-		So, programs using the vkRendererBackend framework can only focus on their own core pipelines and algorithms.
-	*/
-	
-	// Such as UI, Gizmos etc.
-	struct OverlayPass
-	{
-		void (*draw)(PassContext* passCtx);
-	};
-
-
 	struct State
 	{
 		// Window related data stored (Window and other related params are owned by the App)
@@ -121,6 +92,7 @@ namespace SK::VkRendererBackend
 		uint32_t numSwapchainImages;
 		std::vector<VkImage> swapchainImages;
 		std::vector<VkImageView> swapchainImageViews;
+		// Always equal to the size of the window extent
 		VkExtent2D swapchainExtent;
 
 		// Synchronization Structures
@@ -176,8 +148,6 @@ namespace SK::VkRendererBackend
 		VkSampler defaultSamplerLinear;
 		VkSampler defaultSamplerNearest;
 
-		std::vector<OverlayPass> overlayPasses;
-
 		// Shader cache
 		std::unordered_map<size_t, VkShaderModule> shaderCache;
 
@@ -202,7 +172,6 @@ namespace SK::VkRendererBackend
 
 	// begin/end frames and some internal common draw functionalities
 	bool beginFrame(State* vkRendererBackend);
-	void drawOverlays(State* vkRendererBackend);
 	void endFrame(State* vkRendererBackend);
 
 	void immediateSubmit(State* vkRendererBackend, std::function<void(VkCommandBuffer cmd)>&& function);
@@ -227,8 +196,6 @@ namespace SK::VkRendererBackend
 
 	void setViewport(State* vkRendererBackend, VkCommandBuffer cmd);
 	void setScissor(State* vkRendererBackend, VkCommandBuffer cmd);
-
-	void registerOverlayPass(State* vkRendererBackend, OverlayPass pass);
 
 	VkShaderModule getOrLoadShader(State* vkRendererBackend, const char* path);
 	void clearShaderCache(State* vkRendererBackend);

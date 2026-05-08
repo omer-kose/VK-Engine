@@ -203,28 +203,6 @@ bool SK::VkRendererBackend::beginFrame(State* vkRendererBackend)
     return true;
 }
 
-void SK::VkRendererBackend::drawOverlays(State* vkRendererBackend)
-{
-    VkCommandBuffer cmd = vkRendererBackend->currentCmdBuffer;
-    uint32_t swapchainImageIndex = vkRendererBackend->currentSwapchainImageIndex;
-
-    SK::VkUtil::transitionImage(cmd, vkRendererBackend->drawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-    SK::VkUtil::transitionImage(cmd, vkRendererBackend->swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-
-    // Execute a copy operation from the draw image into the swapchain image
-    SK::VkUtil::copyImageToImage(cmd, vkRendererBackend->drawImage.image, vkRendererBackend->swapchainImages[swapchainImageIndex], vkRendererBackend->drawExtent, vkRendererBackend->swapchainExtent);
-
-    // After drawing, we need to draw overlays on top of the swapchain image, so transition the swapchain image into optimal drawing layout
-    SK::VkUtil::transitionImage(cmd, vkRendererBackend->swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-
-    // Execute overlay passes
-    for(auto& pass : vkRendererBackend->overlayPasses)
-    {
-        PassContext ctx = { cmd, vkRendererBackend->swapchainImageViews[swapchainImageIndex], vkRendererBackend->swapchainExtent, vkRendererBackend };
-        pass.draw(&ctx);
-    }
-}
-
 void SK::VkRendererBackend::endFrame(State* vkRendererBackend)
 {
     FrameData& currentFrame = getCurrentFrameData(vkRendererBackend);
@@ -569,11 +547,6 @@ void SK::VkRendererBackend::destroyDrawAndDepthImages(State* vkRendererBackend)
 SK::VkRendererBackend::FrameData& SK::VkRendererBackend::getCurrentFrameData(State* vkRendererBackend)
 {
     return vkRendererBackend->frames[vkRendererBackend->frameNumber % FRAME_OVERLAP];
-}
-
-void SK::VkRendererBackend::registerOverlayPass(State* vkRendererBackend, OverlayPass pass)
-{
-    vkRendererBackend->overlayPasses.push_back(pass);
 }
 
 VkShaderModule SK::VkRendererBackend::getOrLoadShader(State* vkRendererBackend, const char* path)

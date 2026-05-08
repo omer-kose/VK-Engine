@@ -2,6 +2,7 @@
 
 #include <RendererBackend/vulkan/vk_renderer.h>
 #include <RendererBackend/vulkan/vk_initializers.h>
+#include <RendererBackend/vulkan/vk_images.h>
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
@@ -71,11 +72,6 @@ void SK::UI::init(State* ui, SK::VkRendererBackend::State* vkRendererBackend)
         vkDestroyDescriptorPool(vkRendererBackend->device, imguiPool, nullptr);
     });
 
-    // Register UI draw to vkRendererBackend's overlay passes
-    SK::VkRendererBackend::OverlayPass pass;
-    pass.draw = &draw;
-    SK::VkRendererBackend::registerOverlayPass(vkRendererBackend, pass);
-
     ui->isInitialized = true;
 }
 
@@ -97,14 +93,26 @@ void SK::UI::endFrame()
     ImGui::Render();
 }
 
-void SK::UI::draw(SK::VkRendererBackend::PassContext* ctx)
+void SK::UI::draw(SK::VkRendererBackend::State* vkRendererBackend)
 {
-    VkRenderingAttachmentInfo colorAttachment = SK::VkInit::attachment_info(ctx->targetImageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    VkRenderingInfo renderInfo = SK::VkInit::rendering_info(ctx->imageExtent, &colorAttachment, nullptr);
+    VkCommandBuffer cmd = vkRendererBackend->currentCmdBuffer;
+    uint32_t swapchainImageIndex = vkRendererBackend->currentSwapchainImageIndex;
 
-    vkCmdBeginRendering(ctx->cmd, &renderInfo);
-    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), ctx->cmd);
-    vkCmdEndRendering(ctx->cmd);
+    SK::VkUtil::transitionImage(cmd, vkRendererBackend->drawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    SK::VkUtil::transitionImage(cmd, vkRendererBackend->swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    // Execute a copy operation from the draw image into the swapchain image
+    SK::VkUtil::copyImageToImage(cmd, vkRendererBackend->drawImage.image, vkRendererBackend->swapchainImages[swapchainImageIndex], vkRendererBackend->drawExtent, vkRendererBackend->swapchainExtent);
+
+    // After drawing, we need to draw overlays on top of the swapchain image, so transition the swapchain image into optimal drawing layout
+    SK::VkUtil::transitionImage(cmd, vkRendererBackend->swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+    VkRenderingAttachmentInfo colorAttachment = SK::VkInit::attachment_info(vkRendererBackend->swapchainImageViews[swapchainImageIndex], nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    VkRenderingInfo renderInfo = SK::VkInit::rendering_info(vkRendererBackend->swapchainExtent, &colorAttachment, nullptr);
+
+    vkCmdBeginRendering(cmd, &renderInfo);
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
+    vkCmdEndRendering(cmd);
 }
 
 void SK::UI::shutdown(State* ui)

@@ -136,7 +136,7 @@ int main(int argc, char* argv[])
         {
             SK::VkRendererBackend::updateSceneBuffer(&vkRendererBackend, gpuSceneData);
             SK::ForwardRenderer::draw(&forwardRenderer, &vkRendererBackend, &vkAssetRegistry, &vkMaterialRegistry, drawContext);
-            SK::VkRendererBackend::drawOverlays(&vkRendererBackend);
+            SK::UI::draw(&vkRendererBackend);
             SK::VkRendererBackend::endFrame(&vkRendererBackend);
         }
 
