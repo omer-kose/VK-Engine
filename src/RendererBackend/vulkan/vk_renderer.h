@@ -210,28 +210,24 @@ namespace SK::VkRendererBackend
 
 	void handleWindowResize(State* vkRendererBackend);
 
-
-	void createDrawAndDepthImages(State* vkRendererBackend);
-	void destroyDrawAndDepthImages(State* vkRendererBackend);
-
 	/*
 		Internal Helpers
-		TODO: Rename these
 	*/
 	// Vulkan Context
-	void m_initVulkan(State* vkRendererBackend);
-	void m_initSwapchain(State* vkRendererBackend);
-	void m_initCommands(State* vkRendererBackend);
-	void m_initSyncStructures(State* vkRendererBackend);
+	void initVulkan(State* vkRendererBackend);
+	void initSwapchain(State* vkRendererBackend);
+	void initCommands(State* vkRendererBackend);
+	void initSyncStructures(State* vkRendererBackend);
 	// Swapchain
-	void m_createSwapchain(State* vkRendererBackend, uint32_t width, uint32_t height);
-	void m_destroySwapchain(State* vkRendererBackend);
+	void createSwapchain(State* vkRendererBackend, uint32_t width, uint32_t height);
+	void destroySwapchain(State* vkRendererBackend);
 	// Descriptors
-	void m_initDescriptors(State* vkRendererBackend);
-
+	void initDescriptors(State* vkRendererBackend);
+	// Draw and Depth Images
+	void createDrawAndDepthImages(State* vkRendererBackend);
+	void destroyDrawAndDepthImages(State* vkRendererBackend);
 	// Default Engine Data
-	void m_initDefaultData(State* vkRendererBackend);
-
+	void initDefaultData(State* vkRendererBackend);
 	// Init Scene Buffer
-	void m_initGlobalSceneBuffer(State* vkRendererBackend);
+	void initGlobalSceneBuffer(State* vkRendererBackend);
 };

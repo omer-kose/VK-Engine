@@ -83,19 +83,19 @@ void SK::VkRendererBackend::init(State* vkRendererBackend, struct SDL_Window* wi
     vkRendererBackend->windowExtent = VkExtent2D{ windowWidth, windowHeight };
 
     // Vulkan Bootstrapping
-    m_initVulkan(vkRendererBackend);
-    m_initSwapchain(vkRendererBackend);
-    m_initCommands(vkRendererBackend);
+    initVulkan(vkRendererBackend);
+    initSwapchain(vkRendererBackend);
+    initCommands(vkRendererBackend);
     // initSwapchain sets the number of swapchain images which is needed to create correct amount of submitSemaphores. So, it needs to be called before initSyncStructures.
-    m_initSyncStructures(vkRendererBackend);
+    initSyncStructures(vkRendererBackend);
 
     createDrawAndDepthImages(vkRendererBackend);
 
-    m_initDescriptors(vkRendererBackend);
+    initDescriptors(vkRendererBackend);
 
-    m_initDefaultData(vkRendererBackend);
+    initDefaultData(vkRendererBackend);
 
-    m_initGlobalSceneBuffer(vkRendererBackend);
+    initGlobalSceneBuffer(vkRendererBackend);
 
     // everything went fine
     vkRendererBackend->isInitialized = true;
@@ -133,7 +133,7 @@ void SK::VkRendererBackend::shutdown(State* vkRendererBackend)
         // destroying the vma allocator is also inside the mainDeletionQueue, so any resource allocation must be freed before flushing the queue
         vkRendererBackend->mainDeletionQueue.flush();
 
-        m_destroySwapchain(vkRendererBackend);
+        destroySwapchain(vkRendererBackend);
 
         vkDestroyDevice(vkRendererBackend->device, nullptr);
         vkDestroySurfaceKHR(vkRendererBackend->instance, vkRendererBackend->surface, nullptr);
@@ -675,7 +675,7 @@ void SK::VkRendererBackend::clearPipelineCache(State* vkRendererBackend)
     vkRendererBackend->pipelineCache.clear();
 }
 
-void SK::VkRendererBackend::m_initVulkan(State* vkRendererBackend)
+void SK::VkRendererBackend::initVulkan(State* vkRendererBackend)
 {
     vkb::InstanceBuilder builder;
 
@@ -746,12 +746,12 @@ void SK::VkRendererBackend::m_initVulkan(State* vkRendererBackend)
     });
 }
 
-void SK::VkRendererBackend::m_initSwapchain(State* vkRendererBackend)
+void SK::VkRendererBackend::initSwapchain(State* vkRendererBackend)
 {
-    m_createSwapchain(vkRendererBackend, vkRendererBackend->windowExtent.width, vkRendererBackend->windowExtent.height);
+    createSwapchain(vkRendererBackend, vkRendererBackend->windowExtent.width, vkRendererBackend->windowExtent.height);
 }
 
-void SK::VkRendererBackend::m_initCommands(State* vkRendererBackend)
+void SK::VkRendererBackend::initCommands(State* vkRendererBackend)
 {
     // Create the command pool and allow for resetting of individual command buffers
     VkCommandPoolCreateInfo commandPoolInfo = SK::VkInit::command_pool_create_info(vkRendererBackend->graphicsQueueFamily, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
@@ -777,7 +777,7 @@ void SK::VkRendererBackend::m_initCommands(State* vkRendererBackend)
     });
 }
 
-void SK::VkRendererBackend::m_initSyncStructures(State* vkRendererBackend)
+void SK::VkRendererBackend::initSyncStructures(State* vkRendererBackend)
 {
     // Create synchronization structures
     // One fence to sync CPU-GPU when the gpu has finished rendering the frame,
@@ -807,7 +807,7 @@ void SK::VkRendererBackend::m_initSyncStructures(State* vkRendererBackend)
     });
 }
 
-void SK::VkRendererBackend::m_createSwapchain(State* vkRendererBackend, uint32_t width, uint32_t height)
+void SK::VkRendererBackend::createSwapchain(State* vkRendererBackend, uint32_t width, uint32_t height)
 {
     vkb::SwapchainBuilder swapchainBuilder{ vkRendererBackend->chosenGPU, vkRendererBackend->device, vkRendererBackend->surface};
 
@@ -830,7 +830,7 @@ void SK::VkRendererBackend::m_createSwapchain(State* vkRendererBackend, uint32_t
     vkRendererBackend->numSwapchainImages = static_cast<uint32_t>(vkRendererBackend->swapchainImages.size());
 }
 
-void SK::VkRendererBackend::m_destroySwapchain(State* vkRendererBackend)
+void SK::VkRendererBackend::destroySwapchain(State* vkRendererBackend)
 {
     // Deleting the swapchain deletes the images it holds internally.
     vkDestroySwapchainKHR(vkRendererBackend->device, vkRendererBackend->swapchain, nullptr);
@@ -856,15 +856,15 @@ void SK::VkRendererBackend::handleWindowResize(State* vkRendererBackend)
     vkRendererBackend->windowExtent.height = h;
 
     // Recreate swapchain and draw, depth images.
-    m_destroySwapchain(vkRendererBackend);
-    m_createSwapchain(vkRendererBackend, vkRendererBackend->windowExtent.width, vkRendererBackend->windowExtent.height);
+    destroySwapchain(vkRendererBackend);
+    createSwapchain(vkRendererBackend, vkRendererBackend->windowExtent.width, vkRendererBackend->windowExtent.height);
     destroyDrawAndDepthImages(vkRendererBackend);
     createDrawAndDepthImages(vkRendererBackend);
 
     vkRendererBackend->windowResizeRequested = false;
 }
 
-void SK::VkRendererBackend::m_initDescriptors(State* vkRendererBackend)
+void SK::VkRendererBackend::initDescriptors(State* vkRendererBackend)
 {
     // Create the global growable descriptor allocator 
     std::vector<DescriptorAllocatorGrowable::PoolSize> sizes = {
@@ -917,7 +917,7 @@ void SK::VkRendererBackend::m_initDescriptors(State* vkRendererBackend)
     }
 }
 
-void SK::VkRendererBackend::m_initDefaultData(State* vkRendererBackend)
+void SK::VkRendererBackend::initDefaultData(State* vkRendererBackend)
 {
     // Default textures
     // 3 default textures 1 pixel each
@@ -965,7 +965,7 @@ void SK::VkRendererBackend::m_initDefaultData(State* vkRendererBackend)
     });
 }
 
-void SK::VkRendererBackend::m_initGlobalSceneBuffer(State* vkRendererBackend)
+void SK::VkRendererBackend::initGlobalSceneBuffer(State* vkRendererBackend)
 {
     for(int i = 0; i < FRAME_OVERLAP; ++i)
     {
