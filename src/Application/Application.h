@@ -14,14 +14,14 @@ struct SDL_Window;
 
 namespace SK::Application
 {
+	using SDLEventCallback = void (*)(const SDL_Event& event, void* eventData);
+
 	struct State
 	{
 		SDL_Window* window;
 		uint32_t windowWidth = 1920;
 		uint32_t windowHeight = 1080;
 		
-		Camera mainCamera;
-
 		bool isMinimized = false;
 		bool shouldQuit = false;
 
@@ -29,8 +29,7 @@ namespace SK::Application
 	};
 
 	void init(State* application, uint32_t windowWidth = 1920, uint32_t windowHeight = 1080);
-	void handleSDLEvents(State* application);
-	void initCamera(State* application, glm::vec3 position, float pitch, float yaw);
+	void handleSDLEvents(State* application, SDLEventCallback eventCallback = nullptr, void* eventContext = nullptr);
 
 	void shutdown(State* application);
 };

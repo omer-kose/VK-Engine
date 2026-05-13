@@ -25,12 +25,10 @@ void SK::Application::init(State* application, uint32_t windowWidth, uint32_t wi
         window_flags
     );
 
-    initCamera(application, glm::vec3(30.f, -0.0f, -85.0f), 0.0f, 0.0f);
-
     application->isInitialized = true;
 }
 
-void SK::Application::handleSDLEvents(State* application)
+void SK::Application::handleSDLEvents(State* application, SDLEventCallback eventCallback, void* eventContext)
 {
     SDL_Event e;
 
@@ -55,19 +53,11 @@ void SK::Application::handleSDLEvents(State* application)
             }
         }
 
-        application->mainCamera.processSDLEvent(e);
-        
-        // send SDL event to ImGui for processing
-        SK::UI::processSDLEvents(e);
+        if (eventCallback != nullptr)
+        {
+            eventCallback(e, eventContext);
+        }
     }
-}
-
-void SK::Application::initCamera(State* application, glm::vec3 position, float pitch, float yaw)
-{
-    application->mainCamera.velocity = glm::vec3(0.0f);
-    application->mainCamera.position = position;
-    application->mainCamera.pitch = pitch;
-    application->mainCamera.yaw = yaw;
 }
 
 void SK::Application::shutdown(State* application)

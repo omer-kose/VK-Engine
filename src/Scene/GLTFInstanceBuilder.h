@@ -8,5 +8,5 @@
 
 namespace SK::Scene
 {
-    void buildMeshInstancesFromGLTFScene(const SK::Asset::AssetRegistry* assetRegistry, std::string_view sceneName, glm::mat4 sceneWorldTransform, std::vector<MeshInstance>& outInstances);
+    void buildMeshInstancesFromGLTFScene(const SK::Asset::AssetRegistry* assetRegistry, std::string_view sceneName, const glm::mat4& sceneWorldTransform, std::vector<MeshInstance>& outInstances);
 }

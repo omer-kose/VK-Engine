@@ -1,6 +1,8 @@
 #include <Application/Application.h>
 #include <RendererBackend/vulkan/vk_renderer.h>
+#include <RendererBackend/vulkan/VkSceneResources.h>
 #include <UI/UI.h>
+#include <Scene/Scene.h>
 #include <Renderer/GlobalGPUTypes.h>
 #include <Renderer/ForwardRenderer.h>
 
@@ -11,40 +13,24 @@
 #include <thread>
 #include <chrono>
 
-#include <glm/gtx/transform.hpp>
-// GPU Scene Data
-SK::Renderer::GPUSceneData gpuSceneData;
-
-// TODO: Asset System Test
-#include <AssetSystem/AssetRegistry.h>
-#include <AssetSystem/AssetImporter_GLTF.h>
-#include <MaterialSystem/MaterialRegistry.h>
-#include <RendererBackend/vulkan/VkAssetRegistry.h>
-#include <RendererBackend/vulkan/VkMaterialRegistry.h>
-#include <Scene/MeshInstance.h>
-#include <Scene/GLTFInstanceBuilder.h>
-#include <Renderer/DrawContext.h>
-#include <Renderer/DrawPacketBuilder.h>
-
-void updateSceneTemp(SK::VkRendererBackend::State* vkRendererBackend, Camera& camera)
+// Program specific Event Context
+struct EventContext
 {
-    // TODO: Update timings are missing here but Engine Stats should be reconsidered too. Not sure if they should be in vkRendererBackend.
-    camera.update();
+    SK::Scene::State* scene = nullptr;
+};
 
-    // TODO: Scene Data is directly set here. Not good!
-    gpuSceneData.view = camera.getViewMatrix();
-    // camera projection
-    gpuSceneData.proj = glm::perspectiveRH_ZO(glm::radians(70.f), (float)vkRendererBackend->windowExtent.width / (float)vkRendererBackend->windowExtent.height, 0.1f, 10000.f);
+// Event callback that will be called by the Application Layer.
+static void SDLEventCallback(const SDL_Event& event, void* eventContext)
+{
+    auto* context = static_cast<EventContext*>(eventContext);
 
-    // invert the Y direction on projection matrix so that we are more similar
-    // to opengl and gltf axis
-    gpuSceneData.proj[1][1] *= -1;
-    gpuSceneData.viewproj = gpuSceneData.proj * gpuSceneData.view;
+    if (context && context->scene)
+    {
+        SDL_Event mutableEvent = event;
+        context->scene->camera.processSDLEvent(mutableEvent);
+    }
 
-    //some default lighting parameters
-    gpuSceneData.ambientColor = glm::vec4(0.1f);
-    gpuSceneData.sunlightColor = glm::vec4(1.0f);
-    gpuSceneData.sunlightDirection = glm::vec4(0.0f, 1.0f, 0.5f, 1.0f);
+    SK::UI::processSDLEvents(event);
 }
 
 int main(int argc, char* argv[])
@@ -58,41 +44,24 @@ int main(int argc, char* argv[])
     SK::UI::State ui;
     SK::UI::init(&ui, &vkRendererBackend);
 
-    // Asset System
-    SK::Asset::AssetRegistry assetRegistry;
-    SK::Material::MaterialRegistry materialRegistry;
-    SK::VkRendererBackend::VkAssetRegistry vkAssetRegistry;
-    SK::VkRendererBackend::VkMaterialRegistry vkMaterialRegistry;
-    // Load the structure scene
-    SK::Asset::ImportedAsset structureScene;
-    // Load and register the gltf scene
-    // TODO: Infer the path from the name by providing the extension (glb or gltf)
-    std::string gltfName = "structure";
-    if (SK::Asset::importGLTF("../../assets/structure.glb", &structureScene))
-    {
-        if (structureScene.gltfScene.has_value())
-        {
-            SK::Asset::registerImported(&assetRegistry, &materialRegistry, std::move(structureScene));
-            SK::VkRendererBackend::buildGPUAssets(&vkRendererBackend, &assetRegistry, &vkAssetRegistry);
-            SK::VkRendererBackend::buildMaterialRegistry(&vkRendererBackend, &assetRegistry, &materialRegistry, &vkAssetRegistry, &vkMaterialRegistry);
-            SK::Asset::discardCPUMeshData(&assetRegistry);
-            SK::Asset::discardCPUTextureData(&assetRegistry);
-        }
-    }
+    SK::Scene::State scene;
+    SK::Scene::setCameraProperties(&scene, glm::vec3(30.0f, 0.0f, -85.0f), 0.0f, 0.0f);
+    SK::Scene::setProjectionProperties(&scene, 70.0f, 0.1f, 10000.0f);
+    SK::Scene::setGlobalLightingProperties(&scene, glm::vec4(0.1f), glm::vec4(0.0f, 1.0f, 0.5f, 1.0f), glm::vec4(1.0f));
+    const bool sceneLoaded = SK::Scene::loadGLTFScene(&scene, "../../assets/structure.glb");
+    assert(sceneLoaded);
+
+    SK::VkRendererBackend::VkSceneResources vkSceneResources;
+    SK::VkRendererBackend::uploadSceneResources(&vkRendererBackend, &scene, &vkSceneResources);
+
+    EventContext eventContext{};
+    eventContext.scene = &scene;
 
     // Renderer frontends
     SK::ForwardRenderer::State forwardRenderer;
     // For descriptor layouts, vkRendererBackend and vkMaterialRegistry should be created before initializing renderers. 
     // NOTE: Just knowing the number of total textures for materials is enough to create a descriptor set layout for bindless resources. So, this is a soft constraint but still number of textures is need to be known.
-    SK::ForwardRenderer::init(&forwardRenderer, &vkRendererBackend, &vkMaterialRegistry);
-    // Draw context that renderer frontends will use
-    SK::Renderer::DrawContext drawContext;
-
-    // Instance the scene and fill in the draw context
-    std::vector<SK::Scene::MeshInstance> meshInstances;
-    SK::Scene::buildMeshInstancesFromGLTFScene(&assetRegistry, gltfName, glm::mat4(1.0f), meshInstances);
-    // Create draw packets out of instances
-    SK::Renderer::buildDrawPacketsFromMeshInstances(&assetRegistry, &materialRegistry, meshInstances, &drawContext);
+    SK::ForwardRenderer::init(&forwardRenderer, &vkRendererBackend, &vkSceneResources.vkMaterialRegistry);
 
     // main loop
     while(!application.shouldQuit)
@@ -100,7 +69,7 @@ int main(int argc, char* argv[])
         // Begin frame time clock
         auto start = std::chrono::system_clock::now();
 
-        SK::Application::handleSDLEvents(&application);
+        SK::Application::handleSDLEvents(&application, &SDLEventCallback, &eventContext);
 
         // sleep if windows is minimized
         if(application.isMinimized)
@@ -131,12 +100,13 @@ int main(int argc, char* argv[])
         // --- UI FRAME END ---
         SK::UI::endFrame();
 
-        updateSceneTemp(&vkRendererBackend, application.mainCamera);
+        SK::Scene::updateCamera(&scene);
+        SK::Scene::updateGPUSceneData(&scene, vkRendererBackend.windowExtent.width, vkRendererBackend.windowExtent.height);
 
         if(SK::VkRendererBackend::beginFrame(&vkRendererBackend))
         {
-            SK::VkRendererBackend::updateSceneBuffer(&vkRendererBackend, gpuSceneData);
-            SK::ForwardRenderer::draw(&forwardRenderer, &vkRendererBackend, &vkAssetRegistry, &vkMaterialRegistry, drawContext);
+            SK::VkRendererBackend::updateSceneBuffer(&vkRendererBackend, scene.gpuSceneData);
+            SK::ForwardRenderer::draw(&forwardRenderer, &vkRendererBackend, &vkSceneResources.vkAssetRegistry, &vkSceneResources.vkMaterialRegistry, scene.drawContext);
             SK::UI::draw(&vkRendererBackend);
             SK::VkRendererBackend::endFrame(&vkRendererBackend);
         }
@@ -151,10 +121,8 @@ int main(int argc, char* argv[])
     // Make sure that GPU finished executing every command before shutting down the systems.
     vkDeviceWaitIdle(vkRendererBackend.device);
 
-    SK::VkRendererBackend::clearMaterialRegistry(&vkRendererBackend, &vkMaterialRegistry);
-    SK::VkRendererBackend::clearGPUAssets(&vkRendererBackend, &vkAssetRegistry);
-    SK::Material::clearMaterialRegistry(&materialRegistry);
-    SK::Asset::clearAssetRegistry(&assetRegistry);
+    SK::VkRendererBackend::clearSceneResources(&vkRendererBackend, &vkSceneResources);
+    SK::Scene::clear(&scene);
     
     // Once everything is safe to delete shut the systems down.
     SK::ForwardRenderer::shutdown(&forwardRenderer, &vkRendererBackend);

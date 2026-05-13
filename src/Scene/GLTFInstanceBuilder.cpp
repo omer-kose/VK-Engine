@@ -21,7 +21,7 @@ static void traverseNode(const SK::Asset::GLTFScene& scene, int nodeIndex, const
     }
 }
 
-void SK::Scene::buildMeshInstancesFromGLTFScene(const SK::Asset::AssetRegistry* assetRegistry, std::string_view sceneName, glm::mat4 sceneWorldTransform, std::vector<MeshInstance>& outInstances)
+void SK::Scene::buildMeshInstancesFromGLTFScene(const SK::Asset::AssetRegistry* assetRegistry, std::string_view sceneName, const glm::mat4& sceneWorldTransform, std::vector<MeshInstance>& outInstances)
 {
     outInstances.clear();
 
