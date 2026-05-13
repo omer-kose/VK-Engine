@@ -1,4 +1,3 @@
-#include <RendererBackend/vulkan/vk_types.h>
 #include <SDL_events.h>
 
 class Camera

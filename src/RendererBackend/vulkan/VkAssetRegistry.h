@@ -19,7 +19,7 @@ namespace SK::VkRendererBackend
 	{
 		struct GPUMesh
 		{
-			GPUMeshBuffers meshBuffers;
+			VkGPUMeshBuffers meshBuffers;
 			std::string name;
 		};
 

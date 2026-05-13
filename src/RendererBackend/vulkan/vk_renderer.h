@@ -13,6 +13,12 @@
 struct SDL_Window;
 class Camera;
 
+namespace SK::Renderer
+{
+	struct GPUSceneData;
+	struct Vertex;
+}
+
 namespace SK::VkRendererBackend
 {
 	// Persistent resources that rotate and reused per frame
@@ -189,9 +195,9 @@ namespace SK::VkRendererBackend
 
 	VkSampler createSampler(State* vkRendererBackend, VkFilter minFilter, VkFilter magFilter, VkSamplerMipmapMode mipmapMode, VkSamplerAddressMode addressMode);
 
-	GPUMeshBuffers uploadMesh(State* vkRendererBackend, std::span<Vertex> vertices, std::span<uint32_t> indices);
+	VkGPUMeshBuffers uploadMesh(State* vkRendererBackend, std::span<SK::Renderer::Vertex> vertices, std::span<uint32_t> indices);
 
-	void updateSceneBuffer(State* vkRendererBackend, const GPUSceneData& gpuSceneData);
+	void updateSceneBuffer(State* vkRendererBackend, const SK::Renderer::GPUSceneData& gpuSceneData);
 	VkDescriptorSet fetchCurrentSceneBufferDescriptorSet(State* vkRendererBackend);
 
 	void setViewport(State* vkRendererBackend, VkCommandBuffer cmd);

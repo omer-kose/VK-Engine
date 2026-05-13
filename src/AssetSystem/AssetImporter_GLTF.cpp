@@ -14,6 +14,8 @@
 #include <glm/vec4.hpp>
 #include <glm/gtx/quaternion.hpp>
 
+#include <Renderer/GlobalGPUTypes.h>
+
 static SK::Asset::TextureFilter extractTextureFilter(fastgltf::Filter filter)
 {
 	switch(filter)
@@ -268,7 +270,7 @@ bool SK::Asset::importGLTF(std::string_view filePath, ImportedAsset* outAsset)
 
     // Meshes
     std::vector<uint32_t> indices;
-    std::vector<Vertex> vertices;
+    std::vector<SK::Renderer::Vertex> vertices;
 
     outAsset->meshes.reserve(asset.meshes.size());
 
@@ -321,7 +323,7 @@ bool SK::Asset::importGLTF(std::string_view filePath, ImportedAsset* outAsset)
                 fastgltf::iterateAccessorWithIndex<glm::vec3>(asset, posAccessor,
                     [&](glm::vec3 v, size_t index) 
                     {
-                        Vertex& out = vertices[vertexOffset + index];
+                        SK::Renderer::Vertex& out = vertices[vertexOffset + index];
                         out.position = v;
                         out.normal = { 0, 0, 0 };
                         out.tangent = glm::vec4{ 0.0f };

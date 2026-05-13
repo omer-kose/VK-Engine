@@ -4,8 +4,7 @@
 #include <vector>
 #include <cstdint>
 
-// By the end of implementation, Asset System should be totally independent of vk_types.h. The types like Vertex etc. are not Vulkan specific but for now they stay
-#include <RendererBackend/vulkan/vk_types.h>
+#include <Renderer/GlobalGPUTypes.h>
 
 /*
 	Asset System is API-agnostic. It only holds raw data + metadata. It follows retention policy. Unnecessary CPU data will be discarded after uploaded to the GPU.
@@ -81,7 +80,7 @@ namespace SK::Asset
 
 	struct RawMesh
 	{
-		std::vector<Vertex> vertices;
+		std::vector<SK::Renderer::Vertex> vertices;
 		std::vector<uint32_t> indices;
 		std::vector<SubMesh> subMeshes;
 		CPURetention retention = CPURetention::DropAfterUpload;

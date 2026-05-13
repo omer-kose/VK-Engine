@@ -1,6 +1,7 @@
 #include <Application/Application.h>
 #include <RendererBackend/vulkan/vk_renderer.h>
 #include <UI/UI.h>
+#include <Renderer/GlobalGPUTypes.h>
 #include <Renderer/ForwardRenderer.h>
 
 #include "imgui.h"
@@ -12,7 +13,7 @@
 
 #include <glm/gtx/transform.hpp>
 // GPU Scene Data
-GPUSceneData gpuSceneData;
+SK::Renderer::GPUSceneData gpuSceneData;
 
 // TODO: Asset System Test
 #include <AssetSystem/AssetRegistry.h>

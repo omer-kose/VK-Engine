@@ -19,6 +19,8 @@
 
 #include <glm/gtx/transform.hpp>
 
+#include <Renderer/GlobalGPUTypes.h>
+
 constexpr bool useValidationLayers = true;
 
 static size_t hashPipelineLayoutKey(const SK::VkRendererBackend::PipelineLayoutKey& k)
@@ -437,12 +439,12 @@ VkSampler SK::VkRendererBackend::createSampler(State* vkRendererBackend, VkFilte
     return sampler;
 }
 
-GPUMeshBuffers SK::VkRendererBackend::uploadMesh(State* vkRendererBackend, std::span<Vertex> vertices, std::span<uint32_t> indices)
+VkGPUMeshBuffers SK::VkRendererBackend::uploadMesh(State* vkRendererBackend, std::span<SK::Renderer::Vertex> vertices, std::span<uint32_t> indices)
 {
-    const size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
+    const size_t vertexBufferSize = vertices.size() * sizeof(SK::Renderer::Vertex);
     const size_t indexBufferSize = indices.size() * sizeof(uint32_t);
 
-    GPUMeshBuffers meshBuffers;
+    VkGPUMeshBuffers meshBuffers;
 
     // Create the vertex buffer and fetch the device address of it
     meshBuffers.vertexBuffer = createBuffer(vkRendererBackend, vertexBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
@@ -485,10 +487,10 @@ GPUMeshBuffers SK::VkRendererBackend::uploadMesh(State* vkRendererBackend, std::
     Both update and bind scene buffer functions must be called after the frame fence waits as it will be guaranteed that the frame is done being used by GPU. Otherwise, the data can be corrupted. 
     So, it can be safely called after frameBegin function
 */
-void SK::VkRendererBackend::updateSceneBuffer(State* vkRendererBackend, const GPUSceneData& sceneData)
+void SK::VkRendererBackend::updateSceneBuffer(State* vkRendererBackend, const SK::Renderer::GPUSceneData & sceneData)
 {
     // Update the scene buffer
-    GPUSceneData* pGpuSceneDataBuffer = (GPUSceneData*)vkRendererBackend->gpuSceneDataBuffer[vkRendererBackend->frameNumber % FRAME_OVERLAP].allocation->GetMappedData();
+    SK::Renderer::GPUSceneData* pGpuSceneDataBuffer = (SK::Renderer::GPUSceneData*)vkRendererBackend->gpuSceneDataBuffer[vkRendererBackend->frameNumber % FRAME_OVERLAP].allocation->GetMappedData();
     *pGpuSceneDataBuffer = sceneData;
 }
 
@@ -970,7 +972,7 @@ void SK::VkRendererBackend::initGlobalSceneBuffer(State* vkRendererBackend)
     for(int i = 0; i < FRAME_OVERLAP; ++i)
     {
         // Allocate a new uniform buffer for scene data (allocating on VRAM that CPU can write to directly. It is limited but it is perfect for allocating reasonable amounts that are dynamic)
-        vkRendererBackend->gpuSceneDataBuffer[i] = createBuffer(vkRendererBackend, sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+        vkRendererBackend->gpuSceneDataBuffer[i] = createBuffer(vkRendererBackend, sizeof(SK::Renderer::GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
         vkRendererBackend->mainDeletionQueue.pushFunction([=]() {
             destroyBuffer(vkRendererBackend, vkRendererBackend->gpuSceneDataBuffer[i]);
         });
@@ -978,7 +980,7 @@ void SK::VkRendererBackend::initGlobalSceneBuffer(State* vkRendererBackend)
         // Create a descriptor set for the uniform data
         vkRendererBackend->gpuSceneDescriptorSet[i] = vkRendererBackend->globalDescriptorAllocator.allocate(vkRendererBackend->device, vkRendererBackend->gpuSceneDataDescriptorLayout);
         DescriptorWriter writer;
-        writer.writeBuffer(0, vkRendererBackend->gpuSceneDataBuffer[i].buffer, sizeof(GPUSceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+        writer.writeBuffer(0, vkRendererBackend->gpuSceneDataBuffer[i].buffer, sizeof(SK::Renderer::GPUSceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
         writer.updateSet(vkRendererBackend->device, vkRendererBackend->gpuSceneDescriptorSet[i]);
     }
 }
