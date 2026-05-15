@@ -1,6 +1,6 @@
-#include <RendererBackend/Vulkan/vk_images.h>
+#include <RendererBackend/Vulkan/VkImages.h>
 
-#include <RendererBackend/Vulkan/vk_initializers.h>
+#include <RendererBackend/Vulkan/VkInitializers.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"

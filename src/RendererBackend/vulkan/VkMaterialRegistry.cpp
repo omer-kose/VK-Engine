@@ -1,7 +1,7 @@
 #include "VkMaterialRegistry.h"
 
 #include <RendererBackend/Vulkan/VkAssetRegistry.h>
-#include <RendererBackend/Vulkan/vk_renderer.h>
+#include <RendererBackend/Vulkan/VkRendererBackend.h>
 
 #include <AssetSystem/AssetRegistry.h>
 #include <MaterialSystem/MaterialRegistry.h>

@@ -1,6 +1,6 @@
 #include "VkAssetRegistry.h"
 
-#include <RendererBackend/Vulkan/vk_renderer.h>
+#include <RendererBackend/Vulkan/VkRendererBackend.h>
 #include <AssetSystem/AssetRegistry.h>
 
 static VkFilter mapFilterMode(SK::Asset::TextureFilter textureFilter)

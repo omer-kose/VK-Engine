@@ -1,8 +1,8 @@
 #pragma once
 
 #include <vector>
-#include <RendererBackend/Vulkan/vk_types.h>
-#include <RendererBackend/Vulkan/vk_descriptors.h>
+#include <RendererBackend/Vulkan/VkTypes.h>
+#include <RendererBackend/Vulkan/VkDescriptors.h>
 
 #include <MaterialSystem/MaterialInfo.h>
 

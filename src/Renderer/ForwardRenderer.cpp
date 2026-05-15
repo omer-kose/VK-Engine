@@ -1,8 +1,8 @@
 #include "ForwardRenderer.h"
 
-#include <RendererBackend/Vulkan/vk_renderer.h>
-#include <RendererBackend/Vulkan/vk_pipelines.h>
-#include <RendererBackend/Vulkan/vk_initializers.h>
+#include <RendererBackend/Vulkan/VkRendererBackend.h>
+#include <RendererBackend/Vulkan/VkPipelines.h>
+#include <RendererBackend/Vulkan/VkInitializers.h>
 
 #include <RendererBackend/Vulkan/VkAssetRegistry.h>
 #include <RendererBackend/Vulkan/VkMaterialRegistry.h>

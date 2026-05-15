@@ -1,6 +1,6 @@
 #include "AssetRegistry.h"
 
-#include <RendererBackend/Vulkan/vk_renderer.h>
+#include <RendererBackend/Vulkan/VkRendererBackend.h>
 
 void SK::Asset::registerImported(AssetRegistry* assetRegistry, SK::Material::MaterialRegistry* materialRegistry, ImportedAsset&& importedAsset)
 {

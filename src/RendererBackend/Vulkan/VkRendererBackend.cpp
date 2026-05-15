@@ -1,4 +1,4 @@
-﻿#include "vk_renderer.h"
+﻿#include "VkRendererBackend.h"
 
 #include <chrono>
 #include <thread>
@@ -6,10 +6,10 @@
 
 #include <SDL_vulkan.h>
 
-#include <RendererBackend/Vulkan/vk_initializers.h>
-#include <RendererBackend/Vulkan/vk_types.h>
-#include <RendererBackend/Vulkan/vk_images.h>
-#include <RendererBackend/Vulkan/vk_pipelines.h>
+#include <RendererBackend/Vulkan/VkInitializers.h>
+#include <RendererBackend/Vulkan/VkTypes.h>
+#include <RendererBackend/Vulkan/VkImages.h>
+#include <RendererBackend/Vulkan/VkPipelines.h>
 #include "VkBootstrap.h"
 
 #define VMA_IMPLEMENTATION

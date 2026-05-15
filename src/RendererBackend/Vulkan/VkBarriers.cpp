@@ -1,4 +1,4 @@
-#include "vk_barriers.h"
+#include "VkBarriers.h"
 
 VkImageMemoryBarrier2 SK::VkUtil::imageBarrier(VkImage image, VkPipelineStageFlags2 srcStageMask, VkAccessFlags2 srcAccessMask, VkImageLayout oldLayout, VkPipelineStageFlags2 dstStageMask, VkAccessFlags2 dstAccessMask, VkImageLayout newLayout, VkImageAspectFlags aspectMask, uint32_t baseMipLevel, uint32_t levelCount)
 {
