@@ -3,7 +3,7 @@
 #include <deque>
 #include <span>
 
-#include <RendererBackend/vulkan/vk_types.h>
+#include <RendererBackend/Vulkan/vk_types.h>
 
 struct DescriptorLayoutBuilder
 {

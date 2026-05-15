@@ -1,7 +1,7 @@
 #pragma once
 
-#include <RendererBackend/vulkan/VkAssetRegistry.h>
-#include <RendererBackend/vulkan/VkMaterialRegistry.h>
+#include <RendererBackend/Vulkan/VkAssetRegistry.h>
+#include <RendererBackend/Vulkan/VkMaterialRegistry.h>
 
 namespace SK::Scene
 {

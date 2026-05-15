@@ -1,6 +1,6 @@
 #include <Application/Application.h>
-#include <RendererBackend/vulkan/vk_renderer.h>
-#include <RendererBackend/vulkan/VkSceneResources.h>
+#include <RendererBackend/Vulkan/vk_renderer.h>
+#include <RendererBackend/Vulkan/VkSceneResources.h>
 #include <UI/UI.h>
 #include <Scene/Scene.h>
 #include <Renderer/GlobalGPUTypes.h>

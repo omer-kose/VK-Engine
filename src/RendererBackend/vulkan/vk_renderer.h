@@ -4,8 +4,8 @@
 #pragma once
 #include <span>
 
-#include <RendererBackend/vulkan/vk_types.h>
-#include <RendererBackend/vulkan/vk_descriptors.h>
+#include <RendererBackend/Vulkan/vk_types.h>
+#include <RendererBackend/Vulkan/vk_descriptors.h>
 
 #include <Util/DeletionQueue.h>
 
