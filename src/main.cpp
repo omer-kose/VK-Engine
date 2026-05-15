@@ -61,6 +61,7 @@ int main(int argc, char* argv[])
     SK::ForwardRenderer::State forwardRenderer;
     // For descriptor layouts, vkRendererBackend and vkMaterialRegistry should be created before initializing renderers. 
     // NOTE: Just knowing the number of total textures for materials is enough to create a descriptor set layout for bindless resources. So, this is a soft constraint but still number of textures is need to be known.
+    // TODO: Will write a RHI
     SK::ForwardRenderer::init(&forwardRenderer, &vkRendererBackend, &vkSceneResources.vkMaterialRegistry);
 
     // main loop
