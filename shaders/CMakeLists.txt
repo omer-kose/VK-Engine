@@ -1,10 +1,10 @@
 if(WIN32)
     add_definitions(-DNOMINMAX)
     set(GLSL_COMPILER glslangValidator.exe)
-    set(GLSL_COMPILER_FLAGS -gVS -V)
+    set(GLSL_COMPILER_FLAGS -V)
 else()
     set(GLSL_COMPILER glslangValidator)
-    set(GLSL_COMPILER_FLAGS -gVS -V)
+    set(GLSL_COMPILER_FLAGS -V)
 endif(WIN32)
 
 
