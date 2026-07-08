@@ -148,7 +148,7 @@ void PipelineBuilder::setPolygonMode(VkPolygonMode polygonMode)
 
 void PipelineBuilder::setCullMode(VkCullModeFlags cullMode, VkFrontFace frontFace)
 {
-	rasterizer.cullMode;
+	rasterizer.cullMode = cullMode;
 	rasterizer.frontFace = frontFace;
 }
 
