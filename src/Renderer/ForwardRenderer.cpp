@@ -66,7 +66,7 @@ void SK::ForwardRenderer::draw(SK::Renderer::RenderContext* renderContext, const
 	auto bindCommonResources = [&]() {
 		SK::Renderer::bindSceneResources(renderContext);
 		SK::Renderer::bindMaterialResources(renderContext);
-		};
+	};
 
 	auto drawPacket = [&](const SK::Renderer::DrawPacket& packet) {
 		PushConstants pushConstants{};

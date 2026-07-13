@@ -7,9 +7,22 @@ namespace SK::Renderer
 	static constexpr uint64_t INVALID_HANDLE = UINT64_MAX;
 
 	// Opaque handle types
+	// Handles are indices into records / resources in the Backend Render Context not actual values of backend resource handles.
+	// They are opaque handle types, so caller side will be using them with the routines provided by the Render Context.
 	struct PipelineHandle
 	{
 		uint64_t id;
+	};
+
+	struct ResourceSetHandle
+	{
+		uint64_t id;
+	};
+
+	struct PipelineResourceSet
+	{
+		ResourceSetHandle set;
+		uint32_t slot;
 	};
 
 	struct BufferHandle
@@ -105,8 +118,15 @@ namespace SK::Renderer
 		uint32_t pushConstantSize = 0;
 		ShaderStageFlags pushConstantStages = ShaderStageFlagBits::None;
 
+		// Engine-wide resources.
+		// If true, scene resources are expected at set slot 0.
 		bool usesSceneResources = false;
+		// If true, material/bindless resources are expected at set slot 1.
 		bool usesMaterialResources = false;
+
+		// Renderer/pass-specific custom resources.
+		// Each renderer decides the slot.
+		std::vector<PipelineResourceSet> customResourceSets;
 	};
 
 	struct ComputePipelineDesc
@@ -118,8 +138,15 @@ namespace SK::Renderer
 		uint32_t pushConstantSize = 0;
 		ShaderStageFlags pushConstantStages = ShaderStageFlagBits::None;
 
+		// Engine-wide resources.
+		// If true, scene resources are expected at set slot 0.
 		bool usesSceneResources = false;
+		// If true, material/bindless resources are expected at set slot 1.
 		bool usesMaterialResources = false;
+
+		// Renderer/pass-specific custom resources.
+		// Each renderer decides the slot.
+		std::vector<PipelineResourceSet> customResourceSets;
 	};
 
 	struct RenderContext;
@@ -140,6 +167,7 @@ namespace SK::Renderer
 
 		void (*bindSceneResources)(RenderContext* renderContext);
 		void (*bindMaterialResources)(RenderContext* renderContext);
+		void (*bindResourceSet)(RenderContext* renderContext, uint32_t slot, ResourceSetHandle set);
 
 		void (*pushConstants)(RenderContext* renderContext, ShaderStageFlags stages, uint32_t offset, uint32_t size, const void* data);
 
@@ -170,6 +198,7 @@ namespace SK::Renderer
 
 	void bindSceneResources(RenderContext* renderContext);
 	void bindMaterialResources(RenderContext* renderContext);
+	void bindResourceSet(RenderContext* renderContext, uint32_t slot, ResourceSetHandle set);
 
 	void pushConstants(RenderContext* renderContext, ShaderStageFlags stages, uint32_t offset, uint32_t size, const void* data);
 

@@ -75,6 +75,16 @@ void SK::Renderer::bindMaterialResources(RenderContext* renderContext)
 	renderContext->api->bindMaterialResources(renderContext);
 }
 
+void SK::Renderer::bindResourceSet(RenderContext* renderContext, uint32_t slot, ResourceSetHandle set)
+{
+	assert(renderContext != nullptr);
+	assert(renderContext->api != nullptr);
+	assert(renderContext->api->bindResourceSet != nullptr);
+	assert(set.id != INVALID_HANDLE);
+
+	renderContext->api->bindResourceSet(renderContext, slot, set);
+}
+
 void SK::Renderer::pushConstants(RenderContext* renderContext, ShaderStageFlags stages, uint32_t offset, uint32_t size, const void* data)
 {
 	assert(renderContext != nullptr);
@@ -90,7 +100,6 @@ void SK::Renderer::bindIndexBuffer(RenderContext* renderContext, size_t meshInde
 	assert(renderContext != nullptr);
 	assert(renderContext->api != nullptr);
 	assert(renderContext->api->bindIndexBuffer != nullptr);
-	assert(buffer.id != INVALID_HANDLE);
 
 	renderContext->api->bindIndexBuffer(renderContext, meshIndex, indexType);
 }
