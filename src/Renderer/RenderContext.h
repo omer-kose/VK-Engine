@@ -147,6 +147,19 @@ namespace SK::Renderer
 		std::vector<PipelineResourceSet> customResourceSets;
 	};
 
+	// Generalized memory/allocation intent.
+	// Describes how the resource will be accessed, not a literal memory type.
+	// Each backend maps this to its own heap/pool concept.
+	enum class MemoryUsage : uint8_t
+	{
+		GpuOnly,   // Device-local only, fastest GPU access, not CPU-visible
+		CpuOnly,   // Host-visible, CPU reads/writes, e.g. readback targets
+		CpuToGpu,  // Host-visible, optimized for frequent CPU writes read by GPU (staging/upload)
+		GpuToCpu,  // Host-visible, optimized for GPU writes read back by CPU (readback)
+		CpuCopy,   // Host-only staging memory, no device access at all
+		Auto,      // Let the driver/allocator pick based on usage flags
+	};
+
 	// --------------------------------Buffer------------------------------------------------------
 	// Generalized buffer usage bitmask.
 	// Roughly maps to VkBufferUsageFlags on Vulkan. On D3D12 most of these bits
@@ -192,17 +205,12 @@ namespace SK::Renderer
 	// Using a named uint64_t for consistency with Graphics APIs. They use named aliases for uint64_t buffer device address such as VkDeviceAddress and D3D12_GPU_VIRTUAL_ADDRESS.
 	using BufferDeviceAddress = uint64_t;
 
-	// Generalized memory/allocation intent.
-	// Describes how the resource will be accessed, not a literal memory type.
-	// Each backend maps this to its own heap/pool concept.
-	enum class MemoryUsage : uint8_t
+	struct BufferDesc
 	{
-		GpuOnly,   // Device-local only, fastest GPU access, not CPU-visible
-		CpuOnly,   // Host-visible, CPU reads/writes, e.g. readback targets
-		CpuToGpu,  // Host-visible, optimized for frequent CPU writes read by GPU (staging/upload)
-		GpuToCpu,  // Host-visible, optimized for GPU writes read back by CPU (readback)
-		CpuCopy,   // Host-only staging memory, no device access at all
-		Auto,      // Let the driver/allocator pick based on usage flags
+		size_t size; // size in bytes
+		BufferUsage usage;
+		MemoryUsage memoryUsage;
+		const void* data = nullptr; // Initial data to be uploaded. When this is provided, the buffer will be chosen to be created on the GPU local memory.
 	};
 
 	// --------------------------------Texture------------------------------------------------------
@@ -331,9 +339,6 @@ namespace SK::Renderer
 		// TODO: To be implemented
 		PipelineHandle (*getComputePipeline)(RenderContext* renderContext, const ComputePipelineDesc& desc);
 
-		// TODO: Also, implement a generic buffer device address getter.
-		BufferDeviceAddress (*getVertexBufferDeviceAddress)(RenderContext* renderContext, size_t meshIndex);
-
 		void (*beginMainRendering)(RenderContext* renderContext);
 		void (*endRendering)(RenderContext* renderContext);
 
@@ -349,6 +354,11 @@ namespace SK::Renderer
 		void (*drawIndexed)(RenderContext* renderContext, uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance);
 
 		void (*dispatch)(RenderContext* renderContext, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
+
+		// TODO: Also, implement a generic buffer device address getter.
+		BufferDeviceAddress (*getVertexBufferDeviceAddress)(RenderContext* renderContext, size_t meshIndex);
+
+		BufferHandle (*createBuffer)(RenderContext* renderContext, const BufferDesc& desc);
 	};
 
 	// Render Context packs up data (state) and functionality of the Graphics API backend. It provides functionality and hides the backend details.
@@ -362,8 +372,6 @@ namespace SK::Renderer
 	// Free function wrappers of function pointers in RenderContextAPI. This paradigm allows us to use free function style as well as providing a central entry point for checks and functions dispatches.
 	PipelineHandle getGraphicsPipeline(RenderContext* renderContext, const GraphicsPipelineDesc& desc);
 	PipelineHandle getComputePipeline(RenderContext* renderContext, const ComputePipelineDesc& desc);
-
-	BufferDeviceAddress getVertexBufferDeviceAddress(RenderContext* renderContext, size_t meshIndex);
 
 	void beginMainRendering(RenderContext* renderContext);
 	void endRendering(RenderContext* renderContext);
@@ -380,4 +388,8 @@ namespace SK::Renderer
 	void drawIndexed(RenderContext* renderContext, uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance);
 
 	void dispatch(RenderContext* renderContext, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
+
+	BufferDeviceAddress getVertexBufferDeviceAddress(RenderContext* renderContext, size_t meshIndex);
+
+	BufferHandle createBuffer(RenderContext* renderContext, const BufferDesc& desc);
 }

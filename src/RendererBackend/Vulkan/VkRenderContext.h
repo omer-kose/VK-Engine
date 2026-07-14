@@ -49,10 +49,12 @@ namespace SK::VkRendererBackend
 		std::vector<ResourceRecord> customResourceRecords;
 		// book-keeping for reusing the layouts for custom resources
 		std::unordered_map<size_t, VkDescriptorSetLayout> customResourceLayoutByHash;
-
+		
 		// Cache the current pipeline information for later use when a pipeline is bound.
 		SK::Renderer::PipelineKind currentPipelineKind = SK::Renderer::PipelineKind::Graphics;
 		VkPipelineLayout currentPipelineLayout = VK_NULL_HANDLE;
+
+		std::vector<AllocatedBuffer> buffers;
 	};
 
 	void initVkRenderContext(VkRenderContext* vkRenderContext, State* vkRendererBackend, VkSceneResources* vkSceneResources);

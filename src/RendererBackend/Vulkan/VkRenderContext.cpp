@@ -631,15 +631,15 @@ static VkFormat toVkFormat(SK::Renderer::Format format)
 	case SK::Renderer::Format::RGBA32Sint:                 return VK_FORMAT_R32G32B32A32_SINT;
 	case SK::Renderer::Format::RGBA32Float:                return VK_FORMAT_R32G32B32A32_SFLOAT;
 
-		// NOTE: same bit layout as DXGI_FORMAT_R10G10B10A2_UNORM, described
-		// from the opposite byte order
+	// NOTE: same bit layout as DXGI_FORMAT_R10G10B10A2_UNORM, described
+	// from the opposite byte order
 	case SK::Renderer::Format::RGB10A2Unorm:               return VK_FORMAT_A2B10G10R10_UNORM_PACK32;
-		// Same story: matches DXGI_FORMAT_R11G11B10_FLOAT.
+	// Same story: matches DXGI_FORMAT_R11G11B10_FLOAT.
 	case SK::Renderer::Format::RG11B10Float:               return VK_FORMAT_B10G11R11_UFLOAT_PACK32;
 
 	case SK::Renderer::Format::Depth16Unorm:               return VK_FORMAT_D16_UNORM;
-		// Not guaranteed supported on all Vulkan implementations - query
-		// vkGetPhysicalDeviceFormatProperties before relying on this one.
+	// Not guaranteed supported on all Vulkan implementations - query
+	// vkGetPhysicalDeviceFormatProperties before relying on this one.
 	case SK::Renderer::Format::Depth24UnormStencil8Uint:   return VK_FORMAT_D24_UNORM_S8_UINT;
 	case SK::Renderer::Format::Depth32Float:               return VK_FORMAT_D32_SFLOAT;
 	case SK::Renderer::Format::Depth32FloatStencil8Uint:   return VK_FORMAT_D32_SFLOAT_S8_UINT;
@@ -731,6 +731,26 @@ static VkSamplerCreateInfo toVkSamplerCreateInfo(const SK::Renderer::SamplerDesc
 	return info;
 }
 
+static SK::Renderer::BufferHandle vkCreateBuffer(SK::Renderer::RenderContext* renderContext, const SK::Renderer::BufferDesc& desc)
+{
+	SK::VkRendererBackend::VkRenderContext* vkRenderContext = fetchVkRenderContext(renderContext);
+	SK::VkRendererBackend::State* vkRendererBackend = vkRenderContext->vkRendererBackend;
+	AllocatedBuffer buffer;
+
+	if (!desc.data)
+	{
+		buffer = SK::VkRendererBackend::createBuffer(vkRendererBackend, desc.size, toVkBufferUsageFlags(desc.usage), toVmaMemoryUsageLegacy(desc.memoryUsage));
+	}
+	else
+	{
+		buffer = SK::VkRendererBackend::createAndUploadGPUBuffer(vkRendererBackend, desc.size, toVkBufferUsageFlags(desc.usage), desc.data);
+	}
+
+	const uint64_t bufferIndex = static_cast<uint64_t>(vkRenderContext->buffers.size());
+	vkRenderContext->buffers.push_back(buffer);
+	
+	return SK::Renderer::BufferHandle{ bufferIndex };
+}
 
 void SK::VkRendererBackend::initVkRenderContext(VkRenderContext* vkRenderContext, State* vkRendererBackend, VkSceneResources* vkSceneResources)
 {
@@ -742,6 +762,7 @@ void SK::VkRendererBackend::initVkRenderContext(VkRenderContext* vkRenderContext
 	vkRenderContext->customResourceLayoutByHash.clear();
 	vkRenderContext->currentPipelineKind = SK::Renderer::PipelineKind::Graphics;
 	vkRenderContext->currentPipelineLayout = VK_NULL_HANDLE;
+	vkRenderContext->buffers.clear();
 }
 
 SK::Renderer::RenderContext SK::VkRendererBackend::makeRenderContext(VkRenderContext* vkRenderContext)
@@ -750,7 +771,6 @@ SK::Renderer::RenderContext SK::VkRendererBackend::makeRenderContext(VkRenderCon
 	{
 		.getGraphicsPipeline = vkGetGraphicsPipeline,
 		.getComputePipeline = vkGetComputePipeline,
-		.getVertexBufferDeviceAddress = vkGetVertexBufferDeviceAddress,
 		.beginMainRendering = vkBeginMainRendering,
 		.endRendering = vkEndRendering,
 		.bindPipeline = vkBindPipeline,
@@ -761,6 +781,8 @@ SK::Renderer::RenderContext SK::VkRendererBackend::makeRenderContext(VkRenderCon
 		.bindIndexBuffer = vkBindIndexBuffer,
 		.drawIndexed = vkDrawIndexed,
 		.dispatch = vkDispatch,
+		.getVertexBufferDeviceAddress = vkGetVertexBufferDeviceAddress,
+		.createBuffer = vkCreateBuffer
 	};
 
 	SK::Renderer::RenderContext renderContext{};
@@ -785,6 +807,11 @@ void SK::VkRendererBackend::clearVkRenderContext(VkRenderContext* vkRenderContex
 			// Descriptor sets are owned by descriptor pools.
 			record.set = VK_NULL_HANDLE;
 		}
+
+		for (AllocatedBuffer& buffer : vkRenderContext->buffers)
+		{
+			SK::VkRendererBackend::destroyBuffer(vkRenderContext->vkRendererBackend, buffer);
+		}
 	}
 
 	vkRenderContext->vkRendererBackend = nullptr;
@@ -795,4 +822,5 @@ void SK::VkRendererBackend::clearVkRenderContext(VkRenderContext* vkRenderContex
 	vkRenderContext->customResourceLayoutByHash.clear();
 	vkRenderContext->currentPipelineKind = SK::Renderer::PipelineKind::Graphics;
 	vkRenderContext->currentPipelineLayout = VK_NULL_HANDLE;
+	vkRenderContext->buffers.clear();
 }
