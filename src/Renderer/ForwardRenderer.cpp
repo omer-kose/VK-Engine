@@ -24,7 +24,7 @@ void SK::ForwardRenderer::createResources(SK::Renderer::RenderContext* renderCon
 	opaqueDesc.frontFace = SK::Renderer::FrontFace::CounterClockwise;
 	opaqueDesc.depthTest = true;
 	opaqueDesc.depthWrite = true;
-	opaqueDesc.depthCompare = SK::Renderer::CompareOp::LessEqual;
+	opaqueDesc.depthCompare = SK::Renderer::CompareOp::LessOrEqual;
 	opaqueDesc.blending = false;
 	opaqueDesc.pushConstantSize = sizeof(PushConstants);
 	opaqueDesc.pushConstantStages = SK::Renderer::ShaderStageFlagBits::VertexShader | SK::Renderer::ShaderStageFlagBits::FragmentShader;

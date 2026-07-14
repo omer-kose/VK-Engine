@@ -193,6 +193,7 @@ namespace SK::VkRendererBackend
 	AllocatedImage createImage(State* vkRendererBackend, void* data, VkExtent3D imageExtent, VkFormat format, VkImageUsageFlags usage, bool mipMapped = false);
 	void destroyImage(State* vkRendererBackend, const AllocatedImage& img);
 
+	// Simpler and limited version that is used by asset creation for material textures currently.
 	VkSampler createSampler(State* vkRendererBackend, VkFilter minFilter, VkFilter magFilter, VkSamplerMipmapMode mipmapMode, VkSamplerAddressMode addressMode);
 
 	VkGPUMeshBuffers uploadMesh(State* vkRendererBackend, std::span<SK::Renderer::Vertex> vertices, std::span<uint32_t> indices);

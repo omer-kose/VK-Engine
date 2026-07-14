@@ -104,23 +104,16 @@ static VkCompareOp toVkCompareOp(SK::Renderer::CompareOp compareOp)
 {
 	switch (compareOp)
 	{
-	case SK::Renderer::CompareOp::Never:
-		return VK_COMPARE_OP_NEVER;
-	case SK::Renderer::CompareOp::Less:
-		return VK_COMPARE_OP_LESS;
-	case SK::Renderer::CompareOp::LessEqual:
-		return VK_COMPARE_OP_LESS_OR_EQUAL;
-	case SK::Renderer::CompareOp::Equal:
-		return VK_COMPARE_OP_EQUAL;
-	case SK::Renderer::CompareOp::GreaterEqual:
-		return VK_COMPARE_OP_GREATER_OR_EQUAL;
-	case SK::Renderer::CompareOp::Greater:
-		return VK_COMPARE_OP_GREATER;
-	case SK::Renderer::CompareOp::Always:
-		return VK_COMPARE_OP_ALWAYS;
-	default:
-		return VK_COMPARE_OP_LESS_OR_EQUAL;
+		case SK::Renderer::CompareOp::Never:          return VK_COMPARE_OP_NEVER;
+		case SK::Renderer::CompareOp::Less:           return VK_COMPARE_OP_LESS;
+		case SK::Renderer::CompareOp::Equal:          return VK_COMPARE_OP_EQUAL;
+		case SK::Renderer::CompareOp::LessOrEqual:    return VK_COMPARE_OP_LESS_OR_EQUAL;
+		case SK::Renderer::CompareOp::Greater:        return VK_COMPARE_OP_GREATER;
+		case SK::Renderer::CompareOp::NotEqual:       return VK_COMPARE_OP_NOT_EQUAL;
+		case SK::Renderer::CompareOp::GreaterOrEqual: return VK_COMPARE_OP_GREATER_OR_EQUAL;
+		case SK::Renderer::CompareOp::Always:         return VK_COMPARE_OP_ALWAYS;
 	}
+	return VK_COMPARE_OP_ALWAYS;
 }
 
 static VkIndexType toVkIndexType(SK::Renderer::IndexType indexType)
@@ -541,6 +534,203 @@ static void vkDispatch(SK::Renderer::RenderContext* renderContext, uint32_t grou
 		groupCountZ
 	);
 }
+
+// --------------------------------Buffer------------------------------------------------------
+static VkBufferUsageFlags toVkBufferUsageFlags(SK::Renderer::BufferUsage usage)
+{
+	VkBufferUsageFlags flags = 0;
+
+	if (SK::Renderer::hasFlag(usage, SK::Renderer::BufferUsage::TransferSrc))          flags |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+	if (SK::Renderer::hasFlag(usage, SK::Renderer::BufferUsage::TransferDst))          flags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	if (SK::Renderer::hasFlag(usage, SK::Renderer::BufferUsage::UniformBuffer))        flags |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+	if (SK::Renderer::hasFlag(usage, SK::Renderer::BufferUsage::StorageBuffer))        flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+	if (SK::Renderer::hasFlag(usage, SK::Renderer::BufferUsage::IndexBuffer))          flags |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+	if (SK::Renderer::hasFlag(usage, SK::Renderer::BufferUsage::VertexBuffer))         flags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+	if (SK::Renderer::hasFlag(usage, SK::Renderer::BufferUsage::IndirectBuffer))       flags |= VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+	if (SK::Renderer::hasFlag(usage, SK::Renderer::BufferUsage::ShaderDeviceAddress))  flags |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+
+	if (SK::Renderer::hasFlag(usage, SK::Renderer::BufferUsage::AccelStructInput))
+		flags |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
+
+	if (SK::Renderer::hasFlag(usage, SK::Renderer::BufferUsage::AccelStructStorage))
+		flags |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR;
+
+	if (SK::Renderer::hasFlag(usage, SK::Renderer::BufferUsage::ShaderBindingTable))
+		flags |= VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
+
+	return flags;
+}
+
+// Legacy-style mapping (VMA_MEMORY_USAGE_GPU_ONLY etc.). Still works, but VMA
+// 3.x recommends VMA_MEMORY_USAGE_AUTO + explicit allocation flags instead
+// TODO: Upgrade VMA to its recommended style.
+static VmaMemoryUsage toVmaMemoryUsageLegacy(SK::Renderer::MemoryUsage usage)
+{
+	switch (usage)
+	{
+	case SK::Renderer::MemoryUsage::GpuOnly:  return VMA_MEMORY_USAGE_GPU_ONLY;
+	case SK::Renderer::MemoryUsage::CpuOnly:  return VMA_MEMORY_USAGE_CPU_ONLY;
+	case SK::Renderer::MemoryUsage::CpuToGpu: return VMA_MEMORY_USAGE_CPU_TO_GPU;
+	case SK::Renderer::MemoryUsage::GpuToCpu: return VMA_MEMORY_USAGE_GPU_TO_CPU;
+	case SK::Renderer::MemoryUsage::CpuCopy:  return VMA_MEMORY_USAGE_CPU_COPY;
+	case SK::Renderer::MemoryUsage::Auto:    return VMA_MEMORY_USAGE_AUTO;
+	}
+	return VMA_MEMORY_USAGE_AUTO;
+}
+
+// --------------------------------Texture------------------------------------------------------
+static VkExtent3D toVkExtent3D(SK::Renderer::Extent3D extent)
+{
+	return VkExtent3D{ extent.width, extent.height, extent.depth };
+}
+
+static VkFormat toVkFormat(SK::Renderer::Format format)
+{
+	switch (format)
+	{
+	case SK::Renderer::Format::Unknown:                    return VK_FORMAT_UNDEFINED;
+
+	case SK::Renderer::Format::R8Unorm:                    return VK_FORMAT_R8_UNORM;
+	case SK::Renderer::Format::R8Snorm:                    return VK_FORMAT_R8_SNORM;
+	case SK::Renderer::Format::R8Uint:                     return VK_FORMAT_R8_UINT;
+	case SK::Renderer::Format::R8Sint:                     return VK_FORMAT_R8_SINT;
+	case SK::Renderer::Format::RG8Unorm:                   return VK_FORMAT_R8G8_UNORM;
+	case SK::Renderer::Format::RG8Snorm:                   return VK_FORMAT_R8G8_SNORM;
+	case SK::Renderer::Format::RG8Uint:                    return VK_FORMAT_R8G8_UINT;
+	case SK::Renderer::Format::RG8Sint:                    return VK_FORMAT_R8G8_SINT;
+	case SK::Renderer::Format::RGBA8Unorm:                 return VK_FORMAT_R8G8B8A8_UNORM;
+	case SK::Renderer::Format::RGBA8UnormSrgb:             return VK_FORMAT_R8G8B8A8_SRGB;
+	case SK::Renderer::Format::RGBA8Snorm:                 return VK_FORMAT_R8G8B8A8_SNORM;
+	case SK::Renderer::Format::RGBA8Uint:                  return VK_FORMAT_R8G8B8A8_UINT;
+	case SK::Renderer::Format::RGBA8Sint:                  return VK_FORMAT_R8G8B8A8_SINT;
+	case SK::Renderer::Format::BGRA8Unorm:                 return VK_FORMAT_B8G8R8A8_UNORM;
+	case SK::Renderer::Format::BGRA8UnormSrgb:             return VK_FORMAT_B8G8R8A8_SRGB;
+
+	case SK::Renderer::Format::R16Unorm:                   return VK_FORMAT_R16_UNORM;
+	case SK::Renderer::Format::R16Uint:                    return VK_FORMAT_R16_UINT;
+	case SK::Renderer::Format::R16Sint:                    return VK_FORMAT_R16_SINT;
+	case SK::Renderer::Format::R16Float:                   return VK_FORMAT_R16_SFLOAT;
+	case SK::Renderer::Format::RG16Uint:                   return VK_FORMAT_R16G16_UINT;
+	case SK::Renderer::Format::RG16Sint:                   return VK_FORMAT_R16G16_SINT;
+	case SK::Renderer::Format::RG16Float:                  return VK_FORMAT_R16G16_SFLOAT;
+	case SK::Renderer::Format::RGBA16Unorm:                return VK_FORMAT_R16G16B16A16_UNORM;
+	case SK::Renderer::Format::RGBA16Uint:                 return VK_FORMAT_R16G16B16A16_UINT;
+	case SK::Renderer::Format::RGBA16Sint:                 return VK_FORMAT_R16G16B16A16_SINT;
+	case SK::Renderer::Format::RGBA16Float:                return VK_FORMAT_R16G16B16A16_SFLOAT;
+
+	case SK::Renderer::Format::R32Uint:                    return VK_FORMAT_R32_UINT;
+	case SK::Renderer::Format::R32Sint:                    return VK_FORMAT_R32_SINT;
+	case SK::Renderer::Format::R32Float:                   return VK_FORMAT_R32_SFLOAT;
+	case SK::Renderer::Format::RG32Uint:                   return VK_FORMAT_R32G32_UINT;
+	case SK::Renderer::Format::RG32Sint:                   return VK_FORMAT_R32G32_SINT;
+	case SK::Renderer::Format::RG32Float:                  return VK_FORMAT_R32G32_SFLOAT;
+	case SK::Renderer::Format::RGB32Uint:                  return VK_FORMAT_R32G32B32_UINT;
+	case SK::Renderer::Format::RGB32Sint:                  return VK_FORMAT_R32G32B32_SINT;
+	case SK::Renderer::Format::RGB32Float:                 return VK_FORMAT_R32G32B32_SFLOAT;
+	case SK::Renderer::Format::RGBA32Uint:                 return VK_FORMAT_R32G32B32A32_UINT;
+	case SK::Renderer::Format::RGBA32Sint:                 return VK_FORMAT_R32G32B32A32_SINT;
+	case SK::Renderer::Format::RGBA32Float:                return VK_FORMAT_R32G32B32A32_SFLOAT;
+
+		// NOTE: same bit layout as DXGI_FORMAT_R10G10B10A2_UNORM, described
+		// from the opposite byte order
+	case SK::Renderer::Format::RGB10A2Unorm:               return VK_FORMAT_A2B10G10R10_UNORM_PACK32;
+		// Same story: matches DXGI_FORMAT_R11G11B10_FLOAT.
+	case SK::Renderer::Format::RG11B10Float:               return VK_FORMAT_B10G11R11_UFLOAT_PACK32;
+
+	case SK::Renderer::Format::Depth16Unorm:               return VK_FORMAT_D16_UNORM;
+		// Not guaranteed supported on all Vulkan implementations - query
+		// vkGetPhysicalDeviceFormatProperties before relying on this one.
+	case SK::Renderer::Format::Depth24UnormStencil8Uint:   return VK_FORMAT_D24_UNORM_S8_UINT;
+	case SK::Renderer::Format::Depth32Float:               return VK_FORMAT_D32_SFLOAT;
+	case SK::Renderer::Format::Depth32FloatStencil8Uint:   return VK_FORMAT_D32_SFLOAT_S8_UINT;
+
+	case SK::Renderer::Format::BC1RgbaUnorm:               return VK_FORMAT_BC1_RGBA_UNORM_BLOCK;
+	case SK::Renderer::Format::BC1RgbaUnormSrgb:           return VK_FORMAT_BC1_RGBA_SRGB_BLOCK;
+	case SK::Renderer::Format::BC3RgbaUnorm:               return VK_FORMAT_BC3_UNORM_BLOCK;
+	case SK::Renderer::Format::BC3RgbaUnormSrgb:           return VK_FORMAT_BC3_SRGB_BLOCK;
+	case SK::Renderer::Format::BC4RUnorm:                  return VK_FORMAT_BC4_UNORM_BLOCK;
+	case SK::Renderer::Format::BC4RSnorm:                  return VK_FORMAT_BC4_SNORM_BLOCK;
+	case SK::Renderer::Format::BC5RgUnorm:                 return VK_FORMAT_BC5_UNORM_BLOCK;
+	case SK::Renderer::Format::BC5RgSnorm:                 return VK_FORMAT_BC5_SNORM_BLOCK;
+	case SK::Renderer::Format::BC6HRgbUfloat:              return VK_FORMAT_BC6H_UFLOAT_BLOCK;
+	case SK::Renderer::Format::BC6HRgbSfloat:              return VK_FORMAT_BC6H_SFLOAT_BLOCK;
+	case SK::Renderer::Format::BC7RgbaUnorm:               return VK_FORMAT_BC7_UNORM_BLOCK;
+	case SK::Renderer::Format::BC7RgbaUnormSrgb:           return VK_FORMAT_BC7_SRGB_BLOCK;
+	}
+
+	return VK_FORMAT_UNDEFINED;
+}
+
+static VkImageUsageFlags toVkImageUsageFlags(SK::Renderer::TextureUsage usage)
+{
+	VkImageUsageFlags flags = 0;
+
+	if (SK::Renderer::hasFlag(usage, SK::Renderer::TextureUsage::TransferSrc))            flags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+	if (SK::Renderer::hasFlag(usage, SK::Renderer::TextureUsage::TransferDst))            flags |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+	if (SK::Renderer::hasFlag(usage, SK::Renderer::TextureUsage::Sampled))                flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
+	if (SK::Renderer::hasFlag(usage, SK::Renderer::TextureUsage::Storage))                flags |= VK_IMAGE_USAGE_STORAGE_BIT;
+	if (SK::Renderer::hasFlag(usage, SK::Renderer::TextureUsage::ColorAttachment))        flags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+	if (SK::Renderer::hasFlag(usage, SK::Renderer::TextureUsage::DepthStencilAttachment)) flags |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+
+	return flags;
+}
+
+// --------------------------------Sampler------------------------------------------------------
+static VkFilter toVkFilter(SK::Renderer::Filter f)
+{
+	return f == SK::Renderer::Filter::Linear ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
+}
+
+static VkSamplerMipmapMode toVkMipmapMode(SK::Renderer::MipmapMode m)
+{
+	return m == SK::Renderer::MipmapMode::Linear ? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST;
+}
+
+static VkSamplerAddressMode toVkAddressMode(SK::Renderer::AddressMode mode)
+{
+	switch (mode)
+	{
+	case SK::Renderer::AddressMode::Repeat:            return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	case SK::Renderer::AddressMode::MirroredRepeat:    return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+	case SK::Renderer::AddressMode::ClampToEdge:       return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	case SK::Renderer::AddressMode::ClampToBorder:     return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+	case SK::Renderer::AddressMode::MirrorClampToEdge: return VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
+	}
+	return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+}
+
+static VkBorderColor toVkBorderColor(SK::Renderer::BorderColor color)
+{
+	switch (color)
+	{
+	case SK::Renderer::BorderColor::TransparentBlack: return VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
+	case SK::Renderer::BorderColor::OpaqueBlack:      return VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
+	case SK::Renderer::BorderColor::OpaqueWhite:      return VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+	}
+	return VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
+}
+
+static VkSamplerCreateInfo toVkSamplerCreateInfo(const SK::Renderer::SamplerDesc& desc)
+{
+	VkSamplerCreateInfo info{};
+	info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	info.magFilter = toVkFilter(desc.magFilter);
+	info.minFilter = toVkFilter(desc.minFilter);
+	info.mipmapMode = toVkMipmapMode(desc.mipmapMode);
+	info.addressModeU = toVkAddressMode(desc.addressModeU);
+	info.addressModeV = toVkAddressMode(desc.addressModeV);
+	info.addressModeW = toVkAddressMode(desc.addressModeW);
+	info.mipLodBias = desc.mipLodBias;
+	info.anisotropyEnable = desc.anisotropyEnable ? VK_TRUE : VK_FALSE;
+	info.maxAnisotropy = desc.maxAnisotropy;
+	info.compareEnable = desc.compareEnable ? VK_TRUE : VK_FALSE;
+	info.compareOp = toVkCompareOp(desc.compareOp);
+	info.minLod = desc.minLod;
+	info.maxLod = desc.maxLod;
+	info.borderColor = toVkBorderColor(desc.borderColor);
+	return info;
+}
+
 
 void SK::VkRendererBackend::initVkRenderContext(VkRenderContext* vkRenderContext, State* vkRendererBackend, VkSceneResources* vkSceneResources)
 {

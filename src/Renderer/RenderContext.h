@@ -35,9 +35,6 @@ namespace SK::Renderer
 		uint64_t id;
 	};
 
-	// Using a named uint64_t for consistency with Graphics APIs. They use named aliases for uint64_t buffer device address such as VkDeviceAddress and D3D12_GPU_VIRTUAL_ADDRESS.
-	using BufferDeviceAddress = uint64_t;
-
 	using ShaderStageFlags = uint32_t;
 
 	enum ShaderStageFlagBits : uint32_t
@@ -82,13 +79,14 @@ namespace SK::Renderer
 
 	enum class CompareOp : uint8_t
 	{
-		Never = 0,
-		Less,
-		LessEqual,
-		Equal,
-		GreaterEqual,
-		Greater,
-		Always,
+		Never = 0, 
+		Less, 
+		Equal, 
+		LessOrEqual, 
+		Greater, 
+		NotEqual, 
+		GreaterOrEqual, 
+		Always
 	};
 
 	enum class IndexType : uint8_t
@@ -111,7 +109,7 @@ namespace SK::Renderer
 
 		bool depthTest = true;
 		bool depthWrite = true;
-		CompareOp depthCompare = CompareOp::LessEqual;
+		CompareOp depthCompare = CompareOp::LessOrEqual;
 
 		bool blending = false;
 
@@ -147,6 +145,182 @@ namespace SK::Renderer
 		// Renderer/pass-specific custom resources.
 		// Each renderer decides the slot.
 		std::vector<PipelineResourceSet> customResourceSets;
+	};
+
+	// --------------------------------Buffer------------------------------------------------------
+	// Generalized buffer usage bitmask.
+	// Roughly maps to VkBufferUsageFlags on Vulkan. On D3D12 most of these bits
+	// don't affect resource creation (they instead determine which view types
+	// you're allowed to create later)
+	enum class BufferUsage : uint32_t
+	{
+		None = 0,
+		TransferSrc = 1u << 0,  // Source of a copy operation
+		TransferDst = 1u << 1,  // Destination of a copy operation
+		UniformBuffer = 1u << 2,  // Constant/uniform buffer (CBV in D3D12)
+		StorageBuffer = 1u << 3,  // Read-write shader storage buffer (UAV in D3D12)
+		IndexBuffer = 1u << 4,
+		VertexBuffer = 1u << 5,
+		IndirectBuffer = 1u << 6,  // Indirect draw/dispatch argument buffer
+		ShaderDeviceAddress = 1u << 7,  // Buffer device address / raw GPU VA access
+		AccelStructInput = 1u << 8,  // Input geometry for acceleration structure build
+		AccelStructStorage = 1u << 9,  // Backing storage for an acceleration structure
+		ShaderBindingTable = 1u << 10, // Ray tracing shader binding table
+	};
+
+	inline BufferUsage operator|(BufferUsage a, BufferUsage b)
+	{
+		return static_cast<BufferUsage>(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
+	}
+
+	inline BufferUsage operator&(BufferUsage a, BufferUsage b)
+	{
+		return static_cast<BufferUsage>(static_cast<uint32_t>(a) & static_cast<uint32_t>(b));
+	}
+
+	inline BufferUsage& operator|=(BufferUsage& a, BufferUsage b)
+	{
+		a = a | b;
+		return a;
+	}
+
+	inline bool hasFlag(BufferUsage value, BufferUsage flag)
+	{
+		return (static_cast<uint32_t>(value) & static_cast<uint32_t>(flag)) == static_cast<uint32_t>(flag);
+	}
+
+	// Using a named uint64_t for consistency with Graphics APIs. They use named aliases for uint64_t buffer device address such as VkDeviceAddress and D3D12_GPU_VIRTUAL_ADDRESS.
+	using BufferDeviceAddress = uint64_t;
+
+	// Generalized memory/allocation intent.
+	// Describes how the resource will be accessed, not a literal memory type.
+	// Each backend maps this to its own heap/pool concept.
+	enum class MemoryUsage : uint8_t
+	{
+		GpuOnly,   // Device-local only, fastest GPU access, not CPU-visible
+		CpuOnly,   // Host-visible, CPU reads/writes, e.g. readback targets
+		CpuToGpu,  // Host-visible, optimized for frequent CPU writes read by GPU (staging/upload)
+		GpuToCpu,  // Host-visible, optimized for GPU writes read back by CPU (readback)
+		CpuCopy,   // Host-only staging memory, no device access at all
+		Auto,      // Let the driver/allocator pick based on usage flags
+	};
+
+	// --------------------------------Texture------------------------------------------------------
+	struct Extent3D
+	{
+		uint32_t width = 1;
+		uint32_t height = 1;
+		uint32_t depth = 1; // 3D textures only; leave at 1 for 2D/array/cube
+	};
+
+	enum class Format : uint16_t
+	{
+		Unknown,
+
+		// 8-bit
+		R8Unorm, R8Snorm, R8Uint, R8Sint,
+		RG8Unorm, RG8Snorm, RG8Uint, RG8Sint,
+		RGBA8Unorm, RGBA8UnormSrgb, RGBA8Snorm, RGBA8Uint, RGBA8Sint,
+		BGRA8Unorm, BGRA8UnormSrgb, // common swapchain formats
+
+		// 16-bit
+		R16Unorm, R16Uint, R16Sint, R16Float,
+		RG16Uint, RG16Sint, RG16Float,
+		RGBA16Unorm, RGBA16Uint, RGBA16Sint, RGBA16Float,
+
+		// 32-bit
+		R32Uint, R32Sint, R32Float,
+		RG32Uint, RG32Sint, RG32Float,
+		RGB32Uint, RGB32Sint, RGB32Float, // vertex-attribute use mainly; not always renderable
+		RGBA32Uint, RGBA32Sint, RGBA32Float,
+
+		// Packed HDR
+		RGB10A2Unorm,  // 10-10-10-2
+		RG11B10Float,  // 11-11-10 float, common HDR render target
+
+		// Depth / stencil
+		Depth16Unorm,
+		Depth24UnormStencil8Uint,
+		Depth32Float,
+		Depth32FloatStencil8Uint,
+
+		// Block-compressed (desktop)
+		BC1RgbaUnorm, BC1RgbaUnormSrgb,
+		BC3RgbaUnorm, BC3RgbaUnormSrgb,
+		BC4RUnorm, BC4RSnorm,
+		BC5RgUnorm, BC5RgSnorm,
+		BC6HRgbUfloat, BC6HRgbSfloat,
+		BC7RgbaUnorm, BC7RgbaUnormSrgb,
+	};
+
+	enum class TextureUsage : uint32_t
+	{
+		None = 0,
+		TransferSrc = 1u << 0,
+		TransferDst = 1u << 1,
+		Sampled = 1u << 2, // Read via a sampler in a shader (SRV in D3D12)
+		Storage = 1u << 3, // Read-write access in a shader (UAV in D3D12)
+		ColorAttachment = 1u << 4, // Render target
+		DepthStencilAttachment = 1u << 5,
+	};
+
+	inline TextureUsage operator|(TextureUsage a, TextureUsage b)
+	{
+		return static_cast<TextureUsage>(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
+	}
+
+	inline TextureUsage operator&(TextureUsage a, TextureUsage b)
+	{
+		return static_cast<TextureUsage>(static_cast<uint32_t>(a) & static_cast<uint32_t>(b));
+	}
+
+	inline TextureUsage& operator|=(TextureUsage& a, TextureUsage b)
+	{
+		a = a | b;
+		return a;
+	}
+
+	inline bool hasFlag(TextureUsage value, TextureUsage flag)
+	{
+		return (static_cast<uint32_t>(value) & static_cast<uint32_t>(flag)) == static_cast<uint32_t>(flag);
+	}
+
+	// --------------------------------Sampler------------------------------------------------------
+	enum class Filter : uint8_t { Nearest, Linear };
+	enum class MipmapMode : uint8_t { Nearest, Linear };
+
+	enum class AddressMode : uint8_t
+	{
+		Repeat,            // VK_SAMPLER_ADDRESS_MODE_REPEAT             / D3D12_TEXTURE_ADDRESS_MODE_WRAP
+		MirroredRepeat,    // VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT    / D3D12_TEXTURE_ADDRESS_MODE_MIRROR
+		ClampToEdge,       // VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE      / D3D12_TEXTURE_ADDRESS_MODE_CLAMP
+		ClampToBorder,     // VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER    / D3D12_TEXTURE_ADDRESS_MODE_BORDER
+		MirrorClampToEdge, // VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE (Vulkan 1.2+) / D3D12_TEXTURE_ADDRESS_MODE_MIRROR_ONCE
+	};
+
+	enum class BorderColor : uint8_t
+	{
+		TransparentBlack,
+		OpaqueBlack,
+		OpaqueWhite,
+	};
+
+	struct SamplerDesc
+	{
+		Filter      magFilter = Filter::Linear;
+		Filter      minFilter = Filter::Linear;
+		MipmapMode  mipmapMode = MipmapMode::Linear;
+		AddressMode addressModeU = AddressMode::Repeat;
+		AddressMode addressModeV = AddressMode::Repeat;
+		AddressMode addressModeW = AddressMode::Repeat;
+		float       mipLodBias = 0.0f;
+		bool        anisotropyEnable = false;
+		float       maxAnisotropy = 1.0f;
+		bool        compareEnable = false;
+		CompareOp   compareOp = CompareOp::Always;
+		float       minLod = 0.0f;
+		float       maxLod = 1000.0f; // matches VK_LOD_CLAMP_NONE; treat as "no clamp" in practice
+		BorderColor borderColor = BorderColor::TransparentBlack;
 	};
 
 	struct RenderContext;
