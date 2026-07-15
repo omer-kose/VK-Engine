@@ -211,6 +211,7 @@ namespace SK::Renderer
 		BufferUsage usage;
 		MemoryUsage memoryUsage;
 		const void* data = nullptr; // Initial data to be uploaded. When this is provided, the buffer will be chosen to be created on the GPU local memory.
+		const char* debugName = nullptr;
 	};
 
 	// --------------------------------Texture------------------------------------------------------

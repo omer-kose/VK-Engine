@@ -735,19 +735,20 @@ static SK::Renderer::BufferHandle vkCreateBuffer(SK::Renderer::RenderContext* re
 {
 	SK::VkRendererBackend::VkRenderContext* vkRenderContext = fetchVkRenderContext(renderContext);
 	SK::VkRendererBackend::State* vkRendererBackend = vkRenderContext->vkRendererBackend;
-	AllocatedBuffer buffer;
+	SK::VkRendererBackend::BufferRecord bufferRecord;
+	bufferRecord.debugName = desc.debugName;
 
 	if (!desc.data)
 	{
-		buffer = SK::VkRendererBackend::createBuffer(vkRendererBackend, desc.size, toVkBufferUsageFlags(desc.usage), toVmaMemoryUsageLegacy(desc.memoryUsage));
+		bufferRecord.buffer = SK::VkRendererBackend::createBuffer(vkRendererBackend, desc.size, toVkBufferUsageFlags(desc.usage), toVmaMemoryUsageLegacy(desc.memoryUsage));
 	}
 	else
 	{
-		buffer = SK::VkRendererBackend::createAndUploadGPUBuffer(vkRendererBackend, desc.size, toVkBufferUsageFlags(desc.usage), desc.data);
+		bufferRecord.buffer = SK::VkRendererBackend::createAndUploadGPUBuffer(vkRendererBackend, desc.size, toVkBufferUsageFlags(desc.usage), desc.data);
 	}
 
 	const uint64_t bufferIndex = static_cast<uint64_t>(vkRenderContext->buffers.size());
-	vkRenderContext->buffers.push_back(buffer);
+	vkRenderContext->buffers.push_back(bufferRecord);
 	
 	return SK::Renderer::BufferHandle{ bufferIndex };
 }
@@ -808,9 +809,9 @@ void SK::VkRendererBackend::clearVkRenderContext(VkRenderContext* vkRenderContex
 			record.set = VK_NULL_HANDLE;
 		}
 
-		for (AllocatedBuffer& buffer : vkRenderContext->buffers)
+		for (BufferRecord& bufferRecord : vkRenderContext->buffers)
 		{
-			SK::VkRendererBackend::destroyBuffer(vkRenderContext->vkRendererBackend, buffer);
+			SK::VkRendererBackend::destroyBuffer(vkRenderContext->vkRendererBackend, bufferRecord.buffer);
 		}
 	}
 

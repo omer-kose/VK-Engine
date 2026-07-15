@@ -33,6 +33,12 @@ namespace SK::VkRendererBackend
 		bool ownsLayout = false;
 	};
 
+	struct BufferRecord
+	{
+		AllocatedBuffer buffer;
+		const char* debugName = nullptr;
+	};
+
 	/*
 		VkRenderContext provides a context for the backend. The engine frontend (RenderContext) will use the functionality provided by the backend via VkRenderContext bridge.
 	*/
@@ -54,7 +60,7 @@ namespace SK::VkRendererBackend
 		SK::Renderer::PipelineKind currentPipelineKind = SK::Renderer::PipelineKind::Graphics;
 		VkPipelineLayout currentPipelineLayout = VK_NULL_HANDLE;
 
-		std::vector<AllocatedBuffer> buffers;
+		std::vector<BufferRecord> buffers;
 	};
 
 	void initVkRenderContext(VkRenderContext* vkRenderContext, State* vkRendererBackend, VkSceneResources* vkSceneResources);
