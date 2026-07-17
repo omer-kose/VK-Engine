@@ -368,10 +368,8 @@ AllocatedImage SK::VkRendererBackend::createImage(State* vkRendererBackend, VkEx
     return newImage;
 }
 
-AllocatedImage SK::VkRendererBackend::createImage(State* vkRendererBackend, void* data, VkExtent3D imageExtent, VkFormat format, VkImageUsageFlags usage, bool mipMapped)
+AllocatedImage SK::VkRendererBackend::createImage(State* vkRendererBackend, const void* data, size_t dataSize, VkExtent3D imageExtent, VkFormat format, VkImageUsageFlags usage, bool mipMapped)
 {
-    // Hardcoding the textures to be RGBA 8 bit format. This should be sufficient as most of the textures are in that format.
-    size_t dataSize = imageExtent.depth * imageExtent.width * imageExtent.height * 4;
     AllocatedBuffer uploadBuffer = createBuffer(vkRendererBackend, dataSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
     memcpy(uploadBuffer.allocInfo.pMappedData, data, dataSize);
@@ -419,6 +417,13 @@ void SK::VkRendererBackend::destroyImage(State* vkRendererBackend, const Allocat
     vmaDestroyImage(vkRendererBackend->vmaAllocator, img.image, img.allocation);
 }
 
+VkSampler SK::VkRendererBackend::createSampler(State* vkRendererBackend, const VkSamplerCreateInfo& createInfo)
+{
+    VkSampler sampler;
+    VK_CHECK(vkCreateSampler(vkRendererBackend->device, &createInfo, 0, &sampler));
+    return sampler;
+}
+
 VkSampler SK::VkRendererBackend::createSampler(State* vkRendererBackend, VkFilter minFilter, VkFilter magFilter, VkSamplerMipmapMode mipmapMode, VkSamplerAddressMode addressMode)
 {
     VkSamplerCreateInfo createInfo = { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
@@ -437,6 +442,11 @@ VkSampler SK::VkRendererBackend::createSampler(State* vkRendererBackend, VkFilte
     VkSampler sampler;
     VK_CHECK(vkCreateSampler(vkRendererBackend->device, &createInfo, 0, &sampler));
     return sampler;
+}
+
+void SK::VkRendererBackend::destroySampler(State* vkRendererBackend, VkSampler sampler)
+{
+    vkDestroySampler(vkRendererBackend->device, sampler, nullptr);
 }
 
 VkGPUMeshBuffers SK::VkRendererBackend::uploadMesh(State* vkRendererBackend, std::span<SK::Renderer::Vertex> vertices, std::span<uint32_t> indices)
@@ -923,14 +933,15 @@ void SK::VkRendererBackend::initDefaultData(State* vkRendererBackend)
 {
     // Default textures
     // 3 default textures 1 pixel each
+    size_t dataSize = 4; // 1 pixel RGBA 8 bit
     uint32_t white = glm::packUnorm4x8(glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
-    vkRendererBackend->whiteImage = createImage(vkRendererBackend, (void*)&white, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    vkRendererBackend->whiteImage = createImage(vkRendererBackend, (void*)&white, dataSize, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
 
     uint32_t grey = glm::packUnorm4x8(glm::vec4(0.66f, 0.66f, 0.66f, 1.0f));
-    vkRendererBackend->greyImage = createImage(vkRendererBackend, (void*)&grey, VkExtent3D{ 1, 1, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    vkRendererBackend->greyImage = createImage(vkRendererBackend, (void*)&grey, dataSize, VkExtent3D{ 1, 1, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
 
     uint32_t black = glm::packUnorm4x8(glm::vec4(0.0f, 0.0f, 0.0f, 0.0f));
-    vkRendererBackend->blackImage =createImage(vkRendererBackend, (void*)&black, VkExtent3D{ 1, 1, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    vkRendererBackend->blackImage =createImage(vkRendererBackend, (void*)&black, dataSize, VkExtent3D{ 1, 1, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
 
     //checkerboard image
     uint32_t magenta = glm::packUnorm4x8(glm::vec4(1, 0, 1, 1));
@@ -943,7 +954,8 @@ void SK::VkRendererBackend::initDefaultData(State* vkRendererBackend)
         }
     }
 
-    vkRendererBackend->errorCheckerboardImage = createImage(vkRendererBackend, pixels.data(), VkExtent3D{ 16, 16, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    dataSize = 16 * 16 * 1 * 4; // 16 x 16 RGBA 8 bit
+    vkRendererBackend->errorCheckerboardImage = createImage(vkRendererBackend, pixels.data(), dataSize, VkExtent3D{ 16, 16, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
 
     // Default samplers
     VkSamplerCreateInfo samplerInfo = { .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };

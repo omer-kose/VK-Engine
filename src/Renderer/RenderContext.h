@@ -332,6 +332,18 @@ namespace SK::Renderer
 		BorderColor borderColor = BorderColor::TransparentBlack;
 	};
 
+	struct TextureDesc
+	{
+		Extent3D imageExtent;
+		Format format;
+		TextureUsage usage;
+		std::optional<SamplerDesc> samplerDesc = std::nullopt; // if the texture is sampled, it will describe its sampler to be cached or retrieved.
+		const char* debugName = nullptr;
+		const void* data = nullptr; // initial data to be uploaded.
+		size_t dataSize = 0; // will be filled when data is provided for the texture.
+		bool mipMapped = false;
+	};
+
 	struct RenderContext;
 
 	struct RenderContextAPI
@@ -360,6 +372,7 @@ namespace SK::Renderer
 		BufferDeviceAddress (*getVertexBufferDeviceAddress)(RenderContext* renderContext, size_t meshIndex);
 
 		BufferHandle (*createBuffer)(RenderContext* renderContext, const BufferDesc& desc);
+		TextureHandle(*createTexture)(RenderContext* renderContext, const TextureDesc& desc);
 	};
 
 	// Render Context packs up data (state) and functionality of the Graphics API backend. It provides functionality and hides the backend details.
@@ -393,4 +406,5 @@ namespace SK::Renderer
 	BufferDeviceAddress getVertexBufferDeviceAddress(RenderContext* renderContext, size_t meshIndex);
 
 	BufferHandle createBuffer(RenderContext* renderContext, const BufferDesc& desc);
+	TextureHandle createTexture(RenderContext* renderContext, const TextureDesc& desc);
 }

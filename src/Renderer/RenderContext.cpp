@@ -38,6 +38,15 @@ SK::Renderer::BufferHandle SK::Renderer::createBuffer(RenderContext* renderConte
 	return renderContext->api->createBuffer(renderContext, desc);
 }
 
+SK::Renderer::TextureHandle SK::Renderer::createTexture(RenderContext* renderContext, const TextureDesc& desc)
+{
+	assert(renderContext != nullptr);
+	assert(renderContext->api != nullptr);
+	assert(renderContext->api->createTexture != nullptr);
+
+	return renderContext->api->createTexture(renderContext, desc);
+}
+
 void SK::Renderer::beginMainRendering(RenderContext* renderContext)
 {
 	assert(renderContext != nullptr);
