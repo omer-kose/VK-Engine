@@ -152,19 +152,6 @@ static size_t hashString(const char* str)
 	return std::hash<std::string>{}(str ? str : "");
 }
 
-static void hashCustomResourceSets(size_t* hash, const std::vector<SK::Renderer::PipelineResourceSet>& customResourceSets)
-{
-	std::hash<uint64_t> integerHasher;
-
-	hashCombine(hash, integerHasher(static_cast<uint64_t>(customResourceSets.size())));
-
-	for (const SK::Renderer::PipelineResourceSet& customSet : customResourceSets)
-	{
-		hashCombine(hash, integerHasher(customSet.slot));
-		hashCombine(hash, integerHasher(customSet.set.id));
-	}
-}
-
 static size_t hashGraphicsPipelineDesc(const SK::Renderer::GraphicsPipelineDesc& desc)
 {
 	size_t hash = 0;
@@ -191,7 +178,6 @@ static size_t hashGraphicsPipelineDesc(const SK::Renderer::GraphicsPipelineDesc&
 
 	hashCombine(&hash, integerHasher(desc.usesSceneResources ? 1 : 0));
 	hashCombine(&hash, integerHasher(desc.usesMaterialResources ? 1 : 0));
-	hashCustomResourceSets(&hash, desc.customResourceSets);
 
 	return hash;
 }
@@ -210,7 +196,6 @@ static size_t hashComputePipelineDesc(const SK::Renderer::ComputePipelineDesc& d
 
 	hashCombine(&hash, integerHasher(desc.usesSceneResources ? 1 : 0));
 	hashCombine(&hash, integerHasher(desc.usesMaterialResources ? 1 : 0));
-	hashCustomResourceSets(&hash, desc.customResourceSets);
 
 	return hash;
 }
@@ -219,32 +204,19 @@ static SK::VkRendererBackend::PipelineLayoutKey buildPipelineLayoutKey(
 	SK::VkRendererBackend::VkRenderContext* vkRenderContext,
 	bool usesSceneResources,
 	bool usesMaterialResources,
-	const std::vector<SK::Renderer::PipelineResourceSet>& customResourceSets,
 	uint32_t pushConstantSize,
 	SK::Renderer::ShaderStageFlags pushConstantStages)
 {
 	SK::VkRendererBackend::PipelineLayoutKey layoutKey{};
 
-	uint32_t numResourceSets = 0;
-	numResourceSets += (usesSceneResources == true);
-	numResourceSets += (usesMaterialResources == true);
-	numResourceSets += customResourceSets.size();
-
-	layoutKey.setLayouts.resize(numResourceSets, VK_NULL_HANDLE);
-
 	if (usesSceneResources)
 	{
-		layoutKey.setLayouts[SCENE_RESOURCE_SET_SLOT] = vkRenderContext->vkRendererBackend->gpuSceneDataDescriptorLayout;
+		layoutKey.setLayouts.push_back(vkRenderContext->vkRendererBackend->gpuSceneDataDescriptorLayout);
 	}
 
 	if (usesMaterialResources)
 	{
-		layoutKey.setLayouts[MATERIAL_RESOURCE_SET_SLOT] = vkRenderContext->sceneResources->vkMaterialRegistry.resourceDescriptorSetLayout;
-	}
-
-	for (const SK::Renderer::PipelineResourceSet& customSet : customResourceSets)
-	{
-		layoutKey.setLayouts[customSet.slot] = vkRenderContext->customResourceRecords[customSet.set.id].layout;
+		layoutKey.setLayouts.push_back(vkRenderContext->sceneResources->vkMaterialRegistry.resourceDescriptorSetLayout);
 	}
 
 	if (pushConstantSize > 0)
@@ -292,7 +264,6 @@ static SK::Renderer::PipelineHandle vkGetGraphicsPipeline(SK::Renderer::RenderCo
 		vkRenderContext,
 		desc.usesSceneResources,
 		desc.usesMaterialResources,
-		desc.customResourceSets,
 		desc.pushConstantSize,
 		desc.pushConstantStages
 	);
@@ -446,25 +417,6 @@ static void vkBindMaterialResources(SK::Renderer::RenderContext* renderContext)
 		MATERIAL_RESOURCE_SET_SLOT,
 		1,
 		&sceneResources->vkMaterialRegistry.resourceDescriptorSet,
-		0,
-		nullptr
-	);
-}
-
-static void vkBindResourceSet(SK::Renderer::RenderContext* ctx, uint32_t slot, SK::Renderer::ResourceSetHandle set)
-{
-	SK::VkRendererBackend::VkRenderContext* vkRenderContext = fetchVkRenderContext(ctx);
-	SK::VkRendererBackend::State* vkRendererBackend = vkRenderContext->vkRendererBackend;
-
-	const SK::VkRendererBackend::ResourceRecord record = vkRenderContext->customResourceRecords[set.id];
-
-	vkCmdBindDescriptorSets(
-		vkRendererBackend->currentCmdBuffer,
-		toVkPipelineBindPoint(vkRenderContext->currentPipelineKind),
-		vkRenderContext->currentPipelineLayout,
-		slot,
-		1,
-		&record.set,
 		0,
 		nullptr
 	);
@@ -864,11 +816,10 @@ void SK::VkRendererBackend::initVkRenderContext(VkRenderContext* vkRenderContext
 	vkRenderContext->sceneResources = vkSceneResources;
 	vkRenderContext->pipelines.clear();
 	vkRenderContext->pipelineIndexByHash.clear();
-	vkRenderContext->customResourceRecords.clear();
-	vkRenderContext->customResourceLayoutByHash.clear();
 	vkRenderContext->currentPipelineKind = SK::Renderer::PipelineKind::Graphics;
 	vkRenderContext->currentPipelineLayout = VK_NULL_HANDLE;
 	vkRenderContext->buffers.clear();
+	vkRenderContext->textures.clear();
 	vkRenderContext->samplers.clear();
 	vkRenderContext->samplerIndexByHash.clear();
 }
@@ -884,7 +835,6 @@ SK::Renderer::RenderContext SK::VkRendererBackend::makeRenderContext(VkRenderCon
 		.bindPipeline = vkBindPipeline,
 		.bindSceneResources = vkBindSceneResources,
 		.bindMaterialResources = vkBindMaterialResources,
-		.bindResourceSet = vkBindResourceSet,
 		.pushConstants = vkPushConstants,
 		.bindIndexBuffer = vkBindIndexBuffer,
 		.drawIndexed = vkDrawIndexed,
@@ -905,18 +855,6 @@ void SK::VkRendererBackend::clearVkRenderContext(VkRenderContext* vkRenderContex
 {
 	if (vkRenderContext->vkRendererBackend != nullptr)
 	{
-		for (ResourceRecord& record : vkRenderContext->customResourceRecords)
-		{
-			if (record.ownsLayout && record.layout != VK_NULL_HANDLE)
-			{
-				vkDestroyDescriptorSetLayout(vkRenderContext->vkRendererBackend->device, record.layout, nullptr);
-				record.layout = VK_NULL_HANDLE;
-			}
-
-			// Descriptor sets are owned by descriptor pools.
-			record.set = VK_NULL_HANDLE;
-		}
-
 		for (BufferRecord& bufferRecord : vkRenderContext->buffers)
 		{
 			SK::VkRendererBackend::destroyBuffer(vkRenderContext->vkRendererBackend, bufferRecord.buffer);
@@ -937,11 +875,10 @@ void SK::VkRendererBackend::clearVkRenderContext(VkRenderContext* vkRenderContex
 	vkRenderContext->sceneResources = nullptr;
 	vkRenderContext->pipelines.clear();
 	vkRenderContext->pipelineIndexByHash.clear();
-	vkRenderContext->customResourceRecords.clear();
-	vkRenderContext->customResourceLayoutByHash.clear();
 	vkRenderContext->currentPipelineKind = SK::Renderer::PipelineKind::Graphics;
 	vkRenderContext->currentPipelineLayout = VK_NULL_HANDLE;
 	vkRenderContext->buffers.clear();
+	vkRenderContext->textures.clear();
 	vkRenderContext->samplers.clear();
 	vkRenderContext->samplerIndexByHash.clear();
 }

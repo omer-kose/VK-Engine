@@ -21,18 +21,6 @@ namespace SK::VkRendererBackend
 		SK::Renderer::PipelineKind kind = SK::Renderer::PipelineKind::Graphics;
 	};
 
-	struct ResourceRecord
-	{
-		size_t layoutHash = 0;
-
-		VkDescriptorSetLayout layout = VK_NULL_HANDLE;
-		VkDescriptorSet set = VK_NULL_HANDLE;
-
-		// Built-in scene/material resources are not stored here.
-		// Future custom resource records can use this ownership flags.
-		bool ownsLayout = false;
-	};
-
 	struct BufferRecord
 	{
 		AllocatedBuffer buffer;
@@ -59,10 +47,6 @@ namespace SK::VkRendererBackend
 		// TODO: This is for reusing the pipelines while retrieving them in frontend renderers. However, the retrievers also store those pipeline handles so this might be an unnecessary book-keeping.
 		std::unordered_map<size_t, uint64_t> pipelineIndexByHash;
 
-		std::vector<ResourceRecord> customResourceRecords;
-		// book-keeping for reusing the layouts for custom resources
-		std::unordered_map<size_t, VkDescriptorSetLayout> customResourceLayoutByHash;
-		
 		// Cache the current pipeline information for later use when a pipeline is bound.
 		SK::Renderer::PipelineKind currentPipelineKind = SK::Renderer::PipelineKind::Graphics;
 		VkPipelineLayout currentPipelineLayout = VK_NULL_HANDLE;

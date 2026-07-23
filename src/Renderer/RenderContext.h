@@ -14,17 +14,6 @@ namespace SK::Renderer
 		uint64_t id;
 	};
 
-	struct ResourceSetHandle
-	{
-		uint64_t id;
-	};
-
-	struct PipelineResourceSet
-	{
-		ResourceSetHandle set;
-		uint32_t slot;
-	};
-
 	struct BufferHandle
 	{
 		uint64_t id;
@@ -121,10 +110,6 @@ namespace SK::Renderer
 		bool usesSceneResources = false;
 		// If true, material/bindless resources are expected at set slot 1.
 		bool usesMaterialResources = false;
-
-		// Renderer/pass-specific custom resources.
-		// Each renderer decides the slot.
-		std::vector<PipelineResourceSet> customResourceSets;
 	};
 
 	struct ComputePipelineDesc
@@ -141,10 +126,6 @@ namespace SK::Renderer
 		bool usesSceneResources = false;
 		// If true, material/bindless resources are expected at set slot 1.
 		bool usesMaterialResources = false;
-
-		// Renderer/pass-specific custom resources.
-		// Each renderer decides the slot.
-		std::vector<PipelineResourceSet> customResourceSets;
 	};
 
 	// Generalized memory/allocation intent.
@@ -359,7 +340,6 @@ namespace SK::Renderer
 
 		void (*bindSceneResources)(RenderContext* renderContext);
 		void (*bindMaterialResources)(RenderContext* renderContext);
-		void (*bindResourceSet)(RenderContext* renderContext, uint32_t slot, ResourceSetHandle set);
 
 		void (*pushConstants)(RenderContext* renderContext, ShaderStageFlags stages, uint32_t offset, uint32_t size, const void* data);
 
@@ -394,7 +374,6 @@ namespace SK::Renderer
 
 	void bindSceneResources(RenderContext* renderContext);
 	void bindMaterialResources(RenderContext* renderContext);
-	void bindResourceSet(RenderContext* renderContext, uint32_t slot, ResourceSetHandle set);
 
 	void pushConstants(RenderContext* renderContext, ShaderStageFlags stages, uint32_t offset, uint32_t size, const void* data);
 
