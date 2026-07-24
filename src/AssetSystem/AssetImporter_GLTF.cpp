@@ -1,6 +1,7 @@
 #include "AssetImporter_GLTF.h"
 
 #include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <fastgltf/core.hpp>
 #include <fastgltf/tools.hpp>
