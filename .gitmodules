@@ -1,3 +1,6 @@
 [submodule "third_party/fastgltf"]
 	path = third_party/fastgltf
 	url = https://github.com/spnda/fastgltf.git
+[submodule "third_party/fmt"]
+	path = third_party/fmt
+	url = https://github.com/fmtlib/fmt.git
