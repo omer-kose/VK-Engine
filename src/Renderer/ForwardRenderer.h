@@ -1,37 +1,31 @@
 #pragma once
-#include <RendererBackend/Vulkan/VkTypes.h>
 
-// Forward declare with the namespace
-namespace SK::VkRendererBackend
-{
-	struct State;
-	struct VkAssetRegistry;
-	struct VkMaterialRegistry;
-};
+#include <Renderer/RenderContext.h>
+#include <Renderer/DrawContext.h>
 
-namespace SK::Renderer
-{
-	struct DrawContext;
-};
+#include <glm/mat4x4.hpp>
 
 namespace SK::ForwardRenderer
 {
-	struct State
+	struct Resources
 	{
-		VkPipelineLayout pipelineLayout; // both transparent and opaque objects use the same pipeline layout
-		VkPipeline opaquePipeline;
-		VkPipeline transparentPipeline;
+		SK::Renderer::PipelineHandle opaquePipeline;
+		SK::Renderer::PipelineHandle transparentPipeline;
+	};
+
+	struct Input
+	{
+		const SK::Renderer::DrawContext* drawContext = nullptr;
 	};
 
 	// Push constants for mesh draws
 	struct PushConstants
 	{
 		glm::mat4 worldMatrix;
-		VkDeviceAddress vertexBufferAddress;
+		SK::Renderer::BufferDeviceAddress vertexBufferAddress;
 		uint32_t materialIndex;
 	};
 
-	void init(State* forwardRenderer, SK::VkRendererBackend::State* vkRendererBackend, SK::VkRendererBackend::VkMaterialRegistry* vkMaterialRegistry);
-	void draw(State* forwardRenderer, SK::VkRendererBackend::State* vkRendererBackend, SK::VkRendererBackend::VkAssetRegistry* vkAssetRegistry, SK::VkRendererBackend::VkMaterialRegistry* vkMaterialRegistry, const SK::Renderer::DrawContext & ctx);
-	void shutdown(State* forwardRenderer, SK::VkRendererBackend::State* vkRendererBackend);
+	void createResources(SK::Renderer::RenderContext* renderContext, Resources* resources);
+	void draw(SK::Renderer::RenderContext* renderContext, const Resources& resources, const Input& input);
 };

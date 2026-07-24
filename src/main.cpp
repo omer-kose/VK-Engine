@@ -1,9 +1,11 @@
 #include <Application/Application.h>
 #include <RendererBackend/Vulkan/VkRendererBackend.h>
 #include <RendererBackend/Vulkan/VkSceneResources.h>
+#include <RendererBackend/Vulkan/VkRenderContext.h>
 #include <UI/UI.h>
 #include <Scene/Scene.h>
 #include <Renderer/GlobalGPUTypes.h>
+#include <Renderer/RenderContext.h>
 #include <Renderer/ForwardRenderer.h>
 
 #include "imgui.h"
@@ -54,15 +56,17 @@ int main(int argc, char* argv[])
     SK::VkRendererBackend::VkSceneResources vkSceneResources;
     SK::VkRendererBackend::uploadSceneResources(&vkRendererBackend, &scene, &vkSceneResources);
 
+    SK::VkRendererBackend::VkRenderContext vkRenderContext;
+    SK::VkRendererBackend::initVkRenderContext(&vkRenderContext, &vkRendererBackend, &vkSceneResources);
+
+    SK::Renderer::RenderContext renderContext = SK::VkRendererBackend::makeRenderContext(&vkRenderContext);
+
     EventContext eventContext{};
     eventContext.scene = &scene;
 
     // Renderer frontends
-    SK::ForwardRenderer::State forwardRenderer;
-    // For descriptor layouts, vkRendererBackend and vkMaterialRegistry should be created before initializing renderers. 
-    // NOTE: Just knowing the number of total textures for materials is enough to create a descriptor set layout for bindless resources. So, this is a soft constraint but still number of textures is need to be known.
-    // TODO: Will write a RHI
-    SK::ForwardRenderer::init(&forwardRenderer, &vkRendererBackend, &vkSceneResources.vkMaterialRegistry);
+    SK::ForwardRenderer::Resources forwardRendererResources;
+    SK::ForwardRenderer::createResources(&renderContext, &forwardRendererResources);
 
     // main loop
     while(!application.shouldQuit)
@@ -107,7 +111,11 @@ int main(int argc, char* argv[])
         if(SK::VkRendererBackend::beginFrame(&vkRendererBackend))
         {
             SK::VkRendererBackend::updateSceneBuffer(&vkRendererBackend, scene.gpuSceneData);
-            SK::ForwardRenderer::draw(&forwardRenderer, &vkRendererBackend, &vkSceneResources.vkAssetRegistry, &vkSceneResources.vkMaterialRegistry, scene.drawContext);
+
+            SK::ForwardRenderer::Input forwardInput{};
+            forwardInput.drawContext = &scene.drawContext;
+            SK::ForwardRenderer::draw(&renderContext, forwardRendererResources, forwardInput);
+
             SK::UI::draw(&vkRendererBackend);
             SK::VkRendererBackend::endFrame(&vkRendererBackend);
         }
@@ -122,11 +130,10 @@ int main(int argc, char* argv[])
     // Make sure that GPU finished executing every command before shutting down the systems.
     vkDeviceWaitIdle(vkRendererBackend.device);
 
+    SK::VkRendererBackend::clearVkRenderContext(&vkRenderContext);
     SK::VkRendererBackend::clearSceneResources(&vkRendererBackend, &vkSceneResources);
-    SK::Scene::clear(&scene);
     
-    // Once everything is safe to delete shut the systems down.
-    SK::ForwardRenderer::shutdown(&forwardRenderer, &vkRendererBackend);
+    SK::Scene::clear(&scene);
 
     SK::UI::shutdown(&ui);
 

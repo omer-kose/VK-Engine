@@ -66,7 +66,9 @@ void SK::VkRendererBackend::buildGPUAssets(State* vkRendererBackend, SK::Asset::
         // Create image from tex.image.data
         if (!texture.image.data.empty())
         {
-            gpuTexture.image = SK::VkRendererBackend::createImage(vkRendererBackend, (void*)texture.image.data.data(), VkExtent3D{ texture.image.width, texture.image.height, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, texture.description.mipmapped);
+            // Assuming texture data to be in RGBA 8 bit format. TODO: Later on, decide this by looking at the texture format.
+            size_t dataSize = texture.image.width * texture.image.height * 1 * 4;
+            gpuTexture.image = SK::VkRendererBackend::createImage(vkRendererBackend, (void*)texture.image.data.data(), dataSize, VkExtent3D{ texture.image.width, texture.image.height, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, texture.description.mipmapped);
             gpuTexture.ownsImage = true;
         }
         else
@@ -104,7 +106,8 @@ void SK::VkRendererBackend::clearGPUAssets(State* vkRendererBackend, VkAssetRegi
         {
             SK::VkRendererBackend::destroyImage(vkRendererBackend, texture.image);
         }
-        vkDestroySampler(vkRendererBackend->device, texture.sampler, nullptr);
+
+        SK::VkRendererBackend::destroySampler(vkRendererBackend, texture.sampler);
     }
 
     vkAssetRegistry->meshes.clear();
