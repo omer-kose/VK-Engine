@@ -9,8 +9,8 @@
 #include <Renderer/ForwardRenderer.h>
 
 #include "imgui.h"
-#include "imgui_impl_sdl2.h"
-#include "imgui_impl_vulkan.h"
+#include "backends/imgui_impl_sdl2.h"
+#include "backends/imgui_impl_vulkan.h"
 
 #include <thread>
 #include <chrono>

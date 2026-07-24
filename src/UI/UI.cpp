@@ -5,8 +5,8 @@
 #include <RendererBackend/Vulkan/VkImages.h>
 
 #include "imgui.h"
-#include "imgui_impl_sdl2.h"
-#include "imgui_impl_vulkan.h"
+#include "backends/imgui_impl_sdl2.h"
+#include "backends/imgui_impl_vulkan.h"
 
 #include "SDL_events.h"
 
@@ -56,15 +56,13 @@ void SK::UI::init(State* ui, SK::VkRendererBackend::State* vkRendererBackend)
     initInfo.UseDynamicRendering = true;
 
     // Dynamic rendering parameters for ImGui to use
-    initInfo.PipelineRenderingCreateInfo = { .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO, .pNext = nullptr };
-    initInfo.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
-    initInfo.PipelineRenderingCreateInfo.pColorAttachmentFormats = &vkRendererBackend->swapchainImageFormat;
-
-    initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+    initInfo.PipelineInfoMain.PipelineRenderingCreateInfo = { .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO, .pNext = nullptr };
+    initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
+    initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.pColorAttachmentFormats = &vkRendererBackend->swapchainImageFormat;
+   
+    initInfo.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 
     ImGui_ImplVulkan_Init(&initInfo);
-
-    ImGui_ImplVulkan_CreateFontsTexture();
 
     // UI will destroy its own resources
     ui->deletionQueue.pushFunction([=]() {

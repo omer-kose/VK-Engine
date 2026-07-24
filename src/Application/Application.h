@@ -5,8 +5,7 @@
 
 #include <stdint.h>
 
-// Unless I find a better place, camera will be in Application Layer
-#include <camera.h>
+#include <SDL_events.h>
 
 // Forward declare SDL_Window in the global scope to make it independent of the namespace. 
 // SDL.h is not included in the header file as I don't want to expose SDL implementation and its types outside of the Application (Platform) layer.
