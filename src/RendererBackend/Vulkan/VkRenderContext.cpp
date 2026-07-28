@@ -232,7 +232,7 @@ static SK::VkRendererBackend::PipelineLayoutKey buildPipelineLayoutKey(
 	return layoutKey;
 }
 
-static SK::Renderer::PipelineHandle vkGetGraphicsPipeline(SK::Renderer::RenderContext* renderContext, const SK::Renderer::GraphicsPipelineDesc& desc)
+static SK::Renderer::PipelineHandle getGraphicsPipeline_(SK::Renderer::RenderContext* renderContext, const SK::Renderer::GraphicsPipelineDesc& desc)
 {
 	SK::VkRendererBackend::VkRenderContext* vkRenderContext = fetchVkRenderContext(renderContext);
 	SK::VkRendererBackend::State* vkRendererBackend = vkRenderContext->vkRendererBackend;
@@ -303,12 +303,12 @@ static SK::Renderer::PipelineHandle vkGetGraphicsPipeline(SK::Renderer::RenderCo
 }
 
 // TODO: To be implemented
-static SK::Renderer::PipelineHandle vkGetComputePipeline(SK::Renderer::RenderContext* renderContext, const SK::Renderer::ComputePipelineDesc& desc)
+static SK::Renderer::PipelineHandle getComputePipeline_(SK::Renderer::RenderContext* renderContext, const SK::Renderer::ComputePipelineDesc& desc)
 {
 	return SK::Renderer::PipelineHandle{ SK::Renderer::INVALID_HANDLE };
 }
 
-static SK::Renderer::BufferDeviceAddress vkGetVertexBufferDeviceAddress(SK::Renderer::RenderContext* renderContext, size_t meshIndex)
+static SK::Renderer::BufferDeviceAddress getVertexBufferDeviceAddress_(SK::Renderer::RenderContext* renderContext, size_t meshIndex)
 {
 	SK::VkRendererBackend::VkRenderContext* vkRenderContext = fetchVkRenderContext(renderContext);
 	SK::VkRendererBackend::State* vkRendererBackend = vkRenderContext->vkRendererBackend;
@@ -324,7 +324,7 @@ static SK::Renderer::BufferDeviceAddress vkGetVertexBufferDeviceAddress(SK::Rend
 	return static_cast<SK::Renderer::BufferDeviceAddress>(mesh.meshBuffers.vertexBufferAddress);
 }
 
-static void vkBeginMainRendering(SK::Renderer::RenderContext* renderContext)
+static void beginMainRendering_(SK::Renderer::RenderContext* renderContext)
 {
 	SK::VkRendererBackend::VkRenderContext* vkRenderContext = fetchVkRenderContext(renderContext);
 	SK::VkRendererBackend::State* vkRendererBackend = vkRenderContext->vkRendererBackend;
@@ -351,7 +351,7 @@ static void vkBeginMainRendering(SK::Renderer::RenderContext* renderContext)
 	vkCmdBeginRendering(cmd, &renderInfo);
 }
 
-static void vkEndRendering(SK::Renderer::RenderContext* renderContext)
+static void endRendering_(SK::Renderer::RenderContext* renderContext)
 {
 	SK::VkRendererBackend::VkRenderContext* vkRenderContext = fetchVkRenderContext(renderContext);
 	SK::VkRendererBackend::State* vkRendererBackend = vkRenderContext->vkRendererBackend;
@@ -359,7 +359,7 @@ static void vkEndRendering(SK::Renderer::RenderContext* renderContext)
 	vkCmdEndRendering(vkRendererBackend->currentCmdBuffer);
 }
 
-static void vkBindPipeline(SK::Renderer::RenderContext* renderContext, SK::Renderer::PipelineHandle pipeline)
+static void bindPipeline_(SK::Renderer::RenderContext* renderContext, SK::Renderer::PipelineHandle pipeline)
 {
 	SK::VkRendererBackend::VkRenderContext* vkRenderContext = fetchVkRenderContext(renderContext);
 	SK::VkRendererBackend::State* vkRendererBackend = vkRenderContext->vkRendererBackend;
@@ -385,7 +385,7 @@ static void vkBindPipeline(SK::Renderer::RenderContext* renderContext, SK::Rende
 	}
 }
 
-static void vkBindSceneResources(SK::Renderer::RenderContext* renderContext)
+static void bindSceneResources_(SK::Renderer::RenderContext* renderContext)
 {
 	SK::VkRendererBackend::VkRenderContext* vkRenderContext = fetchVkRenderContext(renderContext);
 	SK::VkRendererBackend::State* vkRendererBackend = vkRenderContext->vkRendererBackend;
@@ -404,7 +404,7 @@ static void vkBindSceneResources(SK::Renderer::RenderContext* renderContext)
 	);
 }
 
-static void vkBindMaterialResources(SK::Renderer::RenderContext* renderContext)
+static void bindMaterialResources_(SK::Renderer::RenderContext* renderContext)
 {
 	SK::VkRendererBackend::VkRenderContext* vkRenderContext = fetchVkRenderContext(renderContext);
 	SK::VkRendererBackend::State* vkRendererBackend = vkRenderContext->vkRendererBackend;
@@ -422,7 +422,7 @@ static void vkBindMaterialResources(SK::Renderer::RenderContext* renderContext)
 	);
 }
 
-static void vkPushConstants(SK::Renderer::RenderContext* renderContext, SK::Renderer::ShaderStageFlags stages, uint32_t offset, uint32_t size, const void* data)
+static void pushConstants_(SK::Renderer::RenderContext* renderContext, SK::Renderer::ShaderStageFlags stages, uint32_t offset, uint32_t size, const void* data)
 {
 	SK::VkRendererBackend::VkRenderContext* vkRenderContext = fetchVkRenderContext(renderContext);
 	SK::VkRendererBackend::State* vkRendererBackend = vkRenderContext->vkRendererBackend;
@@ -437,7 +437,7 @@ static void vkPushConstants(SK::Renderer::RenderContext* renderContext, SK::Rend
 	);
 }
 
-static void vkBindIndexBuffer(SK::Renderer::RenderContext* renderContext, size_t meshIndex, SK::Renderer::IndexType indexType)
+static void bindIndexBuffer_(SK::Renderer::RenderContext* renderContext, size_t meshIndex, SK::Renderer::IndexType indexType)
 {
 	SK::VkRendererBackend::VkRenderContext* vkRenderContext = fetchVkRenderContext(renderContext);
 	SK::VkRendererBackend::State* vkRendererBackend = vkRenderContext->vkRendererBackend;
@@ -459,7 +459,7 @@ static void vkBindIndexBuffer(SK::Renderer::RenderContext* renderContext, size_t
 	);
 }
 
-static void vkDrawIndexed(SK::Renderer::RenderContext* renderContext, uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance)
+static void drawIndexed_(SK::Renderer::RenderContext* renderContext, uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance)
 {
 	SK::VkRendererBackend::VkRenderContext* vkRenderContext = fetchVkRenderContext(renderContext);
 	SK::VkRendererBackend::State* vkRendererBackend = vkRenderContext->vkRendererBackend;
@@ -474,7 +474,7 @@ static void vkDrawIndexed(SK::Renderer::RenderContext* renderContext, uint32_t i
 	);
 }
 
-static void vkDispatch(SK::Renderer::RenderContext* renderContext, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ)
+static void dispatch_(SK::Renderer::RenderContext* renderContext, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ)
 {
 	SK::VkRendererBackend::VkRenderContext* vkRenderContext = fetchVkRenderContext(renderContext);
 	SK::VkRendererBackend::State* vkRendererBackend = vkRenderContext->vkRendererBackend;
@@ -683,7 +683,7 @@ static VkSamplerCreateInfo toVkSamplerCreateInfo(const SK::Renderer::SamplerDesc
 	return info;
 }
 
-static SK::Renderer::BufferHandle vkCreateBuffer(SK::Renderer::RenderContext* renderContext, const SK::Renderer::BufferDesc& desc)
+static SK::Renderer::BufferHandle createBuffer_(SK::Renderer::RenderContext* renderContext, const SK::Renderer::BufferDesc& desc)
 {
 	SK::VkRendererBackend::VkRenderContext* vkRenderContext = fetchVkRenderContext(renderContext);
 	SK::VkRendererBackend::State* vkRendererBackend = vkRenderContext->vkRendererBackend;
@@ -770,7 +770,7 @@ static uint32_t getOrCreateSampler(SK::Renderer::RenderContext* renderContext, c
 	return samplerIndex;
 }
 
-static SK::Renderer::TextureHandle vkCreateTexture(SK::Renderer::RenderContext* renderContext, const SK::Renderer::TextureDesc& textureDesc)
+static SK::Renderer::TextureHandle createTexture_(SK::Renderer::RenderContext* renderContext, const SK::Renderer::TextureDesc& textureDesc)
 {
 	SK::VkRendererBackend::VkRenderContext* vkRenderContext = fetchVkRenderContext(renderContext);
 	SK::VkRendererBackend::State* vkRendererBackend = vkRenderContext->vkRendererBackend;
@@ -828,20 +828,20 @@ SK::Renderer::RenderContext SK::VkRendererBackend::makeRenderContext(VkRenderCon
 {
 	static const SK::Renderer::RenderContextAPI api =
 	{
-		.getGraphicsPipeline = vkGetGraphicsPipeline,
-		.getComputePipeline = vkGetComputePipeline,
-		.beginMainRendering = vkBeginMainRendering,
-		.endRendering = vkEndRendering,
-		.bindPipeline = vkBindPipeline,
-		.bindSceneResources = vkBindSceneResources,
-		.bindMaterialResources = vkBindMaterialResources,
-		.pushConstants = vkPushConstants,
-		.bindIndexBuffer = vkBindIndexBuffer,
-		.drawIndexed = vkDrawIndexed,
-		.dispatch = vkDispatch,
-		.getVertexBufferDeviceAddress = vkGetVertexBufferDeviceAddress,
-		.createBuffer = vkCreateBuffer,
-		.createTexture = vkCreateTexture
+		.getGraphicsPipeline = getGraphicsPipeline_,
+		.getComputePipeline = getComputePipeline_,
+		.beginMainRendering = beginMainRendering_,
+		.endRendering = endRendering_,
+		.bindPipeline = bindPipeline_,
+		.bindSceneResources = bindSceneResources_,
+		.bindMaterialResources = bindMaterialResources_,
+		.pushConstants = pushConstants_,
+		.bindIndexBuffer = bindIndexBuffer_,
+		.drawIndexed = drawIndexed_,
+		.dispatch = dispatch_,
+		.getVertexBufferDeviceAddress = getVertexBufferDeviceAddress_,
+		.createBuffer = createBuffer_,
+		.createTexture = createTexture_
 	};
 
 	SK::Renderer::RenderContext renderContext{};

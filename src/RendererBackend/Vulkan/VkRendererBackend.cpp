@@ -12,6 +12,8 @@
 #include <RendererBackend/Vulkan/VkPipelines.h>
 #include "VkBootstrap.h"
 
+#define VOLK_IMPLEMENTATION
+
 #define VMA_IMPLEMENTATION
 #include "vk_mem_alloc.h"
 
@@ -142,6 +144,8 @@ void SK::VkRendererBackend::shutdown(State* vkRendererBackend)
 
         vkb::destroy_debug_utils_messenger(vkRendererBackend->instance, vkRendererBackend->debugMessenger);
         vkDestroyInstance(vkRendererBackend->instance, nullptr);
+
+        volkFinalize();
 
         // Nullify non-owning pointers
         vkRendererBackend->window = nullptr;
@@ -689,6 +693,8 @@ void SK::VkRendererBackend::clearPipelineCache(State* vkRendererBackend)
 
 void SK::VkRendererBackend::initVulkan(State* vkRendererBackend)
 {
+    VK_CHECK(volkInitialize());
+
     vkb::InstanceBuilder builder;
 
     // Create the Vulkan instance with basic debug features.
@@ -699,6 +705,7 @@ void SK::VkRendererBackend::initVulkan(State* vkRendererBackend)
         .build();
 
     vkb::Instance vkbInstance = instRet.value();
+    volkLoadInstanceOnly(vkbInstance.instance);
 
     // Grab the instance
     vkRendererBackend->instance = vkbInstance.instance;
@@ -737,6 +744,7 @@ void SK::VkRendererBackend::initVulkan(State* vkRendererBackend)
     // Create the final Vulkan device
     vkb::DeviceBuilder deviceBuilder{physicalDevice};
     vkb::Device vkbDevice = deviceBuilder.build().value();
+    volkLoadDevice(vkbDevice.device);
 
     // Get the VKDevice handle used in the rest of the Vulkan application
     vkRendererBackend->device = vkbDevice.device;
@@ -745,12 +753,19 @@ void SK::VkRendererBackend::initVulkan(State* vkRendererBackend)
     vkRendererBackend->graphicsQueue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
     vkRendererBackend->graphicsQueueFamily = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
 
-    // Initialize the memory allocator
+    // Initialize the vulkan memory allocator
+    // When using volk, these two function pointers must be provided.
+    const VmaVulkanFunctions vmaFunctions{
+        .vkGetInstanceProcAddr = vkGetInstanceProcAddr,
+        .vkGetDeviceProcAddr = vkGetDeviceProcAddr,
+    };
+
     VmaAllocatorCreateInfo allocatorInfo = {};
     allocatorInfo.physicalDevice = vkRendererBackend->chosenGPU;
     allocatorInfo.device = vkRendererBackend->device;
     allocatorInfo.instance = vkRendererBackend->instance;
     allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+    allocatorInfo.pVulkanFunctions = &vmaFunctions;
     vmaCreateAllocator(&allocatorInfo, &vkRendererBackend->vmaAllocator);
 
     vkRendererBackend->mainDeletionQueue.pushFunction([=](){
