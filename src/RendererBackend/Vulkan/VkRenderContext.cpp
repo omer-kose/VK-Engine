@@ -321,7 +321,7 @@ static SK::Renderer::BufferDeviceAddress getVertexBufferDeviceAddress_(SK::Rende
 	}
 
 	const SK::VkRendererBackend::VkAssetRegistry::GPUMesh& mesh = sceneResources->vkAssetRegistry.meshes[meshIndex];
-	return static_cast<SK::Renderer::BufferDeviceAddress>(mesh.meshBuffers.vertexBufferAddress);
+	return static_cast<SK::Renderer::BufferDeviceAddress>(mesh.meshBuffers.vertexBuffer.address);
 }
 
 static void beginMainRendering_(SK::Renderer::RenderContext* renderContext)

@@ -280,6 +280,8 @@ AllocatedBuffer SK::VkRendererBackend::createBuffer(State* vkRendererBackend, si
     VkBufferCreateInfo bufferInfo = { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, .pNext = nullptr };
     bufferInfo.size = allocSize;
     bufferInfo.usage = usage;
+    // The address of every buffer is cached in this engine.
+    bufferInfo.usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
     VmaAllocationCreateInfo vmaAllocInfo = {};
     vmaAllocInfo.usage = memoryUsage;
@@ -287,6 +289,10 @@ AllocatedBuffer SK::VkRendererBackend::createBuffer(State* vkRendererBackend, si
     AllocatedBuffer newBuffer;
 
     VK_CHECK(vmaCreateBuffer(vkRendererBackend->vmaAllocator, &bufferInfo, &vmaAllocInfo, &newBuffer.buffer, &newBuffer.allocation, &newBuffer.allocInfo));
+
+    // cache the address of the buffer
+    VkBufferDeviceAddressInfo deviceAddressInfo{ .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = newBuffer.buffer };
+    newBuffer.address = vkGetBufferDeviceAddress(vkRendererBackend->device, &deviceAddressInfo);
 
     return newBuffer;
 }
@@ -461,9 +467,7 @@ VkGPUMeshBuffers SK::VkRendererBackend::uploadMesh(State* vkRendererBackend, std
     VkGPUMeshBuffers meshBuffers;
 
     // Create the vertex buffer and fetch the device address of it
-    meshBuffers.vertexBuffer = createBuffer(vkRendererBackend, vertexBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
-    VkBufferDeviceAddressInfo deviceAddressInfo{ .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = meshBuffers.vertexBuffer.buffer };
-    meshBuffers.vertexBufferAddress = vkGetBufferDeviceAddress(vkRendererBackend->device, &deviceAddressInfo);
+    meshBuffers.vertexBuffer = createBuffer(vkRendererBackend, vertexBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
 
     // Create the index buffer
     meshBuffers.indexBuffer = createBuffer(vkRendererBackend, indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);

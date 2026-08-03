@@ -36,6 +36,7 @@ struct AllocatedBuffer
     VkBuffer buffer;
     VmaAllocation allocation;
     VmaAllocationInfo allocInfo;
+    VkDeviceAddress address;
 };
 
 // Holds the resources needed for a mesh
@@ -43,5 +44,4 @@ struct VkGPUMeshBuffers
 {
     AllocatedBuffer indexBuffer;
     AllocatedBuffer vertexBuffer;
-    VkDeviceAddress vertexBufferAddress;
 };
