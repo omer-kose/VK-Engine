@@ -295,7 +295,7 @@ static SK::Renderer::PipelineHandle getGraphicsPipeline_(SK::Renderer::RenderCon
 	record.pipeline = pipeline;
 	record.layout = pipelineLayout;
 
-	const uint64_t pipelineIndex = static_cast<uint64_t>(vkRenderContext->pipelines.size());
+	const uint32_t pipelineIndex = static_cast<uint32_t>(vkRenderContext->pipelines.size());
 	vkRenderContext->pipelines.push_back(record);
 	vkRenderContext->pipelineIndexByHash[descHash] = pipelineIndex;
 
@@ -699,7 +699,7 @@ static SK::Renderer::BufferHandle createBuffer_(SK::Renderer::RenderContext* ren
 		bufferRecord.buffer = SK::VkRendererBackend::createAndUploadGPUBuffer(vkRendererBackend, desc.size, toVkBufferUsageFlags(desc.usage), desc.data);
 	}
 
-	const uint64_t bufferIndex = static_cast<uint64_t>(vkRenderContext->buffers.size());
+	const uint32_t bufferIndex = static_cast<uint32_t>(vkRenderContext->buffers.size());
 	vkRenderContext->buffers.push_back(bufferRecord);
 	
 	return SK::Renderer::BufferHandle{ bufferIndex };
@@ -804,7 +804,7 @@ static SK::Renderer::TextureHandle createTexture_(SK::Renderer::RenderContext* r
 		textureRecord.samplerIndex = getOrCreateSampler(renderContext, textureDesc.samplerDesc.value());
 	}
 
-	const uint64_t textureIndex = static_cast<uint64_t>(vkRenderContext->textures.size());
+	const uint32_t textureIndex = static_cast<uint32_t>(vkRenderContext->textures.size());
 	vkRenderContext->textures.push_back(textureRecord);
 
 	return SK::Renderer::TextureHandle{ textureIndex };

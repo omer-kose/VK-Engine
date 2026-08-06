@@ -45,7 +45,7 @@ namespace SK::VkRendererBackend
 		// VkRenderContext does not own actual handles. It just caches the handles for functionality. The creation and cleaning of the handles are always done by the Renderer Backend.
 		std::vector<PipelineRecord> pipelines;
 		// TODO: This is for reusing the pipelines while retrieving them in frontend renderers. However, the retrievers also store those pipeline handles so this might be an unnecessary book-keeping.
-		std::unordered_map<size_t, uint64_t> pipelineIndexByHash;
+		std::unordered_map<size_t, uint32_t> pipelineIndexByHash;
 
 		// Cache the current pipeline information for later use when a pipeline is bound.
 		SK::Renderer::PipelineKind currentPipelineKind = SK::Renderer::PipelineKind::Graphics;

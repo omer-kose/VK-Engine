@@ -734,6 +734,14 @@ void SK::VkRendererBackend::initVulkan(State* vkRendererBackend)
     VkPhysicalDeviceFeatures features10{};
     features10.samplerAnisotropy = true;
 
+    // Get extensions
+    // Descriptor Heaps
+    VkPhysicalDeviceDescriptorHeapFeaturesEXT descriptorHeapFeatures{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_HEAP_FEATURES_EXT,
+        .pNext = nullptr,
+        .descriptorHeap = true
+    };
+
     // Use vkbootstrap to select a gpu with Vulkan 1.3 and necessary features
     vkb::PhysicalDeviceSelector selector{vkbInstance};
     vkb::PhysicalDevice physicalDevice = selector
@@ -741,6 +749,8 @@ void SK::VkRendererBackend::initVulkan(State* vkRendererBackend)
         .set_required_features_13(features13)
         .set_required_features_12(features12)
         .set_required_features(features10)
+        .add_required_extension(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME)
+        .add_required_extension_features(descriptorHeapFeatures)
         .set_surface(vkRendererBackend->surface)
         .select()
         .value();

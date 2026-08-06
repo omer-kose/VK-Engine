@@ -4,24 +4,24 @@
 
 namespace SK::Renderer
 {
-	static constexpr uint64_t INVALID_HANDLE = UINT64_MAX;
+	static constexpr uint32_t INVALID_HANDLE = UINT32_MAX;
 
 	// Opaque handle types
 	// Handles are indices into records / resources in the Backend Render Context not actual values of backend resource handles.
 	// They are opaque handle types, so caller side will be using them with the routines provided by the Render Context.
 	struct PipelineHandle
 	{
-		uint64_t id;
+		uint32_t id;
 	};
 
 	struct BufferHandle
 	{
-		uint64_t id;
+		uint32_t id;
 	};
 
 	struct TextureHandle
 	{
-		uint64_t id;
+		uint32_t id;
 	};
 
 	using ShaderStageFlags = uint32_t;
