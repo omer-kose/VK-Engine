@@ -1,6 +1,8 @@
 
 #extension GL_EXT_buffer_reference : require
 #extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_shader_8bit_storage : require
+#extension GL_EXT_shader_explicit_arithmetic_types : require
 
 struct Vertex
 {
@@ -43,6 +45,11 @@ struct PBRData
 	uint metallicRoughnessTexture;
 	uint normalTexture;
 	uint emissiveTexture;
+	// Sampler ids
+	uint8_t baseColorTextureSampler;
+	uint8_t metallicRoughnessTextureSampler;
+	uint8_t normalTextureSampler;
+	uint8_t emissiveTextureSampler;
 };
 
 // Bindless Material + Texture resources

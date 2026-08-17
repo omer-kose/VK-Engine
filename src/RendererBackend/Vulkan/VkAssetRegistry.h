@@ -5,6 +5,7 @@
 #include <string>
 
 #include <RendererBackend/Vulkan/VkTypes.h>
+#include <RendererBackend/Vulkan/VkDescriptorHeap.h>
 
 namespace SK::Asset
 {
@@ -26,7 +27,10 @@ namespace SK::VkRendererBackend
 		struct GPUTexture
 		{
 			AllocatedImage image;
+			// TODO: To be deleted
 			VkSampler sampler;
+			ResourceDescriptorHandle imageDescriptor;
+			SamplerDescriptorHandle samplerDescriptor;
 			std::string name;
 			bool ownsImage; // false when fallback error image is used in the absence of image data
 		};

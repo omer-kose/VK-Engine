@@ -76,6 +76,35 @@ static size_t hashPipelineKey(const SK::VkRendererBackend::PipelineKey& k)
     return h;
 }
 
+static void hashCombine(size_t* seed, size_t value)
+{
+    *seed ^= value + 0x9e3779b9 + (*seed << 6) + (*seed >> 2);
+}
+
+static size_t hashSamplerInfo(const VkSamplerCreateInfo& samplerInfo)
+{
+    size_t hash = 0;
+
+    std::hash<uint64_t> integerHasher;
+    std::hash<float> floatHasher;
+
+    hashCombine(&hash, integerHasher(static_cast<uint64_t>(samplerInfo.magFilter)));
+    hashCombine(&hash, integerHasher(static_cast<uint64_t>(samplerInfo.minFilter)));
+    hashCombine(&hash, integerHasher(static_cast<uint64_t>(samplerInfo.mipmapMode)));
+    hashCombine(&hash, integerHasher(static_cast<uint64_t>(samplerInfo.addressModeU)));
+    hashCombine(&hash, integerHasher(static_cast<uint64_t>(samplerInfo.addressModeV)));
+    hashCombine(&hash, integerHasher(static_cast<uint64_t>(samplerInfo.addressModeW)));
+    hashCombine(&hash, floatHasher(samplerInfo.mipLodBias));
+    hashCombine(&hash, integerHasher(samplerInfo.anisotropyEnable ? 1 : 0));
+    hashCombine(&hash, floatHasher(samplerInfo.maxAnisotropy));
+    hashCombine(&hash, integerHasher(samplerInfo.compareEnable ? 1 : 0));
+    hashCombine(&hash, floatHasher(samplerInfo.minLod));
+    hashCombine(&hash, floatHasher(samplerInfo.maxLod));
+    hashCombine(&hash, integerHasher(static_cast<uint64_t>(samplerInfo.borderColor)));
+
+    return hash;
+}
+
 
 void SK::VkRendererBackend::init(State* vkRendererBackend, struct SDL_Window* window, uint32_t windowWidth, uint32_t windowHeight)
 {
@@ -96,10 +125,12 @@ void SK::VkRendererBackend::init(State* vkRendererBackend, struct SDL_Window* wi
     createDrawAndDepthImages(vkRendererBackend);
 
     initDescriptors(vkRendererBackend);
+    initDescriptors2(vkRendererBackend);
 
     initDefaultData(vkRendererBackend);
 
     initGlobalSceneBuffer(vkRendererBackend);
+    //initGlobalSceneBuffer2(vkRendererBackend);
 
     // everything went fine
     vkRendererBackend->isInitialized = true;
@@ -352,6 +383,7 @@ AllocatedImage SK::VkRendererBackend::createImage(State* vkRendererBackend, VkEx
     if(mipMapped)
     {
         imgInfo.mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(imageExtent.width, imageExtent.height)))) + 1;
+        newImage.mipLevels = imgInfo.mipLevels;
     }
 
     // Always allocate images on dedicated GPU memory
@@ -427,6 +459,22 @@ void SK::VkRendererBackend::destroyImage(State* vkRendererBackend, const Allocat
     vmaDestroyImage(vkRendererBackend->vmaAllocator, img.image, img.allocation);
 }
 
+VkImageViewCreateInfo SK::VkRendererBackend::createImageViewInfo(State* vkRendererBackend, const AllocatedImage& image)
+{
+    // Defaulting to the color aspect unless depth format is given
+    VkImageAspectFlags aspectFlag = VK_IMAGE_ASPECT_COLOR_BIT;
+    if (image.imageFormat == VK_FORMAT_D32_SFLOAT) // if the format is the depth format
+    {
+        aspectFlag = VK_IMAGE_ASPECT_DEPTH_BIT;
+    }
+
+    // Create the image-view for the image
+    VkImageViewCreateInfo viewInfo = SK::VkInit::imageview_create_info(image.imageFormat, image.image, aspectFlag);
+    viewInfo.subresourceRange.levelCount = image.mipLevels;
+    
+    return viewInfo;
+}
+
 VkSampler SK::VkRendererBackend::createSampler(State* vkRendererBackend, const VkSamplerCreateInfo& createInfo)
 {
     VkSampler sampler;
@@ -457,6 +505,38 @@ VkSampler SK::VkRendererBackend::createSampler(State* vkRendererBackend, VkFilte
 void SK::VkRendererBackend::destroySampler(State* vkRendererBackend, VkSampler sampler)
 {
     vkDestroySampler(vkRendererBackend->device, sampler, nullptr);
+}
+
+SK::VkRendererBackend::SamplerDescriptorHandle SK::VkRendererBackend::createSamplerDescriptor(State* vkRendererBackend, const VkSamplerCreateInfo& samplerInfo)
+{
+    size_t samplerHash = hashSamplerInfo(samplerInfo);
+    auto existing = vkRendererBackend->samplerDescriptorCache.find(samplerHash);
+    if (existing != vkRendererBackend->samplerDescriptorCache.end())
+    {
+        return existing->second;
+    }
+
+    SamplerDescriptorHandle handle = allocateSamplerDescriptor(&vkRendererBackend->descriptorHeap);
+    writeSamplerDescriptor(vkRendererBackend, &vkRendererBackend->descriptorHeap, handle, samplerInfo);
+    vkRendererBackend->samplerDescriptorCache[samplerHash] = handle;
+}
+
+SK::VkRendererBackend::SamplerDescriptorHandle SK::VkRendererBackend::createSamplerDescriptor(State* vkRendererBackend, VkFilter minFilter, VkFilter magFilter, VkSamplerMipmapMode mipmapMode, VkSamplerAddressMode addressMode)
+{
+    VkSamplerCreateInfo samplerInfo = { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+
+    samplerInfo.minFilter = minFilter;
+    samplerInfo.magFilter = magFilter;
+    samplerInfo.mipmapMode = mipmapMode;
+    samplerInfo.addressModeU = addressMode;
+    samplerInfo.addressModeV = addressMode;
+    samplerInfo.addressModeW = addressMode;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 16.0f;
+    samplerInfo.anisotropyEnable = mipmapMode == VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.maxAnisotropy = mipmapMode == VK_SAMPLER_MIPMAP_MODE_LINEAR ? 4.0f : 1.0f;
+
+    return createSamplerDescriptor(vkRendererBackend, samplerInfo);
 }
 
 VkGPUMeshBuffers SK::VkRendererBackend::uploadMesh(State* vkRendererBackend, std::span<SK::Renderer::Vertex> vertices, std::span<uint32_t> indices)
@@ -729,6 +809,8 @@ void SK::VkRendererBackend::initVulkan(State* vkRendererBackend)
     features12.scalarBlockLayout = true;
     features12.runtimeDescriptorArray = true;
     features12.shaderSampledImageArrayNonUniformIndexing = true;
+    features12.storageBuffer8BitAccess = true;
+    features12.shaderInt8 = true;
 
     // Vulkan 1.0 features
     VkPhysicalDeviceFeatures features10{};
@@ -958,6 +1040,15 @@ void SK::VkRendererBackend::initDescriptors(State* vkRendererBackend)
     }
 }
 
+void SK::VkRendererBackend::initDescriptors2(State* vkRendererBackend)
+{
+    DescriptorHeapDesc desc{ .maxResourceDescriptors = 8192, .maxSamplerDescriptors = 256 };
+    initDescriptorHeap(vkRendererBackend, &vkRendererBackend->descriptorHeap, desc);
+    vkRendererBackend->mainDeletionQueue.pushFunction([=]() {
+        destroyDescriptorHeap(vkRendererBackend, &vkRendererBackend->descriptorHeap);
+    });
+}
+
 void SK::VkRendererBackend::initDefaultData(State* vkRendererBackend)
 {
     // Default textures
@@ -1023,5 +1114,28 @@ void SK::VkRendererBackend::initGlobalSceneBuffer(State* vkRendererBackend)
         DescriptorWriter writer;
         writer.writeBuffer(0, vkRendererBackend->gpuSceneDataBuffer[i].buffer, sizeof(SK::Renderer::GPUSceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
         writer.updateSet(vkRendererBackend->device, vkRendererBackend->gpuSceneDescriptorSet[i]);
+    }
+}
+
+void SK::VkRendererBackend::initGlobalSceneBuffer2(State* vkRendererBackend)
+{
+    for (int i = 0; i < FRAME_OVERLAP; ++i)
+    {
+        // Allocate a new uniform buffer for scene data (allocating on VRAM that CPU can write to directly. It is limited but it is perfect for allocating reasonable amounts that are dynamic)
+        vkRendererBackend->gpuSceneDataBuffer[i] = createBuffer(vkRendererBackend, sizeof(SK::Renderer::GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+        vkRendererBackend->mainDeletionQueue.pushFunction([=]() {
+            destroyBuffer(vkRendererBackend, vkRendererBackend->gpuSceneDataBuffer[i]);
+        });
+
+        // Allocate the descriptor slot from the heap and write the descriptor info onto it.
+        vkRendererBackend->gpuSceneDataDescriptor[i] = allocateResourceDescriptor(&vkRendererBackend->descriptorHeap, ResourceDescriptorKind::UniformBuffer);
+        writeUniformBufferDescriptor(
+            vkRendererBackend, 
+            &vkRendererBackend->descriptorHeap, 
+            vkRendererBackend->gpuSceneDataDescriptor[i],
+            vkRendererBackend->gpuSceneDataBuffer[i],
+            0,
+            sizeof(SK::Renderer::GPUSceneData)
+        );
     }
 }

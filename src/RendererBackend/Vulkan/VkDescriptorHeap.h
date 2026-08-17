@@ -75,7 +75,7 @@ namespace SK::VkRendererBackend
 	struct DescriptorHeapDesc
 	{
 		uint32_t maxResourceDescriptors = 8192;
-		uint32_t maxSamplerDescriptors = 512;
+		uint32_t maxSamplerDescriptors = 256;
 	};
 
 	struct DescriptorHeap

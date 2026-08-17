@@ -2,7 +2,9 @@
 
 #include <vector>
 #include <RendererBackend/Vulkan/VkTypes.h>
+// TODO: To be deleted
 #include <RendererBackend/Vulkan/VkDescriptors.h>
+#include <RendererBackend/Vulkan/VkDescriptorHeap.h>
 
 #include <MaterialSystem/MaterialInfo.h>
 
@@ -28,10 +30,14 @@ namespace SK::VkRendererBackend
 
 			Any other textures in the engine that are not related to materials, will be handled via their own descriptors in the renderers they used.
 		*/
+		// TODO: To be deleted
 		VkDescriptorSetLayout resourceDescriptorSetLayout = VK_NULL_HANDLE;
 		VkDescriptorSet resourceDescriptorSet = VK_NULL_HANDLE;
 		DescriptorAllocator resourceDescriptorAllocator;
+
+
 		AllocatedBuffer pbrMaterialBuffer;
+		ResourceDescriptorHandle pbrMaterialBufferDescriptor;
 	};
 
 	void buildMaterialRegistry(State* vkRendererBackend, SK::Asset::AssetRegistry* assetRegistry, SK::Material::MaterialRegistry* materialRegistry, VkAssetRegistry* vkAssetRegistry, VkMaterialRegistry* vkMaterialRegistry);

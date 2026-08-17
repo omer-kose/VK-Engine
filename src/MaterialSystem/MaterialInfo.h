@@ -25,11 +25,16 @@ namespace SK::Material
 		float baseColorFactor[4] = { 1.f, 1.f, 1.f, 1.f };
 		float metallicFactor = 1.f;
 		float roughnessFactor = 1.f;
-		// Texture ids
+		// Texture ids (On CPU these are actual indices into the textures array. On GPU these are descriptor handle indices into the resource heap.)
 		uint32_t baseColorTexture;
 		uint32_t metallicRoughnessTexture;
 		uint32_t normalTexture;
 		uint32_t emissiveTexture;
+		// Sampler ids
+		uint8_t baseColorTextureSampler;
+		uint8_t metallicRoughnessTextureSampler;
+		uint8_t normalTextureSampler;
+		uint8_t emissiveTextureSampler;
 	};
 
 	struct Instance

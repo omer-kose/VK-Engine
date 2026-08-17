@@ -5,7 +5,9 @@
 #include <span>
 
 #include <RendererBackend/Vulkan/VkTypes.h>
+// TODO: Will be removed when I will completely switch to Descriptor Heaps
 #include <RendererBackend/Vulkan/VkDescriptors.h>
+#include <RendererBackend/Vulkan/VkDescriptorHeap.h>
 
 #include <Util/DeletionQueue.h>
 
@@ -133,6 +135,11 @@ namespace SK::VkRendererBackend
 		AllocatedImage depthImage;
 		VkExtent2D drawExtent;
 
+		// Descriptor Heap
+		DescriptorHeap descriptorHeap;
+		ResourceDescriptorHandle gpuSceneDataDescriptor[FRAME_OVERLAP];
+
+		// TODO: To be deleted 
 		// Global Descriptors
 		DescriptorAllocatorGrowable globalDescriptorAllocator;
 		// Descriptor layout for single texture display
@@ -140,6 +147,7 @@ namespace SK::VkRendererBackend
 		// Scene Descriptor Layout (Global Descriptor Set 0 Layout)
 		VkDescriptorSetLayout gpuSceneDataDescriptorLayout;
 
+		// TODO: To be deleted 
 		// Per-frame Global Scene (uniform) Buffer and the descriptor set (Shared by the whole engine which uses scene data so it is persistent per-frame no need to reallocate) 
 		AllocatedBuffer gpuSceneDataBuffer[FRAME_OVERLAP];
 		VkDescriptorSet gpuSceneDescriptorSet[FRAME_OVERLAP];
@@ -163,10 +171,12 @@ namespace SK::VkRendererBackend
 		// Pipeline cache
 		std::unordered_map<size_t, VkPipeline> pipelineCache;
 
+		// Sampler descriptor cache
+		std::unordered_map<size_t, SamplerDescriptorHandle> samplerDescriptorCache;
+
 		// Per-Frame Transient State (Filled by beginFrame function)
 		uint32_t currentSwapchainImageIndex;
 		VkCommandBuffer currentCmdBuffer;
-		
 	};
 
 
@@ -193,9 +203,16 @@ namespace SK::VkRendererBackend
 	AllocatedImage createImage(State* vkRendererBackend, const void* data, size_t dataSize, VkExtent3D imageExtent, VkFormat format, VkImageUsageFlags usage, bool mipMapped = false);
 	void destroyImage(State* vkRendererBackend, const AllocatedImage& img);
 
+	// Utility function to provide VkImageViewCreateInfo which is used while writing image descriptors.
+	VkImageViewCreateInfo createImageViewInfo(State* vkRendererBackend, const AllocatedImage& image);
+
 	VkSampler createSampler(State* vkRendererBackend, const VkSamplerCreateInfo& createInfo);
 	VkSampler createSampler(State* vkRendererBackend, VkFilter minFilter, VkFilter magFilter, VkSamplerMipmapMode mipmapMode, VkSamplerAddressMode addressMode);
 	void destroySampler(State* vkRendererBackend, VkSampler sampler);
+
+	SamplerDescriptorHandle createSamplerDescriptor(State* vkRendererBackend, const VkSamplerCreateInfo& samplerInfo);
+	// A much simplified and default version that is being used by the current asset system.
+	SamplerDescriptorHandle createSamplerDescriptor(State* vkRendererBackend, VkFilter minFilter, VkFilter magFilter, VkSamplerMipmapMode mipmapMode, VkSamplerAddressMode addressMode);
 
 	VkGPUMeshBuffers uploadMesh(State* vkRendererBackend, std::span<SK::Renderer::Vertex> vertices, std::span<uint32_t> indices);
 
@@ -230,12 +247,16 @@ namespace SK::VkRendererBackend
 	void createSwapchain(State* vkRendererBackend, uint32_t width, uint32_t height);
 	void destroySwapchain(State* vkRendererBackend);
 	// Descriptors
+	// TODO: To be deleted and replaced by the second version that uses descriptor heaps.
 	void initDescriptors(State* vkRendererBackend);
+	void initDescriptors2(State* vkRendererBackend);
 	// Draw and Depth Images
 	void createDrawAndDepthImages(State* vkRendererBackend);
 	void destroyDrawAndDepthImages(State* vkRendererBackend);
 	// Default Engine Data
 	void initDefaultData(State* vkRendererBackend);
 	// Init Scene Buffer
+	// TODO: To be deleted and replaced by the second version that uses descriptor heaps.
 	void initGlobalSceneBuffer(State* vkRendererBackend);
+	void initGlobalSceneBuffer2(State* vkRendererBackend);
 };

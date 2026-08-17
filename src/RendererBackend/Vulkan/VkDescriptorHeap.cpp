@@ -96,7 +96,7 @@ void SK::VkRendererBackend::destroyDescriptorHeap(State* vkRendererBackend, Desc
 void SK::VkRendererBackend::bindDescriptorHeap(State* vkRendererBackend, VkCommandBuffer cmd, const DescriptorHeap* heap)
 {
 	assert(vkRendererBackend);
-	assert(&heap);
+	assert(heap);
 	assert(heap->initialized);
 
 	VkBindHeapInfoEXT resourceHeapBindInfo{
@@ -272,7 +272,7 @@ void SK::VkRendererBackend::writeSampledImageDescriptor(State* vkRendererBackend
 	const VkDeviceSize descriptorOffset = getResourceDescriptorOffset(heap, handle);
 
 	// Where in the descriptor heap the descriptor info will be written onto.
-	VkHostAddressRangeEXT heapAddressRange{ .address = heap->resourceHeapMappedData, .size = heap->imageDescriptorSize };
+	VkHostAddressRangeEXT heapAddressRange{ .address = heap->resourceHeapMappedData + descriptorOffset, .size = heap->imageDescriptorSize };
 
 	VK_CHECK(vkWriteResourceDescriptorsEXT(vkRendererBackend->device, 1, &descriptorInfo, &heapAddressRange));
 }
@@ -306,7 +306,7 @@ void SK::VkRendererBackend::writeStorageImageDescriptor(State* vkRendererBackend
 	const VkDeviceSize descriptorOffset = getResourceDescriptorOffset(heap, handle);
 
 	// Where in the descriptor heap the descriptor info will be written onto.
-	VkHostAddressRangeEXT heapAddressRange{ .address = heap->resourceHeapMappedData, .size = heap->imageDescriptorSize };
+	VkHostAddressRangeEXT heapAddressRange{ .address = heap->resourceHeapMappedData + descriptorOffset, .size = heap->imageDescriptorSize };
 
 	VK_CHECK(vkWriteResourceDescriptorsEXT(vkRendererBackend->device, 1, &descriptorInfo, &heapAddressRange));
 }
@@ -320,7 +320,7 @@ void SK::VkRendererBackend::writeSamplerDescriptor(State* vkRendererBackend, Des
 
 	const VkDeviceSize samplerOffset = getSamplerDescriptorOffset(heap, handle);
 
-	VkHostAddressRangeEXT heapAddressRange{ .address = heap->samplerHeapMappedData, .size = heap->imageDescriptorSize };
+	VkHostAddressRangeEXT heapAddressRange{ .address = heap->samplerHeapMappedData + samplerOffset, .size = heap->samplerDescriptorSize };
 
 	VK_CHECK(vkWriteSamplerDescriptorsEXT(vkRendererBackend->device, 1, &samplerInfo, &heapAddressRange));
 }
