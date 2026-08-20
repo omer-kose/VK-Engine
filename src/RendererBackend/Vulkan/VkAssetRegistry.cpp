@@ -101,14 +101,6 @@ void SK::VkRendererBackend::buildGPUAssets(State* vkRendererBackend, SK::Asset::
             );
         }
 
-        // Create sampler based on texture description
-        gpuTexture.sampler = SK::VkRendererBackend::createSampler(vkRendererBackend,
-            mapFilterMode(texture.description.minFilter),
-            mapFilterMode(texture.description.magFilter),
-            mapMipmapMode(texture.description.mipmapMode),
-            mapAddressMode(texture.description.addressMode)
-        );
-
         gpuTexture.samplerDescriptor = SK::VkRendererBackend::createSamplerDescriptor(vkRendererBackend,
             mapFilterMode(texture.description.minFilter),
             mapFilterMode(texture.description.magFilter),
@@ -136,8 +128,6 @@ void SK::VkRendererBackend::clearGPUAssets(State* vkRendererBackend, VkAssetRegi
         {
             SK::VkRendererBackend::destroyImage(vkRendererBackend, texture.image);
         }
-
-        SK::VkRendererBackend::destroySampler(vkRendererBackend, texture.sampler);
     }
 
     vkAssetRegistry->meshes.clear();

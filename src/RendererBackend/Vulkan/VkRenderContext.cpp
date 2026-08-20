@@ -14,9 +14,6 @@
 #include <functional>
 #include <string>
 
-static constexpr uint32_t SCENE_RESOURCE_SET_SLOT = 0;
-static constexpr uint32_t MATERIAL_RESOURCE_SET_SLOT = 1;
-
 static SK::VkRendererBackend::VkRenderContext* fetchVkRenderContext(SK::Renderer::RenderContext* renderContext)
 {
 	return static_cast<SK::VkRendererBackend::VkRenderContext*>(renderContext->backend);
@@ -142,6 +139,29 @@ static VkPipelineBindPoint toVkPipelineBindPoint(SK::Renderer::PipelineKind kind
 	}
 }
 
+static VkSpirvResourceTypeFlagsEXT toSpirvResourceTypeMask(SK::Renderer::ShaderResourceType type)
+{
+	switch (type)
+	{
+	case SK::Renderer::ShaderResourceType::UniformBuffer:
+		return VK_SPIRV_RESOURCE_TYPE_UNIFORM_BUFFER_BIT_EXT;
+	case SK::Renderer::ShaderResourceType::ReadOnlyStorageBuffer:
+		return VK_SPIRV_RESOURCE_TYPE_READ_ONLY_STORAGE_BUFFER_BIT_EXT;
+	case SK::Renderer::ShaderResourceType::RWStorageBuffer:
+		return VK_SPIRV_RESOURCE_TYPE_READ_WRITE_STORAGE_BUFFER_BIT_EXT;
+	case SK::Renderer::ShaderResourceType::SampledImage:
+		return VK_SPIRV_RESOURCE_TYPE_SAMPLED_IMAGE_BIT_EXT;
+	case SK::Renderer::ShaderResourceType::ReadOnlyStorageImage:
+		return VK_SPIRV_RESOURCE_TYPE_READ_ONLY_IMAGE_BIT_EXT;
+	case SK::Renderer::ShaderResourceType::RWStorageImage:
+		return VK_SPIRV_RESOURCE_TYPE_READ_WRITE_IMAGE_BIT_EXT;
+	case SK::Renderer::ShaderResourceType::Sampler:
+		return VK_SPIRV_RESOURCE_TYPE_SAMPLER_BIT_EXT;
+	}
+
+	return 0;
+}
+
 static void hashCombine(size_t* seed, size_t value)
 {
 	*seed ^= value + 0x9e3779b9 + (*seed << 6) + (*seed >> 2);
@@ -176,8 +196,12 @@ static size_t hashGraphicsPipelineDesc(const SK::Renderer::GraphicsPipelineDesc&
 	hashCombine(&hash, integerHasher(desc.pushConstantSize));
 	hashCombine(&hash, integerHasher(desc.pushConstantStages));
 
-	hashCombine(&hash, integerHasher(desc.usesSceneResources ? 1 : 0));
-	hashCombine(&hash, integerHasher(desc.usesMaterialResources ? 1 : 0));
+	for (const SK::Renderer::ShaderResourceMappingDesc& mapping : desc.shaderResourceMappings)
+	{
+		hashCombine(&hash, integerHasher(mapping.binding));
+		hashCombine(&hash, integerHasher(static_cast<uint64_t>(mapping.type)));
+		hashCombine(&hash, mapping.descriptorIndex);
+	}
 
 	return hash;
 }
@@ -194,42 +218,14 @@ static size_t hashComputePipelineDesc(const SK::Renderer::ComputePipelineDesc& d
 	hashCombine(&hash, integerHasher(desc.pushConstantSize));
 	hashCombine(&hash, integerHasher(desc.pushConstantStages));
 
-	hashCombine(&hash, integerHasher(desc.usesSceneResources ? 1 : 0));
-	hashCombine(&hash, integerHasher(desc.usesMaterialResources ? 1 : 0));
+	for (const SK::Renderer::ShaderResourceMappingDesc& mapping : desc.shaderResourceMappings)
+	{
+		hashCombine(&hash, integerHasher(mapping.binding));
+		hashCombine(&hash, integerHasher(static_cast<uint64_t>(mapping.type)));
+		hashCombine(&hash, mapping.descriptorIndex);
+	}
 
 	return hash;
-}
-
-static SK::VkRendererBackend::PipelineLayoutKey buildPipelineLayoutKey(
-	SK::VkRendererBackend::VkRenderContext* vkRenderContext,
-	bool usesSceneResources,
-	bool usesMaterialResources,
-	uint32_t pushConstantSize,
-	SK::Renderer::ShaderStageFlags pushConstantStages)
-{
-	SK::VkRendererBackend::PipelineLayoutKey layoutKey{};
-
-	if (usesSceneResources)
-	{
-		layoutKey.setLayouts.push_back(vkRenderContext->vkRendererBackend->gpuSceneDataDescriptorLayout);
-	}
-
-	if (usesMaterialResources)
-	{
-		layoutKey.setLayouts.push_back(vkRenderContext->sceneResources->vkMaterialRegistry.resourceDescriptorSetLayout);
-	}
-
-	if (pushConstantSize > 0)
-	{
-		VkPushConstantRange pushConstantRange{};
-		pushConstantRange.offset = 0;
-		pushConstantRange.size = pushConstantSize;
-		pushConstantRange.stageFlags = toVkShaderStageFlags(pushConstantStages);
-
-		layoutKey.pushConstantRanges.push_back(pushConstantRange);
-	}
-
-	return layoutKey;
 }
 
 static SK::Renderer::PipelineHandle getGraphicsPipeline_(SK::Renderer::RenderContext* renderContext, const SK::Renderer::GraphicsPipelineDesc& desc)
@@ -246,36 +242,23 @@ static SK::Renderer::PipelineHandle getGraphicsPipeline_(SK::Renderer::RenderCon
 		return SK::Renderer::PipelineHandle{ existing->second };
 	}
 
-	VkShaderModule vertexShader = SK::VkRendererBackend::getOrLoadShader(vkRendererBackend, desc.vertexShaderPath);
-	if (vertexShader == VK_NULL_HANDLE)
+	SK::VkRendererBackend::Shader vertexShader = SK::VkRendererBackend::getOrLoadShader(vkRendererBackend, desc.vertexShaderPath, VK_SHADER_STAGE_VERTEX_BIT);
+	if (vertexShader.module == VK_NULL_HANDLE)
 	{
 		fmt::println("Failed to load vertex shader: {}", desc.vertexShaderPath ? desc.vertexShaderPath : "<null>");
 		return SK::Renderer::PipelineHandle{};
 	}
 
-	VkShaderModule fragmentShader = SK::VkRendererBackend::getOrLoadShader(vkRendererBackend, desc.fragmentShaderPath);
-	if (fragmentShader == VK_NULL_HANDLE)
+	SK::VkRendererBackend::Shader fragmentShader = SK::VkRendererBackend::getOrLoadShader(vkRendererBackend, desc.fragmentShaderPath, VK_SHADER_STAGE_FRAGMENT_BIT);
+	if (fragmentShader.module == VK_NULL_HANDLE)
 	{
 		fmt::println("Failed to load fragment shader: {}", desc.fragmentShaderPath ? desc.fragmentShaderPath : "<null>");
 		return SK::Renderer::PipelineHandle{};
 	}
 
-	SK::VkRendererBackend::PipelineLayoutKey layoutKey = buildPipelineLayoutKey(
-		vkRenderContext,
-		desc.usesSceneResources,
-		desc.usesMaterialResources,
-		desc.pushConstantSize,
-		desc.pushConstantStages
-	);
-
-	VkPipelineLayout pipelineLayout = SK::VkRendererBackend::getOrCreatePipelineLayout(vkRendererBackend, layoutKey);
-
-	const size_t vertexShaderHash = hashString(desc.vertexShaderPath);
-	const size_t fragmentShaderHash = hashString(desc.fragmentShaderPath);
-
 	SK::VkRendererBackend::PipelineKey pipelineKey{};
-	pipelineKey.vertShader = vertexShaderHash;
-	pipelineKey.fragShader = fragmentShaderHash;
+	pipelineKey.shaders.push_back(vertexShader);
+	pipelineKey.shaders.push_back(fragmentShader);
 	pipelineKey.topology = toVkPrimitiveTopology(desc.topology);
 	pipelineKey.polygonMode = toVkPolygonMode(desc.polygonMode);
 	pipelineKey.cullMode = toVkCullModeFlags(desc.cullMode);
@@ -286,14 +269,22 @@ static SK::Renderer::PipelineHandle getGraphicsPipeline_(SK::Renderer::RenderCon
 	pipelineKey.blending = desc.blending;
 	pipelineKey.colorFormat = vkRendererBackend->drawImage.imageFormat;
 	pipelineKey.depthFormat = vkRendererBackend->depthImage.imageFormat;
-	pipelineKey.layout = pipelineLayout;
+	// Fill the shader resource mappings
+	pipelineKey.shaderResourceMappings.resize(desc.shaderResourceMappings.size());
+	for (size_t i = 0; i < desc.shaderResourceMappings.size(); ++i)
+	{
+		pipelineKey.shaderResourceMappings[i] = { 
+			.binding = desc.shaderResourceMappings[i].binding, 
+			.type = toSpirvResourceTypeMask(desc.shaderResourceMappings[i].type), 
+			.descriptorIndex = desc.shaderResourceMappings[i].descriptorIndex 
+		};
+	}
 
 	VkPipeline pipeline = SK::VkRendererBackend::getOrCreatePipeline(vkRendererBackend, pipelineKey);
 
 	SK::VkRendererBackend::PipelineRecord record{};
 	record.kind = SK::Renderer::PipelineKind::Graphics;
 	record.pipeline = pipeline;
-	record.layout = pipelineLayout;
 
 	const uint32_t pipelineIndex = static_cast<uint32_t>(vkRenderContext->pipelines.size());
 	vkRenderContext->pipelines.push_back(record);
@@ -306,6 +297,22 @@ static SK::Renderer::PipelineHandle getGraphicsPipeline_(SK::Renderer::RenderCon
 static SK::Renderer::PipelineHandle getComputePipeline_(SK::Renderer::RenderContext* renderContext, const SK::Renderer::ComputePipelineDesc& desc)
 {
 	return SK::Renderer::PipelineHandle{ SK::Renderer::INVALID_HANDLE };
+}
+
+static uint32_t getFrameNumber_(SK::Renderer::RenderContext* renderContext)
+{
+	SK::VkRendererBackend::VkRenderContext* vkRenderContext = fetchVkRenderContext(renderContext);
+	SK::VkRendererBackend::State* vkRendererBackend = vkRenderContext->vkRendererBackend;
+
+	return vkRendererBackend->frameNumber;
+}
+
+static uint32_t getFrameIndex_(SK::Renderer::RenderContext* renderContext)
+{
+	SK::VkRendererBackend::VkRenderContext* vkRenderContext = fetchVkRenderContext(renderContext);
+	SK::VkRendererBackend::State* vkRendererBackend = vkRenderContext->vkRendererBackend;
+
+	return vkRendererBackend->frameNumber % SK::VkRendererBackend::FRAME_OVERLAP;
 }
 
 static SK::Renderer::BufferDeviceAddress getVertexBufferDeviceAddress_(SK::Renderer::RenderContext* renderContext, size_t meshIndex)
@@ -373,7 +380,6 @@ static void bindPipeline_(SK::Renderer::RenderContext* renderContext, SK::Render
 	const SK::VkRendererBackend::PipelineRecord& record = vkRenderContext->pipelines[static_cast<size_t>(pipeline.id)];
 
 	vkRenderContext->currentPipelineKind = record.kind;
-	vkRenderContext->currentPipelineLayout = record.layout;
 
 	vkCmdBindPipeline(vkRendererBackend->currentCmdBuffer, toVkPipelineBindPoint(record.kind), record.pipeline);
 
@@ -385,56 +391,35 @@ static void bindPipeline_(SK::Renderer::RenderContext* renderContext, SK::Render
 	}
 }
 
-static void bindSceneResources_(SK::Renderer::RenderContext* renderContext)
+static uint32_t getSceneDataDescriptorIndex_(SK::Renderer::RenderContext* renderContext)
 {
 	SK::VkRendererBackend::VkRenderContext* vkRenderContext = fetchVkRenderContext(renderContext);
 	SK::VkRendererBackend::State* vkRendererBackend = vkRenderContext->vkRendererBackend;
 
-	VkDescriptorSet sceneDescriptorSet = SK::VkRendererBackend::fetchCurrentSceneBufferDescriptorSet(vkRendererBackend);
-
-	vkCmdBindDescriptorSets(
-		vkRendererBackend->currentCmdBuffer,
-		toVkPipelineBindPoint(vkRenderContext->currentPipelineKind),
-		vkRenderContext->currentPipelineLayout,
-		SCENE_RESOURCE_SET_SLOT,
-		1,
-		&sceneDescriptorSet,
-		0,
-		nullptr
-	);
+	return vkRendererBackend->gpuSceneDataDescriptor.index;
 }
 
-static void bindMaterialResources_(SK::Renderer::RenderContext* renderContext)
+static uint32_t getMaterialDataDescriptorIndex_(SK::Renderer::RenderContext* renderContext)
 {
 	SK::VkRendererBackend::VkRenderContext* vkRenderContext = fetchVkRenderContext(renderContext);
 	SK::VkRendererBackend::State* vkRendererBackend = vkRenderContext->vkRendererBackend;
 	SK::VkRendererBackend::VkSceneResources* sceneResources = vkRenderContext->sceneResources;
 
-	vkCmdBindDescriptorSets(
-		vkRendererBackend->currentCmdBuffer,
-		toVkPipelineBindPoint(vkRenderContext->currentPipelineKind),
-		vkRenderContext->currentPipelineLayout,
-		MATERIAL_RESOURCE_SET_SLOT,
-		1,
-		&sceneResources->vkMaterialRegistry.resourceDescriptorSet,
-		0,
-		nullptr
-	);
+	return sceneResources->vkMaterialRegistry.pbrMaterialBufferDescriptor.index;
 }
 
-static void pushConstants_(SK::Renderer::RenderContext* renderContext, SK::Renderer::ShaderStageFlags stages, uint32_t offset, uint32_t size, const void* data)
+static void pushData_(SK::Renderer::RenderContext* renderContext, uint32_t offset, uint32_t size, const void* data)
 {
 	SK::VkRendererBackend::VkRenderContext* vkRenderContext = fetchVkRenderContext(renderContext);
 	SK::VkRendererBackend::State* vkRendererBackend = vkRenderContext->vkRendererBackend;
 
-	vkCmdPushConstants(
-		vkRendererBackend->currentCmdBuffer,
-		vkRenderContext->currentPipelineLayout,
-		toVkShaderStageFlags(stages),
-		offset,
-		size,
-		data
-	);
+	VkPushDataInfoEXT pushDataInfo = { 
+		.sType = VK_STRUCTURE_TYPE_PUSH_DATA_INFO_EXT,
+		.offset = offset,
+		.data = { .address = data, .size = size }
+	};
+
+	vkCmdPushDataEXT(vkRendererBackend->currentCmdBuffer, &pushDataInfo);
 }
 
 static void bindIndexBuffer_(SK::Renderer::RenderContext* renderContext, size_t meshIndex, SK::Renderer::IndexType indexType)
@@ -830,12 +815,14 @@ SK::Renderer::RenderContext SK::VkRendererBackend::makeRenderContext(VkRenderCon
 	{
 		.getGraphicsPipeline = getGraphicsPipeline_,
 		.getComputePipeline = getComputePipeline_,
+		.getFrameNumber = getFrameNumber_,
+		.getFrameIndex = getFrameIndex_,
 		.beginMainRendering = beginMainRendering_,
 		.endRendering = endRendering_,
 		.bindPipeline = bindPipeline_,
-		.bindSceneResources = bindSceneResources_,
-		.bindMaterialResources = bindMaterialResources_,
-		.pushConstants = pushConstants_,
+		.getSceneDataDescriptorIndex = getSceneDataDescriptorIndex_,
+		.getMaterialDataDescriptorIndex = getMaterialDataDescriptorIndex_,
+		.pushData = pushData_,
 		.bindIndexBuffer = bindIndexBuffer_,
 		.drawIndexed = drawIndexed_,
 		.dispatch = dispatch_,

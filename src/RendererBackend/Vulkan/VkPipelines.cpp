@@ -91,10 +91,20 @@ VkPipeline PipelineBuilder::buildPipeline(VkDevice device)
 	// completely clear VertexInputStateCreateInfo as we have no need for it
 	VkPipelineVertexInputStateCreateInfo vertexInputInfo = { .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
 
+	// Set the shader resource mappings
+	VkShaderDescriptorSetAndBindingMappingInfoEXT shaderResourceMappingInfo = {
+		.sType = VK_STRUCTURE_TYPE_SHADER_DESCRIPTOR_SET_AND_BINDING_MAPPING_INFO_EXT,
+		.mappingCount = static_cast<uint32_t>(shaderResourceMappings.size()),
+		.pMappings = shaderResourceMappings.data()
+	};
+	// Inform the shader stages about the mapping
+	for (size_t i = 0; i < shaderStages.size(); ++i)
+	{
+		shaderStages[i].pNext = &shaderResourceMappingInfo;
+	}
+
 	/* Build the actual pipeline */
 	VkGraphicsPipelineCreateInfo pipelineInfo = { .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
-	// Connect the renderInfo to the pNext extension mechanism as we are using Dynamic Rendering without Renderpasses (Vulkan 1.3)
-	pipelineInfo.pNext = &renderInfo;
 	// Connect the info structs
 	pipelineInfo.stageCount = (uint32_t)shaderStages.size();
 	pipelineInfo.pStages = shaderStages.data();
@@ -113,6 +123,16 @@ VkPipeline PipelineBuilder::buildPipeline(VkDevice device)
 	dynamicStateInfo.pDynamicStates = dynamicStates;
 	pipelineInfo.pDynamicState = &dynamicStateInfo;
 
+	// With descriptor heaps we no longer need a pipeline layout
+	// This struct must be chained into pipeline creation to enable the use of heaps (allowing us to leave pipelineLayout empty)
+	// Also, connect the renderInfo to the pNext extension mechanism as we are using Dynamic Rendering without Renderpasses (Vulkan 1.3)
+	VkPipelineCreateFlags2CreateInfo pipelineCreateFlags2CI{
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_CREATE_FLAGS_2_CREATE_INFO,
+		.pNext = &renderInfo,
+		.flags = VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT
+	};
+	pipelineInfo.pNext = &pipelineCreateFlags2CI;
+
 	// its easy to error out on create graphics pipeline, so handling it a bit better than the common VK_CHECK case
 	VkPipeline newPipeline;
 	if(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &newPipeline) != VK_SUCCESS)
@@ -126,11 +146,9 @@ VkPipeline PipelineBuilder::buildPipeline(VkDevice device)
 	}
 }
 
-void PipelineBuilder::setShaders(VkShaderModule vertexShader, VkShaderModule fragmentShader)
+void PipelineBuilder::pushShaderStage(VkShaderModule shader, VkShaderStageFlagBits stage)
 {
-	shaderStages.clear();
-	shaderStages.push_back(SK::VkInit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, vertexShader));
-	shaderStages.push_back(SK::VkInit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, fragmentShader));
+	shaderStages.push_back(SK::VkInit::pipeline_shader_stage_create_info(stage, shader));
 }
 
 void PipelineBuilder::setInputTopology(VkPrimitiveTopology topology)
@@ -237,4 +255,17 @@ void PipelineBuilder::enableDepthTest(bool depthWriteEnable, VkCompareOp compare
 	depthStencil.back = {};
 	depthStencil.minDepthBounds = 0.0f;
 	depthStencil.maxDepthBounds = 1.0f;
+}
+
+void PipelineBuilder::pushShaderResourceMapping(const SK::VkRendererBackend::ShaderResourceMapping& mapping, uint32_t heapArrayStride)
+{
+	shaderResourceMappings.push_back(VkDescriptorSetAndBindingMappingEXT{
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_AND_BINDING_MAPPING_EXT,
+		.descriptorSet = 0, // only set 0 is used so there are no sets actually only bindings
+		.firstBinding = mapping.binding,
+		.bindingCount = 1,
+		.resourceMask = mapping.type,
+		.source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT,
+		.sourceData = { .constantOffset = { .heapOffset = mapping.descriptorIndex * heapArrayStride, .heapArrayStride = heapArrayStride } }
+	});
 }

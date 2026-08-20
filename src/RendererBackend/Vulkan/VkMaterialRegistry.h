@@ -30,12 +30,6 @@ namespace SK::VkRendererBackend
 
 			Any other textures in the engine that are not related to materials, will be handled via their own descriptors in the renderers they used.
 		*/
-		// TODO: To be deleted
-		VkDescriptorSetLayout resourceDescriptorSetLayout = VK_NULL_HANDLE;
-		VkDescriptorSet resourceDescriptorSet = VK_NULL_HANDLE;
-		DescriptorAllocator resourceDescriptorAllocator;
-
-
 		AllocatedBuffer pbrMaterialBuffer;
 		ResourceDescriptorHandle pbrMaterialBufferDescriptor;
 	};

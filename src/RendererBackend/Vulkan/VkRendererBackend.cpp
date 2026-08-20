@@ -9,7 +9,6 @@
 #include <RendererBackend/Vulkan/VkInitializers.h>
 #include <RendererBackend/Vulkan/VkTypes.h>
 #include <RendererBackend/Vulkan/VkImages.h>
-#include <RendererBackend/Vulkan/VkPipelines.h>
 #include "VkBootstrap.h"
 
 #define VOLK_IMPLEMENTATION
@@ -25,31 +24,6 @@
 
 constexpr bool useValidationLayers = true;
 
-static size_t hashPipelineLayoutKey(const SK::VkRendererBackend::PipelineLayoutKey& k)
-{
-    size_t h = 0;
-
-    auto hc = [&](auto v)
-    {
-        std::hash<uint64_t> hasher;
-        h ^= hasher((uint64_t)v) + 0x9e3779b9 + (h << 6) + (h >> 2);
-    };
-    
-    for(auto l : k.setLayouts)
-    {
-        hc(l);
-    }
-
-    for(auto& pc : k.pushConstantRanges)
-    {
-        hc(pc.offset);
-        hc(pc.size);
-        hc(pc.stageFlags);
-    }
-
-    return h;
-}
-
 static size_t hashPipelineKey(const SK::VkRendererBackend::PipelineKey& k)
 {
     size_t h = 0;
@@ -59,8 +33,10 @@ static size_t hashPipelineKey(const SK::VkRendererBackend::PipelineKey& k)
         h ^= hasher(v) + 0x9e3779b9 + (h << 6) + (h >> 2);
     };
 
-    hc(k.vertShader);
-    hc(k.fragShader);
+    for (SK::VkRendererBackend::Shader shader : k.shaders)
+    {
+        hc(shader.module);
+    }
     hc(k.topology);
     hc(k.polygonMode);
     hc(k.cullMode);
@@ -71,7 +47,12 @@ static size_t hashPipelineKey(const SK::VkRendererBackend::PipelineKey& k)
     hc(k.blending);
     hc(k.colorFormat);
     hc(k.depthFormat);
-    hc((uint64_t)k.layout);
+
+    for (SK::VkRendererBackend::ShaderResourceMapping mapping : k.shaderResourceMappings)
+    {
+        hc(mapping.binding);
+        hc(mapping.type);
+    }
 
     return h;
 }
@@ -125,7 +106,6 @@ void SK::VkRendererBackend::init(State* vkRendererBackend, struct SDL_Window* wi
     createDrawAndDepthImages(vkRendererBackend);
 
     initDescriptors(vkRendererBackend);
-    initDescriptors2(vkRendererBackend);
 
     initDefaultData(vkRendererBackend);
 
@@ -160,7 +140,6 @@ void SK::VkRendererBackend::shutdown(State* vkRendererBackend)
 
         // Clear out the caches
         clearShaderCache(vkRendererBackend);
-        clearPipelineLayoutCache(vkRendererBackend);
         clearPipelineCache(vkRendererBackend);
 
         destroyDrawAndDepthImages(vkRendererBackend);
@@ -197,7 +176,6 @@ bool SK::VkRendererBackend::beginFrame(State* vkRendererBackend)
     VK_CHECK(vkWaitForFences(vkRendererBackend->device, 1, &currentFrame.renderFence, true, 1000000000));
 
     currentFrame.deletionQueue.flush();
-    currentFrame.frameDescriptorAllocator.clearPools(vkRendererBackend->device);
 
     // To be able to use the same fence it must be reset after use
     VK_CHECK(vkResetFences(vkRendererBackend->device, 1, &currentFrame.renderFence));
@@ -236,6 +214,9 @@ bool SK::VkRendererBackend::beginFrame(State* vkRendererBackend)
     // Frame has begun successfully, fill in per-frame transient state in the renderer backend state
     vkRendererBackend->currentCmdBuffer = currentFrame.mainCommandBuffer;
     vkRendererBackend->currentSwapchainImageIndex = swapchainImageIndex;
+
+    // Bind the descriptor heaps once per-frame.
+    SK::VkRendererBackend::bindDescriptorHeap(vkRendererBackend, cmd, &vkRendererBackend->descriptorHeap);
 
     return true;
 }
@@ -588,13 +569,8 @@ VkGPUMeshBuffers SK::VkRendererBackend::uploadMesh(State* vkRendererBackend, std
 void SK::VkRendererBackend::updateSceneBuffer(State* vkRendererBackend, const SK::Renderer::GPUSceneData & sceneData)
 {
     // Update the scene buffer
-    SK::Renderer::GPUSceneData* pGpuSceneDataBuffer = (SK::Renderer::GPUSceneData*)vkRendererBackend->gpuSceneDataBuffer[vkRendererBackend->frameNumber % FRAME_OVERLAP].allocation->GetMappedData();
-    *pGpuSceneDataBuffer = sceneData;
-}
-
-VkDescriptorSet SK::VkRendererBackend::fetchCurrentSceneBufferDescriptorSet(State* vkRendererBackend)
-{
-    return vkRendererBackend->gpuSceneDescriptorSet[vkRendererBackend->frameNumber % FRAME_OVERLAP];
+    SK::Renderer::GPUSceneData* pGpuSceneDataBuffer = (SK::Renderer::GPUSceneData*)vkRendererBackend->gpuSceneDataBuffer.allocation->GetMappedData();
+    pGpuSceneDataBuffer[vkRendererBackend->frameNumber % FRAME_OVERLAP] = sceneData;
 }
 
 void SK::VkRendererBackend::setViewport(State* vkRendererBackend, VkCommandBuffer cmd)
@@ -649,7 +625,7 @@ SK::VkRendererBackend::FrameData& SK::VkRendererBackend::getCurrentFrameData(Sta
     return vkRendererBackend->frames[vkRendererBackend->frameNumber % FRAME_OVERLAP];
 }
 
-VkShaderModule SK::VkRendererBackend::getOrLoadShader(State* vkRendererBackend, const char* path)
+SK::VkRendererBackend::Shader SK::VkRendererBackend::getOrLoadShader(State* vkRendererBackend, const char* path, VkShaderStageFlagBits stage)
 {
     size_t hash = std::hash<std::string>{}(path);
 
@@ -659,57 +635,25 @@ VkShaderModule SK::VkRendererBackend::getOrLoadShader(State* vkRendererBackend, 
         return it->second;
     }
 
-    VkShaderModule shaderModule;
-    if(!SK::VkUtil::loadShaderModule(vkRendererBackend->device, path, &shaderModule))
+    Shader shader;
+    shader.stage = stage;
+    if(!SK::VkUtil::loadShaderModule(vkRendererBackend->device, path, &shader.module))
     {
-        return VK_NULL_HANDLE;
+        return Shader{ .module = VK_NULL_HANDLE, .stage = stage };
     }
 
-    vkRendererBackend->shaderCache[hash] = shaderModule;
-    return shaderModule;
+    vkRendererBackend->shaderCache[hash] = shader;
+    return shader;
 }
     
 void SK::VkRendererBackend::clearShaderCache(State* vkRendererBackend)
 {
     for(auto& [k, s] : vkRendererBackend->shaderCache)
     {
-        vkDestroyShaderModule(vkRendererBackend->device, s, nullptr);
+        vkDestroyShaderModule(vkRendererBackend->device, s.module, nullptr);
     }
 
     vkRendererBackend->shaderCache.clear();
-}
-
-VkPipelineLayout SK::VkRendererBackend::getOrCreatePipelineLayout(State* vkRendererBackend, const PipelineLayoutKey& key)
-{
-    size_t hash = hashPipelineLayoutKey(key);
-
-    auto it = vkRendererBackend->pipelineLayoutCache.find(hash);
-    if(it != vkRendererBackend->pipelineLayoutCache.end())
-    {
-        return it->second;
-    }
-
-    VkPipelineLayoutCreateInfo info = SK::VkInit::pipeline_layout_create_info();
-    info.setLayoutCount = (uint32_t)key.setLayouts.size();
-    info.pSetLayouts = key.setLayouts.data();
-    info.pushConstantRangeCount = (uint32_t)key.pushConstantRanges.size();
-    info.pPushConstantRanges = key.pushConstantRanges.data();
-
-    VkPipelineLayout layout;
-    VK_CHECK(vkCreatePipelineLayout(vkRendererBackend->device, &info, nullptr, &layout));
-
-    vkRendererBackend->pipelineLayoutCache[hash] = layout;
-    return layout;
-}
-
-void SK::VkRendererBackend::clearPipelineLayoutCache(State* vkRendererBackend)
-{
-    for(auto& [k, l] : vkRendererBackend->pipelineLayoutCache)
-    {
-        vkDestroyPipelineLayout(vkRendererBackend->device, l, nullptr);
-    }
-
-    vkRendererBackend->pipelineLayoutCache.clear();
 }
 
 VkPipeline SK::VkRendererBackend::getOrCreatePipeline(State* vkRendererBackend, const PipelineKey& key)
@@ -725,10 +669,10 @@ VkPipeline SK::VkRendererBackend::getOrCreatePipeline(State* vkRendererBackend, 
     PipelineBuilder builder;
     builder.clear();
 
-    builder.setShaders(
-        vkRendererBackend->shaderCache[key.vertShader],
-        vkRendererBackend->shaderCache[key.fragShader]
-    );
+    for (const Shader& shader : key.shaders)
+    {
+        builder.pushShaderStage(shader.module, shader.stage);
+    }
 
     builder.setInputTopology(key.topology);
     builder.setPolygonMode(key.polygonMode);
@@ -757,7 +701,11 @@ VkPipeline SK::VkRendererBackend::getOrCreatePipeline(State* vkRendererBackend, 
     builder.setColorAttachmentFormat(key.colorFormat);
     builder.setDepthFormat(key.depthFormat);
 
-    builder.pipelineLayout = key.layout;
+    for (const SK::VkRendererBackend::ShaderResourceMapping mapping : key.shaderResourceMappings)
+    {
+        uint32_t heapArrayStride = mapping.type != VK_SPIRV_RESOURCE_TYPE_SAMPLER_BIT_EXT ? vkRendererBackend->descriptorHeap.resourceDescriptorStride : vkRendererBackend->descriptorHeap.samplerDescriptorSize;
+        builder.pushShaderResourceMapping(mapping, heapArrayStride);
+    }
 
     VkPipeline pipeline = builder.buildPipeline(vkRendererBackend->device);
 
@@ -989,59 +937,6 @@ void SK::VkRendererBackend::handleWindowResize(State* vkRendererBackend)
 
 void SK::VkRendererBackend::initDescriptors(State* vkRendererBackend)
 {
-    // Create the global growable descriptor allocator 
-    std::vector<DescriptorAllocatorGrowable::PoolSize> sizes = {
-        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1 },
-        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 }
-    };
-
-    vkRendererBackend->globalDescriptorAllocator.init(vkRendererBackend->device, 10, sizes);
-    
-    // The descriptor set layout for single texture display
-    {
-        DescriptorLayoutBuilder builder;
-        builder.addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-        vkRendererBackend->displayTextureDescriptorSetLayout = builder.build(vkRendererBackend->device, VK_SHADER_STAGE_FRAGMENT_BIT);
-    }
-
-    // Descriptor set layout for the scene data
-    {
-        DescriptorLayoutBuilder builder;
-        builder.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-        vkRendererBackend->gpuSceneDataDescriptorLayout = builder.build(vkRendererBackend->device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-    }
-
-    // Add the descriptor allocator and layout destructors to the deletion queue
-    vkRendererBackend->mainDeletionQueue.pushFunction([=](){
-        vkRendererBackend->globalDescriptorAllocator.destroyPools(vkRendererBackend->device);
-
-        vkDestroyDescriptorSetLayout(vkRendererBackend->device, vkRendererBackend->displayTextureDescriptorSetLayout, nullptr);
-        vkDestroyDescriptorSetLayout(vkRendererBackend->device, vkRendererBackend->gpuSceneDataDescriptorLayout, nullptr);
-    });
-
-    // Init the per-frame descriptor allocators
-    for(int i = 0; i < FRAME_OVERLAP; ++i)
-    {
-        std::vector<DescriptorAllocatorGrowable::PoolSize> framePoolSizes = {
-            { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3 },
-            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3 },
-            { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 },
-            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4 },
-        };
-
-        vkRendererBackend->frames[i].frameDescriptorAllocator = DescriptorAllocatorGrowable{};
-        vkRendererBackend->frames[i].frameDescriptorAllocator.init(vkRendererBackend->device, 1000, framePoolSizes);
-
-        // Pools in the frame descriptor allocators must be destroyed with the vkRendererBackend shutdown (not with frame shutdown)
-        vkRendererBackend->mainDeletionQueue.pushFunction([=]() {
-            vkRendererBackend->frames[i].frameDescriptorAllocator.destroyPools(vkRendererBackend->device);
-        });
-    }
-}
-
-void SK::VkRendererBackend::initDescriptors2(State* vkRendererBackend)
-{
     DescriptorHeapDesc desc{ .maxResourceDescriptors = 8192, .maxSamplerDescriptors = 256 };
     initDescriptorHeap(vkRendererBackend, &vkRendererBackend->descriptorHeap, desc);
     vkRendererBackend->mainDeletionQueue.pushFunction([=]() {
@@ -1077,65 +972,31 @@ void SK::VkRendererBackend::initDefaultData(State* vkRendererBackend)
     dataSize = 16 * 16 * 1 * 4; // 16 x 16 RGBA 8 bit
     vkRendererBackend->errorCheckerboardImage = createImage(vkRendererBackend, pixels.data(), dataSize, VkExtent3D{ 16, 16, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
 
-    // Default samplers
-    VkSamplerCreateInfo samplerInfo = { .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
-
-    samplerInfo.magFilter = VK_FILTER_NEAREST;
-    samplerInfo.minFilter = VK_FILTER_NEAREST;
-    vkCreateSampler(vkRendererBackend->device, &samplerInfo, nullptr, &vkRendererBackend->defaultSamplerNearest);
-
-    samplerInfo.magFilter = VK_FILTER_LINEAR;
-    samplerInfo.minFilter = VK_FILTER_LINEAR;
-    vkCreateSampler(vkRendererBackend->device, &samplerInfo, nullptr, &vkRendererBackend->defaultSamplerLinear);
-
     vkRendererBackend->mainDeletionQueue.pushFunction([=]() {
         destroyImage(vkRendererBackend, vkRendererBackend->whiteImage);
         destroyImage(vkRendererBackend, vkRendererBackend->greyImage);
         destroyImage(vkRendererBackend, vkRendererBackend->blackImage);
         destroyImage(vkRendererBackend, vkRendererBackend->errorCheckerboardImage);
-
-        vkDestroySampler(vkRendererBackend->device, vkRendererBackend->defaultSamplerNearest, nullptr);
-        vkDestroySampler(vkRendererBackend->device, vkRendererBackend->defaultSamplerLinear, nullptr);
     });
 }
 
 void SK::VkRendererBackend::initGlobalSceneBuffer(State* vkRendererBackend)
 {
-    for(int i = 0; i < FRAME_OVERLAP; ++i)
-    {
-        // Allocate a new uniform buffer for scene data (allocating on VRAM that CPU can write to directly. It is limited but it is perfect for allocating reasonable amounts that are dynamic)
-        vkRendererBackend->gpuSceneDataBuffer[i] = createBuffer(vkRendererBackend, sizeof(SK::Renderer::GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-        vkRendererBackend->mainDeletionQueue.pushFunction([=]() {
-            destroyBuffer(vkRendererBackend, vkRendererBackend->gpuSceneDataBuffer[i]);
-        });
+    size_t bufferSize = FRAME_OVERLAP * sizeof(SK::Renderer::GPUSceneData);
+    // Allocate a new uniform buffer for scene data (allocating on VRAM that CPU can write to directly. It is limited but it is perfect for allocating reasonable amounts that are dynamic)
+    vkRendererBackend->gpuSceneDataBuffer = createBuffer(vkRendererBackend, bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    vkRendererBackend->mainDeletionQueue.pushFunction([=]() {
+        destroyBuffer(vkRendererBackend, vkRendererBackend->gpuSceneDataBuffer);
+    });
 
-        // Create a descriptor set for the uniform data
-        vkRendererBackend->gpuSceneDescriptorSet[i] = vkRendererBackend->globalDescriptorAllocator.allocate(vkRendererBackend->device, vkRendererBackend->gpuSceneDataDescriptorLayout);
-        DescriptorWriter writer;
-        writer.writeBuffer(0, vkRendererBackend->gpuSceneDataBuffer[i].buffer, sizeof(SK::Renderer::GPUSceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-        writer.updateSet(vkRendererBackend->device, vkRendererBackend->gpuSceneDescriptorSet[i]);
-    }
-}
-
-void SK::VkRendererBackend::initGlobalSceneBuffer2(State* vkRendererBackend)
-{
-    for (int i = 0; i < FRAME_OVERLAP; ++i)
-    {
-        // Allocate a new uniform buffer for scene data (allocating on VRAM that CPU can write to directly. It is limited but it is perfect for allocating reasonable amounts that are dynamic)
-        vkRendererBackend->gpuSceneDataBuffer[i] = createBuffer(vkRendererBackend, sizeof(SK::Renderer::GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-        vkRendererBackend->mainDeletionQueue.pushFunction([=]() {
-            destroyBuffer(vkRendererBackend, vkRendererBackend->gpuSceneDataBuffer[i]);
-        });
-
-        // Allocate the descriptor slot from the heap and write the descriptor info onto it.
-        vkRendererBackend->gpuSceneDataDescriptor[i] = allocateResourceDescriptor(&vkRendererBackend->descriptorHeap, ResourceDescriptorKind::UniformBuffer);
-        writeUniformBufferDescriptor(
-            vkRendererBackend, 
-            &vkRendererBackend->descriptorHeap, 
-            vkRendererBackend->gpuSceneDataDescriptor[i],
-            vkRendererBackend->gpuSceneDataBuffer[i],
-            0,
-            sizeof(SK::Renderer::GPUSceneData)
-        );
-    }
+    // Allocate the descriptor slot from the heap and write the descriptor info onto it.
+    vkRendererBackend->gpuSceneDataDescriptor = allocateResourceDescriptor(&vkRendererBackend->descriptorHeap, ResourceDescriptorKind::UniformBuffer);
+    writeUniformBufferDescriptor(
+        vkRendererBackend, 
+        &vkRendererBackend->descriptorHeap, 
+        vkRendererBackend->gpuSceneDataDescriptor,
+        vkRendererBackend->gpuSceneDataBuffer,
+        0,
+        bufferSize
+    );
 }

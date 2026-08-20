@@ -27,8 +27,6 @@ namespace SK::VkRendererBackend
 		struct GPUTexture
 		{
 			AllocatedImage image;
-			// TODO: To be deleted
-			VkSampler sampler;
 			ResourceDescriptorHandle imageDescriptor;
 			SamplerDescriptorHandle samplerDescriptor;
 			std::string name;

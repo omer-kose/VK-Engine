@@ -5,9 +5,8 @@
 #include <span>
 
 #include <RendererBackend/Vulkan/VkTypes.h>
-// TODO: Will be removed when I will completely switch to Descriptor Heaps
-#include <RendererBackend/Vulkan/VkDescriptors.h>
 #include <RendererBackend/Vulkan/VkDescriptorHeap.h>
+#include <RendererBackend/Vulkan/VkPipelines.h>
 
 #include <Util/DeletionQueue.h>
 
@@ -32,8 +31,6 @@ namespace SK::VkRendererBackend
 		VkSemaphore swapchainAcquireSemaphore;
 		VkFence renderFence;
 
-		DescriptorAllocatorGrowable frameDescriptorAllocator;
-
 		// Per-Frame Resource Deletion Queue
 		SK::Util::DeletionQueue deletionQueue;
 	};
@@ -49,16 +46,15 @@ namespace SK::VkRendererBackend
 
 	constexpr unsigned int FRAME_OVERLAP = 2;
 
-	struct PipelineLayoutKey
+	struct Shader
 	{
-		std::vector<VkDescriptorSetLayout> setLayouts;
-		std::vector<VkPushConstantRange> pushConstantRanges;
+		VkShaderModule module;
+		VkShaderStageFlagBits stage;
 	};
 
 	struct PipelineKey
 	{
-		size_t vertShader;
-		size_t fragShader;
+		std::vector<Shader> shaders;
 
 		VkPrimitiveTopology topology;
 		VkPolygonMode polygonMode;
@@ -74,7 +70,7 @@ namespace SK::VkRendererBackend
 		VkFormat colorFormat;
 		VkFormat depthFormat;
 
-		VkPipelineLayout layout;
+		std::vector<ShaderResourceMapping> shaderResourceMappings;
 	};
 
 	struct State
@@ -137,20 +133,10 @@ namespace SK::VkRendererBackend
 
 		// Descriptor Heap
 		DescriptorHeap descriptorHeap;
-		ResourceDescriptorHandle gpuSceneDataDescriptor[FRAME_OVERLAP];
 
-		// TODO: To be deleted 
-		// Global Descriptors
-		DescriptorAllocatorGrowable globalDescriptorAllocator;
-		// Descriptor layout for single texture display
-		VkDescriptorSetLayout displayTextureDescriptorSetLayout;
-		// Scene Descriptor Layout (Global Descriptor Set 0 Layout)
-		VkDescriptorSetLayout gpuSceneDataDescriptorLayout;
-
-		// TODO: To be deleted 
-		// Per-frame Global Scene (uniform) Buffer and the descriptor set (Shared by the whole engine which uses scene data so it is persistent per-frame no need to reallocate) 
-		AllocatedBuffer gpuSceneDataBuffer[FRAME_OVERLAP];
-		VkDescriptorSet gpuSceneDescriptorSet[FRAME_OVERLAP];
+		// Per-frame Global Scene (uniform) Buffer (Shared by the whole engine which uses scene data so it is persistent per-frame no need to reallocate) 
+		AllocatedBuffer gpuSceneDataBuffer; // scene buffer is an array of scene data structs (FRAME_OVERLAP elements)
+		ResourceDescriptorHandle gpuSceneDataDescriptor;
 
 		// Default textures
 		AllocatedImage whiteImage;
@@ -158,15 +144,8 @@ namespace SK::VkRendererBackend
 		AllocatedImage greyImage;
 		AllocatedImage errorCheckerboardImage;
 
-		// Default samplers
-		VkSampler defaultSamplerLinear;
-		VkSampler defaultSamplerNearest;
-
 		// Shader cache
-		std::unordered_map<size_t, VkShaderModule> shaderCache;
-
-		// Pipeline Layout cache
-		std::unordered_map<size_t, VkPipelineLayout> pipelineLayoutCache;
+		std::unordered_map<size_t, Shader> shaderCache;
 
 		// Pipeline cache
 		std::unordered_map<size_t, VkPipeline> pipelineCache;
@@ -217,16 +196,12 @@ namespace SK::VkRendererBackend
 	VkGPUMeshBuffers uploadMesh(State* vkRendererBackend, std::span<SK::Renderer::Vertex> vertices, std::span<uint32_t> indices);
 
 	void updateSceneBuffer(State* vkRendererBackend, const SK::Renderer::GPUSceneData& gpuSceneData);
-	VkDescriptorSet fetchCurrentSceneBufferDescriptorSet(State* vkRendererBackend);
 
 	void setViewport(State* vkRendererBackend, VkCommandBuffer cmd);
 	void setScissor(State* vkRendererBackend, VkCommandBuffer cmd);
 
-	VkShaderModule getOrLoadShader(State* vkRendererBackend, const char* path);
+	Shader getOrLoadShader(State* vkRendererBackend, const char* path, VkShaderStageFlagBits stage);
 	void clearShaderCache(State* vkRendererBackend);
-
-	VkPipelineLayout getOrCreatePipelineLayout(State* vkRendererBackend, const PipelineLayoutKey& key);
-	void clearPipelineLayoutCache(State* vkRendererBackend);
 
 	VkPipeline getOrCreatePipeline(State* vkRendererBackend, const PipelineKey& key);
 	void clearPipelineCache(State* vkRendererBackend);
@@ -247,16 +222,12 @@ namespace SK::VkRendererBackend
 	void createSwapchain(State* vkRendererBackend, uint32_t width, uint32_t height);
 	void destroySwapchain(State* vkRendererBackend);
 	// Descriptors
-	// TODO: To be deleted and replaced by the second version that uses descriptor heaps.
 	void initDescriptors(State* vkRendererBackend);
-	void initDescriptors2(State* vkRendererBackend);
 	// Draw and Depth Images
 	void createDrawAndDepthImages(State* vkRendererBackend);
 	void destroyDrawAndDepthImages(State* vkRendererBackend);
 	// Default Engine Data
 	void initDefaultData(State* vkRendererBackend);
 	// Init Scene Buffer
-	// TODO: To be deleted and replaced by the second version that uses descriptor heaps.
 	void initGlobalSceneBuffer(State* vkRendererBackend);
-	void initGlobalSceneBuffer2(State* vkRendererBackend);
 };

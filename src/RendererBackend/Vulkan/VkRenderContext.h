@@ -17,7 +17,6 @@ namespace SK::VkRendererBackend
 	struct PipelineRecord
 	{
 		VkPipeline pipeline = VK_NULL_HANDLE;
-		VkPipelineLayout layout = VK_NULL_HANDLE;
 		SK::Renderer::PipelineKind kind = SK::Renderer::PipelineKind::Graphics;
 	};
 
@@ -53,6 +52,7 @@ namespace SK::VkRendererBackend
 
 		std::vector<BufferRecord> buffers;
 		std::vector<TextureRecord> textures;
+		// TODO: Sampler objects are no longer needed. Also, samplers belong to VkRendererBackend now. Refactor this accordingly.
 		std::vector<VkSampler> samplers;
 		// Sampler cache 
 		std::unordered_map<size_t, uint32_t> samplerIndexByHash;

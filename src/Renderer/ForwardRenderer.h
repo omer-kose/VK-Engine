@@ -23,6 +23,7 @@ namespace SK::ForwardRenderer
 	{
 		glm::mat4 worldMatrix;
 		SK::Renderer::BufferDeviceAddress vertexBufferAddress;
+		uint32_t frameIndex;
 		uint32_t materialIndex;
 	};
 
