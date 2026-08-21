@@ -29,7 +29,7 @@ namespace SK::VkRendererBackend
 	struct TextureRecord
 	{
 		AllocatedImage image;
-		uint32_t samplerIndex; // The number of permutations for samplers is quite limited in real usage scenarios, so a 32 bit index is a bit overkill.
+		uint8_t samplerIndex; // descriptor index of the sampler
 		const char* debugName = nullptr;
 	};
 
@@ -52,10 +52,6 @@ namespace SK::VkRendererBackend
 
 		std::vector<BufferRecord> buffers;
 		std::vector<TextureRecord> textures;
-		// TODO: Sampler objects are no longer needed. Also, samplers belong to VkRendererBackend now. Refactor this accordingly.
-		std::vector<VkSampler> samplers;
-		// Sampler cache 
-		std::unordered_map<size_t, uint32_t> samplerIndexByHash;
 	};
 
 	void initVkRenderContext(VkRenderContext* vkRenderContext, State* vkRendererBackend, VkSceneResources* vkSceneResources);

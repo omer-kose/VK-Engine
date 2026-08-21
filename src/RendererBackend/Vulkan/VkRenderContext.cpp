@@ -684,42 +684,10 @@ static SK::Renderer::BufferHandle createBuffer_(SK::Renderer::RenderContext* ren
 	return SK::Renderer::BufferHandle{ bufferIndex };
 }
 
-static size_t hashSamplerDesc(const SK::Renderer::SamplerDesc& desc)
-{
-	size_t hash = 0;
-
-	std::hash<uint64_t> integerHasher;
-	std::hash<float> floatHasher;
-
-	hashCombine(&hash, integerHasher(static_cast<uint64_t>(desc.magFilter)));
-	hashCombine(&hash, integerHasher(static_cast<uint64_t>(desc.minFilter)));
-	hashCombine(&hash, integerHasher(static_cast<uint64_t>(desc.mipmapMode)));
-	hashCombine(&hash, integerHasher(static_cast<uint64_t>(desc.addressModeU)));
-	hashCombine(&hash, integerHasher(static_cast<uint64_t>(desc.addressModeV)));
-	hashCombine(&hash, integerHasher(static_cast<uint64_t>(desc.addressModeW)));
-	hashCombine(&hash, floatHasher(desc.mipLodBias));
-	hashCombine(&hash, integerHasher(desc.anisotropyEnable ? 1 : 0));
-	hashCombine(&hash, floatHasher(desc.maxAnisotropy));
-	hashCombine(&hash, integerHasher(desc.compareEnable ? 1 : 0));
-	hashCombine(&hash, floatHasher(desc.minLod));
-	hashCombine(&hash, floatHasher(desc.maxLod));
-	hashCombine(&hash, integerHasher(static_cast<uint64_t>(desc.borderColor)));
-
-	return hash;
-}
-
 static uint32_t getOrCreateSampler(SK::Renderer::RenderContext* renderContext, const SK::Renderer::SamplerDesc& desc)
 {
 	SK::VkRendererBackend::VkRenderContext* vkRenderContext = fetchVkRenderContext(renderContext);
 	SK::VkRendererBackend::State* vkRendererBackend = vkRenderContext->vkRendererBackend;
-
-	const size_t descHash = hashSamplerDesc(desc);
-
-	auto existing = vkRenderContext->samplerIndexByHash.find(descHash);
-	if (existing != vkRenderContext->samplerIndexByHash.end())
-	{
-		return existing->second;
-	}
 
 	// Create and cache the sampler
 	VkSamplerCreateInfo info{
@@ -740,13 +708,7 @@ static uint32_t getOrCreateSampler(SK::Renderer::RenderContext* renderContext, c
 		.borderColor = toVkBorderColor(desc.borderColor)
 	};
 
-	VkSampler sampler = SK::VkRendererBackend::createSampler(vkRendererBackend, info);
-
-	uint32_t samplerIndex = static_cast<uint32_t>(vkRenderContext->samplers.size());
-	vkRenderContext->samplers.push_back(sampler);
-	vkRenderContext->samplerIndexByHash[descHash] = samplerIndex;
-
-	return samplerIndex;
+	return SK::VkRendererBackend::createSamplerDescriptor(vkRendererBackend, info).index;
 }
 
 static SK::Renderer::TextureHandle createTexture_(SK::Renderer::RenderContext* renderContext, const SK::Renderer::TextureDesc& textureDesc)
@@ -799,8 +761,6 @@ void SK::VkRendererBackend::initVkRenderContext(VkRenderContext* vkRenderContext
 	vkRenderContext->currentPipelineLayout = VK_NULL_HANDLE;
 	vkRenderContext->buffers.clear();
 	vkRenderContext->textures.clear();
-	vkRenderContext->samplers.clear();
-	vkRenderContext->samplerIndexByHash.clear();
 }
 
 SK::Renderer::RenderContext SK::VkRendererBackend::makeRenderContext(VkRenderContext* vkRenderContext)
@@ -845,11 +805,6 @@ void SK::VkRendererBackend::clearVkRenderContext(VkRenderContext* vkRenderContex
 		{
 			SK::VkRendererBackend::destroyImage(vkRenderContext->vkRendererBackend, textureRecord.image);
 		}
-
-		for (VkSampler sampler : vkRenderContext->samplers)
-		{
-			SK::VkRendererBackend::destroySampler(vkRenderContext->vkRendererBackend, sampler);
-		}
 	}
 
 	vkRenderContext->vkRendererBackend = nullptr;
@@ -860,6 +815,4 @@ void SK::VkRendererBackend::clearVkRenderContext(VkRenderContext* vkRenderContex
 	vkRenderContext->currentPipelineLayout = VK_NULL_HANDLE;
 	vkRenderContext->buffers.clear();
 	vkRenderContext->textures.clear();
-	vkRenderContext->samplers.clear();
-	vkRenderContext->samplerIndexByHash.clear();
 }

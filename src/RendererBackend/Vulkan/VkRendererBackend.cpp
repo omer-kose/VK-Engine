@@ -456,38 +456,6 @@ VkImageViewCreateInfo SK::VkRendererBackend::createImageViewInfo(State* vkRender
     return viewInfo;
 }
 
-VkSampler SK::VkRendererBackend::createSampler(State* vkRendererBackend, const VkSamplerCreateInfo& createInfo)
-{
-    VkSampler sampler;
-    VK_CHECK(vkCreateSampler(vkRendererBackend->device, &createInfo, 0, &sampler));
-    return sampler;
-}
-
-VkSampler SK::VkRendererBackend::createSampler(State* vkRendererBackend, VkFilter minFilter, VkFilter magFilter, VkSamplerMipmapMode mipmapMode, VkSamplerAddressMode addressMode)
-{
-    VkSamplerCreateInfo createInfo = { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
-
-    createInfo.minFilter = minFilter;
-    createInfo.magFilter = magFilter;
-    createInfo.mipmapMode = mipmapMode;
-    createInfo.addressModeU = addressMode;
-    createInfo.addressModeV = addressMode;
-    createInfo.addressModeW = addressMode;
-    createInfo.minLod = 0.0f;
-    createInfo.maxLod = 16.0f;
-    createInfo.anisotropyEnable = mipmapMode == VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    createInfo.maxAnisotropy = mipmapMode == VK_SAMPLER_MIPMAP_MODE_LINEAR ? 4.0f : 1.0f;
-
-    VkSampler sampler;
-    VK_CHECK(vkCreateSampler(vkRendererBackend->device, &createInfo, 0, &sampler));
-    return sampler;
-}
-
-void SK::VkRendererBackend::destroySampler(State* vkRendererBackend, VkSampler sampler)
-{
-    vkDestroySampler(vkRendererBackend->device, sampler, nullptr);
-}
-
 SK::VkRendererBackend::SamplerDescriptorHandle SK::VkRendererBackend::createSamplerDescriptor(State* vkRendererBackend, const VkSamplerCreateInfo& samplerInfo)
 {
     size_t samplerHash = hashSamplerInfo(samplerInfo);
@@ -500,6 +468,8 @@ SK::VkRendererBackend::SamplerDescriptorHandle SK::VkRendererBackend::createSamp
     SamplerDescriptorHandle handle = allocateSamplerDescriptor(&vkRendererBackend->descriptorHeap);
     writeSamplerDescriptor(vkRendererBackend, &vkRendererBackend->descriptorHeap, handle, samplerInfo);
     vkRendererBackend->samplerDescriptorCache[samplerHash] = handle;
+
+    return handle;
 }
 
 SK::VkRendererBackend::SamplerDescriptorHandle SK::VkRendererBackend::createSamplerDescriptor(State* vkRendererBackend, VkFilter minFilter, VkFilter magFilter, VkSamplerMipmapMode mipmapMode, VkSamplerAddressMode addressMode)

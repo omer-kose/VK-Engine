@@ -185,10 +185,6 @@ namespace SK::VkRendererBackend
 	// Utility function to provide VkImageViewCreateInfo which is used while writing image descriptors.
 	VkImageViewCreateInfo createImageViewInfo(State* vkRendererBackend, const AllocatedImage& image);
 
-	VkSampler createSampler(State* vkRendererBackend, const VkSamplerCreateInfo& createInfo);
-	VkSampler createSampler(State* vkRendererBackend, VkFilter minFilter, VkFilter magFilter, VkSamplerMipmapMode mipmapMode, VkSamplerAddressMode addressMode);
-	void destroySampler(State* vkRendererBackend, VkSampler sampler);
-
 	SamplerDescriptorHandle createSamplerDescriptor(State* vkRendererBackend, const VkSamplerCreateInfo& samplerInfo);
 	// A much simplified and default version that is being used by the current asset system.
 	SamplerDescriptorHandle createSamplerDescriptor(State* vkRendererBackend, VkFilter minFilter, VkFilter magFilter, VkSamplerMipmapMode mipmapMode, VkSamplerAddressMode addressMode);
