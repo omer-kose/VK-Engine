@@ -46,10 +46,6 @@ namespace SK::VkRendererBackend
 		// TODO: This is for reusing the pipelines while retrieving them in frontend renderers. However, the retrievers also store those pipeline handles so this might be an unnecessary book-keeping.
 		std::unordered_map<size_t, uint32_t> pipelineIndexByHash;
 
-		// Cache the current pipeline information for later use when a pipeline is bound.
-		SK::Renderer::PipelineKind currentPipelineKind = SK::Renderer::PipelineKind::Graphics;
-		VkPipelineLayout currentPipelineLayout = VK_NULL_HANDLE;
-
 		std::vector<BufferRecord> buffers;
 		std::vector<TextureRecord> textures;
 	};

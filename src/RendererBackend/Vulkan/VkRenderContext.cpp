@@ -373,8 +373,6 @@ static void bindPipeline_(SK::Renderer::RenderContext* renderContext, SK::Render
 
 	const SK::VkRendererBackend::PipelineRecord& record = vkRenderContext->pipelines[static_cast<size_t>(pipeline.id)];
 
-	vkRenderContext->currentPipelineKind = record.kind;
-
 	vkCmdBindPipeline(vkRendererBackend->currentCmdBuffer, toVkPipelineBindPoint(record.kind), record.pipeline);
 
 	if (record.kind == SK::Renderer::PipelineKind::Graphics)
@@ -757,8 +755,6 @@ void SK::VkRendererBackend::initVkRenderContext(VkRenderContext* vkRenderContext
 	vkRenderContext->sceneResources = vkSceneResources;
 	vkRenderContext->pipelines.clear();
 	vkRenderContext->pipelineIndexByHash.clear();
-	vkRenderContext->currentPipelineKind = SK::Renderer::PipelineKind::Graphics;
-	vkRenderContext->currentPipelineLayout = VK_NULL_HANDLE;
 	vkRenderContext->buffers.clear();
 	vkRenderContext->textures.clear();
 }
@@ -811,8 +807,6 @@ void SK::VkRendererBackend::clearVkRenderContext(VkRenderContext* vkRenderContex
 	vkRenderContext->sceneResources = nullptr;
 	vkRenderContext->pipelines.clear();
 	vkRenderContext->pipelineIndexByHash.clear();
-	vkRenderContext->currentPipelineKind = SK::Renderer::PipelineKind::Graphics;
-	vkRenderContext->currentPipelineLayout = VK_NULL_HANDLE;
 	vkRenderContext->buffers.clear();
 	vkRenderContext->textures.clear();
 }
