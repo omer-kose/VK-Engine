@@ -19,8 +19,6 @@ void SK::ForwardRenderer::createResources(SK::Renderer::RenderContext* renderCon
 	opaqueDesc.depthWrite = true;
 	opaqueDesc.depthCompare = SK::Renderer::CompareOp::LessOrEqual;
 	opaqueDesc.blending = false;
-	opaqueDesc.pushConstantSize = sizeof(PushConstants);
-	opaqueDesc.pushConstantStages = SK::Renderer::ShaderStageFlagBits::VertexShader | SK::Renderer::ShaderStageFlagBits::FragmentShader;
 	opaqueDesc.shaderResourceMappings = {
 		{ 0, SK::Renderer::ShaderResourceType::UniformBuffer, SK::Renderer::getSceneDataDescriptorIndex(renderContext) },
 		{ 1, SK::Renderer::ShaderResourceType::ReadOnlyStorageBuffer, SK::Renderer::getMaterialDataDescriptorIndex(renderContext) },

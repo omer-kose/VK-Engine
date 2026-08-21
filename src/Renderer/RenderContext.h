@@ -130,9 +130,6 @@ namespace SK::Renderer
 
 		bool blending = false;
 
-		uint32_t pushConstantSize = 0;
-		ShaderStageFlags pushConstantStages = ShaderStageFlagBits::None;
-
 		// Typed shader resource declarations to map into descriptor heaps.
 		std::vector<ShaderResourceMappingDesc> shaderResourceMappings;
 	};
@@ -142,9 +139,6 @@ namespace SK::Renderer
 		const char* debugName = nullptr;
 
 		const char* computeShaderPath = nullptr;
-
-		uint32_t pushConstantSize = 0;
-		ShaderStageFlags pushConstantStages = ShaderStageFlagBits::None;
 
 		// Typed shader resource declarations to map into descriptor heaps.
 		std::vector<ShaderResourceMappingDesc> shaderResourceMappings;

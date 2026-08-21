@@ -193,9 +193,6 @@ static size_t hashGraphicsPipelineDesc(const SK::Renderer::GraphicsPipelineDesc&
 
 	hashCombine(&hash, integerHasher(desc.blending ? 1 : 0));
 
-	hashCombine(&hash, integerHasher(desc.pushConstantSize));
-	hashCombine(&hash, integerHasher(desc.pushConstantStages));
-
 	for (const SK::Renderer::ShaderResourceMappingDesc& mapping : desc.shaderResourceMappings)
 	{
 		hashCombine(&hash, integerHasher(mapping.binding));
@@ -214,9 +211,6 @@ static size_t hashComputePipelineDesc(const SK::Renderer::ComputePipelineDesc& d
 
 	hashCombine(&hash, integerHasher(static_cast<uint64_t>(SK::Renderer::PipelineKind::Compute)));
 	hashCombine(&hash, hashString(desc.computeShaderPath));
-
-	hashCombine(&hash, integerHasher(desc.pushConstantSize));
-	hashCombine(&hash, integerHasher(desc.pushConstantStages));
 
 	for (const SK::Renderer::ShaderResourceMappingDesc& mapping : desc.shaderResourceMappings)
 	{
