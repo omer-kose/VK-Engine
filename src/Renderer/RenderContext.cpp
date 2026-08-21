@@ -20,6 +20,24 @@ SK::Renderer::PipelineHandle SK::Renderer::getComputePipeline(RenderContext* ren
 	return renderContext->api->getComputePipeline(renderContext, desc);
 }
 
+uint32_t SK::Renderer::getFrameNumber(RenderContext* renderContext)
+{
+	assert(renderContext != nullptr);
+	assert(renderContext->api != nullptr);
+	assert(renderContext->api->getFrameNumber != nullptr);
+
+	return renderContext->api->getFrameNumber(renderContext);
+}
+
+uint32_t SK::Renderer::getFrameIndex(RenderContext* renderContext)
+{
+	assert(renderContext != nullptr);
+	assert(renderContext->api != nullptr);
+	assert(renderContext->api->getFrameIndex != nullptr);
+
+	return renderContext->api->getFrameIndex(renderContext);
+}
+
 SK::Renderer::BufferDeviceAddress SK::Renderer::getVertexBufferDeviceAddress(RenderContext* renderContext, size_t meshIndex)
 {
 	assert(renderContext != nullptr);
@@ -75,32 +93,32 @@ void SK::Renderer::bindPipeline(RenderContext* renderContext, PipelineHandle pip
 	renderContext->api->bindPipeline(renderContext, pipeline);
 }
 
-void SK::Renderer::bindSceneResources(RenderContext* renderContext)
+uint32_t SK::Renderer::getSceneDataDescriptorIndex(RenderContext* renderContext)
 {
 	assert(renderContext != nullptr);
 	assert(renderContext->api != nullptr);
-	assert(renderContext->api->bindSceneResources != nullptr);
+	assert(renderContext->api->getSceneDataDescriptorIndex != nullptr);
 
-	renderContext->api->bindSceneResources(renderContext);
+	return renderContext->api->getSceneDataDescriptorIndex(renderContext);
 }
 
-void SK::Renderer::bindMaterialResources(RenderContext* renderContext)
+uint32_t SK::Renderer::getMaterialDataDescriptorIndex(RenderContext* renderContext)
 {
 	assert(renderContext != nullptr);
 	assert(renderContext->api != nullptr);
-	assert(renderContext->api->bindMaterialResources != nullptr);
+	assert(renderContext->api->getMaterialDataDescriptorIndex != nullptr);
 
-	renderContext->api->bindMaterialResources(renderContext);
+	return renderContext->api->getMaterialDataDescriptorIndex(renderContext);
 }
 
-void SK::Renderer::pushConstants(RenderContext* renderContext, ShaderStageFlags stages, uint32_t offset, uint32_t size, const void* data)
+void SK::Renderer::pushData(RenderContext* renderContext, uint32_t offset, uint32_t size, const void* data)
 {
 	assert(renderContext != nullptr);
 	assert(renderContext->api != nullptr);
-	assert(renderContext->api->pushConstants != nullptr);
+	assert(renderContext->api->pushData != nullptr);
 	assert(data != nullptr || size == 0);
 
-	renderContext->api->pushConstants(renderContext, stages, offset, size, data);
+	renderContext->api->pushData(renderContext, offset, size, data);
 }
 
 void SK::Renderer::bindIndexBuffer(RenderContext* renderContext, size_t meshIndex, IndexType indexType)

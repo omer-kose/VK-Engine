@@ -4,24 +4,24 @@
 
 namespace SK::Renderer
 {
-	static constexpr uint64_t INVALID_HANDLE = UINT64_MAX;
+	static constexpr uint32_t INVALID_HANDLE = UINT32_MAX;
 
 	// Opaque handle types
 	// Handles are indices into records / resources in the Backend Render Context not actual values of backend resource handles.
 	// They are opaque handle types, so caller side will be using them with the routines provided by the Render Context.
 	struct PipelineHandle
 	{
-		uint64_t id;
+		uint32_t id;
 	};
 
 	struct BufferHandle
 	{
-		uint64_t id;
+		uint32_t id;
 	};
 
 	struct TextureHandle
 	{
-		uint64_t id;
+		uint32_t id;
 	};
 
 	using ShaderStageFlags = uint32_t;
@@ -84,10 +84,38 @@ namespace SK::Renderer
 		Uint32,
 	};
 
+	enum class ShaderResourceType : uint8_t
+	{
+		UniformBuffer = 0,
+		ReadOnlyStorageBuffer,
+		RWStorageBuffer,
+		SampledImage,
+		ReadOnlyStorageImage,
+		RWStorageImage,
+		Sampler
+	};
+
+	/*
+		While Vulkan has the concept of Descriptor sets, DX12 does not. It has register slot logic which more or less corresponds to binding slots in Vulkan.
+		To keep RenderContext Graphics API Agnostic, Vulkan pipelines will map every resource to set = 0 by default. So, there is only binding slots in the mapping description.
+
+		In the future, when the Descriptor Heap extension gets more mature and moved into KHR extensions, I can consider using untyped pointers corresponding to HLSL dynamic descriptor indexing came with SM 6.6.
+		For now, mapping stays.
+	*/
+	struct ShaderResourceMappingDesc
+	{
+		uint32_t binding;
+		ShaderResourceType type;
+		// if the descriptor will be accessed directly the index is required for mapping the resource correctly.
+		// if the resource will be accessed indirectly (such as accessing textures via material data) it stays 0 so that indexing is done in the shader from heap base address correctly.
+		uint32_t descriptorIndex = 0;
+	};
+
 	struct GraphicsPipelineDesc
 	{
 		const char* debugName = nullptr;
 
+		// TODO: Generalize for more shaders
 		const char* vertexShaderPath = nullptr;
 		const char* fragmentShaderPath = nullptr;
 
@@ -102,14 +130,8 @@ namespace SK::Renderer
 
 		bool blending = false;
 
-		uint32_t pushConstantSize = 0;
-		ShaderStageFlags pushConstantStages = ShaderStageFlagBits::None;
-
-		// Engine-wide resources.
-		// If true, scene resources are expected at set slot 0.
-		bool usesSceneResources = false;
-		// If true, material/bindless resources are expected at set slot 1.
-		bool usesMaterialResources = false;
+		// Typed shader resource declarations to map into descriptor heaps.
+		std::vector<ShaderResourceMappingDesc> shaderResourceMappings;
 	};
 
 	struct ComputePipelineDesc
@@ -118,14 +140,8 @@ namespace SK::Renderer
 
 		const char* computeShaderPath = nullptr;
 
-		uint32_t pushConstantSize = 0;
-		ShaderStageFlags pushConstantStages = ShaderStageFlagBits::None;
-
-		// Engine-wide resources.
-		// If true, scene resources are expected at set slot 0.
-		bool usesSceneResources = false;
-		// If true, material/bindless resources are expected at set slot 1.
-		bool usesMaterialResources = false;
+		// Typed shader resource declarations to map into descriptor heaps.
+		std::vector<ShaderResourceMappingDesc> shaderResourceMappings;
 	};
 
 	// Generalized memory/allocation intent.
@@ -333,15 +349,18 @@ namespace SK::Renderer
 		// TODO: To be implemented
 		PipelineHandle (*getComputePipeline)(RenderContext* renderContext, const ComputePipelineDesc& desc);
 
+		uint32_t (*getFrameNumber)(RenderContext* renderContext);
+		uint32_t (*getFrameIndex)(RenderContext* renderContext);
+
 		void (*beginMainRendering)(RenderContext* renderContext);
 		void (*endRendering)(RenderContext* renderContext);
 
 		void (*bindPipeline)(RenderContext* renderContext, PipelineHandle pipeline);
 
-		void (*bindSceneResources)(RenderContext* renderContext);
-		void (*bindMaterialResources)(RenderContext* renderContext);
+		uint32_t (*getSceneDataDescriptorIndex)(RenderContext* renderContext);
+		uint32_t (*getMaterialDataDescriptorIndex)(RenderContext* renderContext);
 
-		void (*pushConstants)(RenderContext* renderContext, ShaderStageFlags stages, uint32_t offset, uint32_t size, const void* data);
+		void (*pushData)(RenderContext* renderContext, uint32_t offset, uint32_t size, const void* data);
 
 		void (*bindIndexBuffer)(RenderContext* renderContext, size_t meshIndex, IndexType indexType);
 		void (*drawIndexed)(RenderContext* renderContext, uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance);
@@ -367,15 +386,18 @@ namespace SK::Renderer
 	PipelineHandle getGraphicsPipeline(RenderContext* renderContext, const GraphicsPipelineDesc& desc);
 	PipelineHandle getComputePipeline(RenderContext* renderContext, const ComputePipelineDesc& desc);
 
+	uint32_t getFrameNumber(RenderContext* renderContext);
+	uint32_t getFrameIndex(RenderContext* renderContext);
+
 	void beginMainRendering(RenderContext* renderContext);
 	void endRendering(RenderContext* renderContext);
 
 	void bindPipeline(RenderContext* renderContext, PipelineHandle pipeline);
 
-	void bindSceneResources(RenderContext* renderContext);
-	void bindMaterialResources(RenderContext* renderContext);
+	uint32_t getSceneDataDescriptorIndex (RenderContext* renderContext);
+	uint32_t getMaterialDataDescriptorIndex (RenderContext* renderContext);
 
-	void pushConstants(RenderContext* renderContext, ShaderStageFlags stages, uint32_t offset, uint32_t size, const void* data);
+	void pushData(RenderContext* renderContext, uint32_t offset, uint32_t size, const void* data);
 
 	void bindIndexBuffer(RenderContext* renderContext, size_t meshIndex, IndexType indexType);
 	void drawIndexed(RenderContext* renderContext, uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance);

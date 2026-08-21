@@ -1,12 +1,5 @@
 #include "ForwardRenderer.h"
 
-#include <RendererBackend/Vulkan/VkRendererBackend.h>
-#include <RendererBackend/Vulkan/VkPipelines.h>
-#include <RendererBackend/Vulkan/VkInitializers.h>
-
-#include <RendererBackend/Vulkan/VkAssetRegistry.h>
-#include <RendererBackend/Vulkan/VkMaterialRegistry.h>
-
 #include <Renderer/DrawContext.h>
 
 #include <chrono>
@@ -26,10 +19,13 @@ void SK::ForwardRenderer::createResources(SK::Renderer::RenderContext* renderCon
 	opaqueDesc.depthWrite = true;
 	opaqueDesc.depthCompare = SK::Renderer::CompareOp::LessOrEqual;
 	opaqueDesc.blending = false;
-	opaqueDesc.pushConstantSize = sizeof(PushConstants);
-	opaqueDesc.pushConstantStages = SK::Renderer::ShaderStageFlagBits::VertexShader | SK::Renderer::ShaderStageFlagBits::FragmentShader;
-	opaqueDesc.usesSceneResources = true;
-	opaqueDesc.usesMaterialResources = true;
+	opaqueDesc.shaderResourceMappings = {
+		{ 0, SK::Renderer::ShaderResourceType::UniformBuffer, SK::Renderer::getSceneDataDescriptorIndex(renderContext) },
+		{ 1, SK::Renderer::ShaderResourceType::ReadOnlyStorageBuffer, SK::Renderer::getMaterialDataDescriptorIndex(renderContext) },
+		// textures and samplers are accessed via the material buffer in the shaders, so their descriptorIndex field left 0.
+		{ 2, SK::Renderer::ShaderResourceType::SampledImage, 0 },
+		{ 3, SK::Renderer::ShaderResourceType::Sampler, 0 }
+	};
 
 	resources->opaquePipeline = SK::Renderer::getGraphicsPipeline(renderContext, opaqueDesc);
 
@@ -63,18 +59,14 @@ void SK::ForwardRenderer::draw(SK::Renderer::RenderContext* renderContext, const
 
 	uint32_t lastMeshIndex = UINT32_MAX;
 
-	auto bindCommonResources = [&]() {
-		SK::Renderer::bindSceneResources(renderContext);
-		SK::Renderer::bindMaterialResources(renderContext);
-	};
-
 	auto drawPacket = [&](const SK::Renderer::DrawPacket& packet) {
 		PushConstants pushConstants{};
 		pushConstants.worldMatrix = packet.worldTransform;
-		pushConstants.materialIndex = packet.materialIndex;
 		pushConstants.vertexBufferAddress = SK::Renderer::getVertexBufferDeviceAddress(renderContext, packet.meshIndex);
+		pushConstants.frameIndex = SK::Renderer::getFrameIndex(renderContext);
+		pushConstants.materialIndex = packet.materialIndex;
 
-		SK::Renderer::pushConstants(renderContext, SK::Renderer::ShaderStageFlagBits::VertexShader | SK::Renderer::ShaderStageFlagBits::FragmentShader, 0, sizeof(PushConstants), &pushConstants);
+		SK::Renderer::pushData(renderContext, 0, sizeof(PushConstants), &pushConstants);
 
 		if (lastMeshIndex != packet.meshIndex)
 		{
@@ -86,7 +78,6 @@ void SK::ForwardRenderer::draw(SK::Renderer::RenderContext* renderContext, const
 	};
 
 	SK::Renderer::bindPipeline(renderContext, resources.opaquePipeline);
-	bindCommonResources();
 
 	for (uint32_t drawIndex : opaqueDraws)
 	{
@@ -94,7 +85,6 @@ void SK::ForwardRenderer::draw(SK::Renderer::RenderContext* renderContext, const
 	}
 
 	SK::Renderer::bindPipeline(renderContext, resources.transparentPipeline);
-	bindCommonResources();
 
 	for (const SK::Renderer::DrawPacket& packet : input.drawContext->transparent)
 	{

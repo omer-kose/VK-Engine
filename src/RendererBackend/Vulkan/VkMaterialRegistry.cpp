@@ -24,11 +24,17 @@ void SK::VkRendererBackend::buildMaterialRegistry(State* vkRendererBackend, SK::
 		gpuPbrMaterialData.metallicFactor = pbrData->metallicFactor;
 		gpuPbrMaterialData.roughnessFactor = pbrData->roughnessFactor;
 
-		gpuPbrMaterialData.baseColorTexture = pbrData->baseColorTexture;
-		gpuPbrMaterialData.metallicRoughnessTexture = pbrData->metallicRoughnessTexture;
-		gpuPbrMaterialData.normalTexture = pbrData->normalTexture;
-		gpuPbrMaterialData.emissiveTexture = pbrData->emissiveTexture;
+		// With descriptor heaps, descriptor handle indices into the resource heap are stored. Doing the mapping from texture index to descriptor handle index here.
+		gpuPbrMaterialData.baseColorTexture = vkAssetRegistry->textures[pbrData->baseColorTexture].imageDescriptor.index;
+		gpuPbrMaterialData.metallicRoughnessTexture = vkAssetRegistry->textures[pbrData->metallicRoughnessTexture].imageDescriptor.index;
+		gpuPbrMaterialData.normalTexture = vkAssetRegistry->textures[pbrData->normalTexture].imageDescriptor.index;
+		gpuPbrMaterialData.emissiveTexture = vkAssetRegistry->textures[pbrData->emissiveTexture].imageDescriptor.index;
 
+		gpuPbrMaterialData.baseColorTextureSampler = vkAssetRegistry->textures[pbrData->baseColorTexture].samplerDescriptor.index;
+		gpuPbrMaterialData.metallicRoughnessTextureSampler = vkAssetRegistry->textures[pbrData->metallicRoughnessTexture].samplerDescriptor.index;
+		gpuPbrMaterialData.normalTextureSampler = vkAssetRegistry->textures[pbrData->normalTexture].samplerDescriptor.index;
+		gpuPbrMaterialData.emissiveTextureSampler = vkAssetRegistry->textures[pbrData->emissiveTexture].samplerDescriptor.index;
+		
 		pbrMaterialData.push_back(gpuPbrMaterialData);
 	}
 
@@ -38,51 +44,23 @@ void SK::VkRendererBackend::buildMaterialRegistry(State* vkRendererBackend, SK::
 	vkMaterialRegistry->pbrMaterialBuffer = SK::VkRendererBackend::createAndUploadGPUBuffer(vkRendererBackend, pbrMaterialBufferSize,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, static_cast<void*>(pbrMaterialData.data()));
 
-	DescriptorLayoutBuilder builder;
-	// Binding 0 Material Buffer
-	builder.addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-	// Binding 1 all the Textures in the Asset System 
-	// TODO: For now, each texture has its own sampler which is a waste. Consider binding samplers seperately later
-	builder.addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, assetRegistry->textures.size());
-	vkMaterialRegistry->resourceDescriptorSetLayout = builder.build(vkRendererBackend->device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-
-	std::vector<DescriptorAllocator::PoolSize> poolSizes = { 
-		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1 },
-		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, static_cast<uint32_t>(vkAssetRegistry->textures.size()) }
-	};
-
-	// Descriptor Allocator will exactly allocate a single descriptor set holding all the material data and textures related to them.
-	vkMaterialRegistry->resourceDescriptorAllocator.initPool(vkRendererBackend->device, 1, poolSizes);
-	vkMaterialRegistry->resourceDescriptorSet = vkMaterialRegistry->resourceDescriptorAllocator.allocate(vkRendererBackend->device, vkMaterialRegistry->resourceDescriptorSetLayout);
-
-	// Write the descriptors
-	DescriptorWriter writer;
-	writer.writeBuffer(0, vkMaterialRegistry->pbrMaterialBuffer.buffer, pbrMaterialBufferSize, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-	std::vector<VkDescriptorImageInfo> textureImageInfo(vkAssetRegistry->textures.size());
-	for (size_t i = 0; i < vkAssetRegistry->textures.size(); ++i)
-	{
-		const SK::VkRendererBackend::VkAssetRegistry::GPUTexture& gpuTexture = vkAssetRegistry->textures[i];
-		textureImageInfo[i] = VkDescriptorImageInfo{ .sampler = gpuTexture.sampler, .imageView = gpuTexture.image.imageView, .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
-	}
-	writer.writeImages(1, textureImageInfo, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-	writer.updateSet(vkRendererBackend->device, vkMaterialRegistry->resourceDescriptorSet);
+	// Create the descriptor
+	vkMaterialRegistry->pbrMaterialBufferDescriptor = SK::VkRendererBackend::allocateResourceDescriptor(&vkRendererBackend->descriptorHeap, SK::VkRendererBackend::ResourceDescriptorKind::StorageBuffer);
+	SK::VkRendererBackend::writeStorageBufferDescriptor(
+		vkRendererBackend,
+		&vkRendererBackend->descriptorHeap,
+		vkMaterialRegistry->pbrMaterialBufferDescriptor,
+		vkMaterialRegistry->pbrMaterialBuffer,
+		0,
+		pbrMaterialBufferSize
+	);
 }
 
 void SK::VkRendererBackend::clearMaterialRegistry(State* vkRendererBackend, VkMaterialRegistry* vkMaterialRegistry)
 {
-	if (vkMaterialRegistry->resourceDescriptorSetLayout != VK_NULL_HANDLE)
-	{
-		vkDestroyDescriptorSetLayout(vkRendererBackend->device, vkMaterialRegistry->resourceDescriptorSetLayout, nullptr);
-		vkMaterialRegistry->resourceDescriptorSetLayout = VK_NULL_HANDLE;
-	}
-
-	vkMaterialRegistry->resourceDescriptorAllocator.destroyPool(vkRendererBackend->device);
-
 	if (vkMaterialRegistry->pbrMaterialBuffer.buffer != VK_NULL_HANDLE)
 	{
 		destroyBuffer(vkRendererBackend, vkMaterialRegistry->pbrMaterialBuffer);
 		vkMaterialRegistry->pbrMaterialBuffer = {};
 	}
-
-	vkMaterialRegistry->resourceDescriptorSet = VK_NULL_HANDLE;
 }

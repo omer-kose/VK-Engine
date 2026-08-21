@@ -1,6 +1,16 @@
 ﻿#pragma once 
 #include <RendererBackend/Vulkan/VkTypes.h>
 
+namespace SK::VkRendererBackend
+{
+    struct ShaderResourceMapping
+    {
+        uint32_t binding;
+        VkSpirvResourceTypeFlagsEXT type;
+        uint32_t descriptorIndex;
+    };
+};
+
 class PipelineBuilder
 {
 public:
@@ -8,7 +18,7 @@ public:
     void clear();
     VkPipeline buildPipeline(VkDevice device);
 
-    void setShaders(VkShaderModule vertexShader, VkShaderModule fragmentShader);
+    void pushShaderStage(VkShaderModule shader, VkShaderStageFlagBits stage);
     void setInputTopology(VkPrimitiveTopology topology);
     void setPolygonMode(VkPolygonMode polygonMode);
     void setCullMode(VkCullModeFlags cullMode, VkFrontFace frontFace);
@@ -20,6 +30,8 @@ public:
     void setDepthFormat(VkFormat format);
     void disableDepthTest();
     void enableDepthTest(bool depthWriteEnable, VkCompareOp compareOp);
+
+    void pushShaderResourceMapping(const SK::VkRendererBackend::ShaderResourceMapping& mapping, uint32_t heapArrayStride);
 public:
 	std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
 
@@ -31,6 +43,8 @@ public:
     VkPipelineDepthStencilStateCreateInfo depthStencil;
     VkPipelineRenderingCreateInfo renderInfo;
     VkFormat colorAttachmentformat;
+
+    std::vector<VkDescriptorSetAndBindingMappingEXT> shaderResourceMappings;
 };
 
 namespace SK::VkUtil 

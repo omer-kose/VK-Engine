@@ -3,6 +3,8 @@
 #include <RendererBackend/Vulkan/VkRendererBackend.h>
 #include <AssetSystem/AssetRegistry.h>
 
+#include <RendererBackend/Vulkan/VkInitializers.h>
+
 static VkFilter mapFilterMode(SK::Asset::TextureFilter textureFilter)
 {
     switch (textureFilter)
@@ -67,19 +69,39 @@ void SK::VkRendererBackend::buildGPUAssets(State* vkRendererBackend, SK::Asset::
         if (!texture.image.data.empty())
         {
             // Assuming texture data to be in RGBA 8 bit format. TODO: Later on, decide this by looking at the texture format.
+            VkFormat imageFormat = VK_FORMAT_R8G8B8A8_UNORM;
             size_t dataSize = texture.image.width * texture.image.height * 1 * 4;
-            gpuTexture.image = SK::VkRendererBackend::createImage(vkRendererBackend, (void*)texture.image.data.data(), dataSize, VkExtent3D{ texture.image.width, texture.image.height, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, texture.description.mipmapped);
+            gpuTexture.image = SK::VkRendererBackend::createImage(vkRendererBackend, (void*)texture.image.data.data(), dataSize, VkExtent3D{ texture.image.width, texture.image.height, 1 }, imageFormat, VK_IMAGE_USAGE_SAMPLED_BIT, texture.description.mipmapped);
             gpuTexture.ownsImage = true;
+
+            // Create the image descriptor
+            gpuTexture.imageDescriptor = SK::VkRendererBackend::allocateResourceDescriptor(&vkRendererBackend->descriptorHeap, SK::VkRendererBackend::ResourceDescriptorKind::SampledImage);
+            SK::VkRendererBackend::writeSampledImageDescriptor(
+                vkRendererBackend,
+                &vkRendererBackend->descriptorHeap,
+                gpuTexture.imageDescriptor,
+                SK::VkRendererBackend::createImageViewInfo(vkRendererBackend, gpuTexture.image),
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL // sampled image
+            );
         }
         else
         {
             // Absence of the image data is actually a bug for a texture. Assign error image for debugging.
             gpuTexture.image = vkRendererBackend->errorCheckerboardImage;
             gpuTexture.ownsImage = false;
+
+            // Still create an image descriptor (leads to duplicate descriptors if more than one errorenous textures are loaded but it is fine as errorenous textures are there to be cleaned not used in a running program).
+            gpuTexture.imageDescriptor = SK::VkRendererBackend::allocateResourceDescriptor(&vkRendererBackend->descriptorHeap, SK::VkRendererBackend::ResourceDescriptorKind::SampledImage);
+            SK::VkRendererBackend::writeSampledImageDescriptor(
+                vkRendererBackend,
+                &vkRendererBackend->descriptorHeap,
+                gpuTexture.imageDescriptor,
+                SK::VkRendererBackend::createImageViewInfo(vkRendererBackend, gpuTexture.image),
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL // sampled image
+            );
         }
 
-        // Create sampler based on texture description
-        gpuTexture.sampler = SK::VkRendererBackend::createSampler(vkRendererBackend,
+        gpuTexture.samplerDescriptor = SK::VkRendererBackend::createSamplerDescriptor(vkRendererBackend,
             mapFilterMode(texture.description.minFilter),
             mapFilterMode(texture.description.magFilter),
             mapMipmapMode(texture.description.mipmapMode),
@@ -106,8 +128,6 @@ void SK::VkRendererBackend::clearGPUAssets(State* vkRendererBackend, VkAssetRegi
         {
             SK::VkRendererBackend::destroyImage(vkRendererBackend, texture.image);
         }
-
-        SK::VkRendererBackend::destroySampler(vkRendererBackend, texture.sampler);
     }
 
     vkAssetRegistry->meshes.clear();

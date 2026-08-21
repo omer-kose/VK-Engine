@@ -12,11 +12,11 @@ layout (location = 0) out vec4 fragColor;
 
 void main() 
 {
-	float lightValue = max(dot(normal, sceneData.sunlightDirection.xyz), 0.1f);
+	float lightValue = max(dot(normal, sceneData[pushConstants.frameIndex].sunlightDirection.xyz), 0.1f);
 	
 	PBRData pbrData = pbrMaterials[pushConstants.materialIndex];
-	vec3 color = colorFactor * texture(nonuniformEXT(textures[pbrData.baseColorTexture]), uv).xyz;
-	vec3 ambient = color *  sceneData.ambientColor.xyz;
+	vec3 color = colorFactor * texture(sampler2D(nonuniformEXT(textures[pbrData.baseColorTexture]), samplers[pbrData.baseColorTextureSampler]), uv).xyz;
+	vec3 ambient = color *  sceneData[pushConstants.frameIndex].ambientColor.xyz;
 
-	fragColor = vec4(color * lightValue * sceneData.sunlightColor.w + ambient, 1.0f);
+	fragColor = vec4(color * lightValue * sceneData[pushConstants.frameIndex].sunlightColor.w + ambient, 1.0f);
 }

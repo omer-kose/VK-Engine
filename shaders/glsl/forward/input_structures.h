@@ -1,6 +1,8 @@
 
 #extension GL_EXT_buffer_reference : require
 #extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_shader_8bit_storage : require
+#extension GL_EXT_shader_explicit_arithmetic_types : require
 
 struct Vertex
 {
@@ -20,10 +22,11 @@ layout(push_constant, scalar) uniform PushConstants
 {
 	mat4 worldMatrix;
 	VertexBuffer vertexBuffer;
+	uint frameIndex;
 	uint materialIndex; // Index into the PBRMaterialData buffer
 } pushConstants;
 
-layout(set = 0, binding = 0) uniform SceneData
+struct SceneData
 {
 	mat4 view;
 	mat4 proj;
@@ -31,7 +34,12 @@ layout(set = 0, binding = 0) uniform SceneData
 	vec4 ambientColor;
 	vec4 sunlightDirection; //w for sun power
 	vec4 sunlightColor;
-} sceneData;
+};
+
+layout(binding = 0) uniform SceneUBO
+{
+	SceneData sceneData[2]; // per frame-in-flight
+}; 
 
 struct PBRData
 {
@@ -43,12 +51,18 @@ struct PBRData
 	uint metallicRoughnessTexture;
 	uint normalTexture;
 	uint emissiveTexture;
+	// Sampler ids
+	uint8_t baseColorTextureSampler;
+	uint8_t metallicRoughnessTextureSampler;
+	uint8_t normalTextureSampler;
+	uint8_t emissiveTextureSampler;
 };
 
 // Bindless Material + Texture resources
-layout(set = 1, binding = 0, scalar) readonly buffer PBRMaterials
+layout(binding = 1, scalar) readonly buffer PBRMaterials
 {
 	PBRData pbrMaterials[];
 };
 
-layout(set = 1, binding = 1) uniform sampler2D textures[];
+layout(binding = 2) uniform texture2D textures[];
+layout(binding = 3) uniform sampler samplers[];
