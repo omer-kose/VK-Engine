@@ -12,7 +12,8 @@ layout (location = 0) out vec4 fragColor;
 
 void main() 
 {
-	float lightValue = max(dot(normal, sceneData[pushConstants.frameIndex].sunlightDirection.xyz), 0.1f);
+	vec3 n = normalize(normal);
+	float lightValue = max(dot(n, -sceneData[pushConstants.frameIndex].sunlightDirection.xyz), 0.1f);
 	
 	PBRData pbrData = pbrMaterials[pushConstants.materialIndex];
 	vec3 color = colorFactor * texture(sampler2D(nonuniformEXT(textures[pbrData.baseColorTexture]), samplers[pbrData.baseColorTextureSampler]), uv).xyz;

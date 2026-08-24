@@ -14,7 +14,7 @@ void main()
 	vec4 position = vec4(v.position, 1.0f);
 	gl_Position = sceneData[pushConstants.frameIndex].viewproj * pushConstants.worldMatrix * position;
 
-	normal = (pushConstants.worldMatrix * vec4(v.normal, 0.0f)).xyz; // TODO: something is wrong with this inverse transpose (or conjug from Iniqo) should be used.
+	normal = (transpose(inverse(pushConstants.worldMatrix)) * vec4(v.normal, 0.0f)).xyz; // TODO: Pass the inverse transpose from the CPU side don't recompute it per vertex.
 	PBRData pbrData = pbrMaterials[pushConstants.materialIndex];
 	colorFactor = pbrData.baseColorFactor.xyz;
 	uv.x = v.uv_x;
