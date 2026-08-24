@@ -365,6 +365,12 @@ static SK::Renderer::BufferDeviceAddress getVertexBufferDeviceAddress_(SK::Rende
 	return static_cast<SK::Renderer::BufferDeviceAddress>(mesh.meshBuffers.vertexBuffer.address);
 }
 
+static SK::Renderer::BufferDeviceAddress getBufferDeviceAddress_(SK::Renderer::RenderContext* renderContext, SK::Renderer::BufferHandle bufferHandle)
+{
+	SK::VkRendererBackend::VkRenderContext* vkRenderContext = fetchVkRenderContext(renderContext);
+	return vkRenderContext->buffers[bufferHandle.id].buffer.address;
+}
+
 static void beginMainRendering_(SK::Renderer::RenderContext* renderContext)
 {
 	SK::VkRendererBackend::VkRenderContext* vkRenderContext = fetchVkRenderContext(renderContext);
@@ -820,6 +826,7 @@ SK::Renderer::RenderContext SK::VkRendererBackend::makeRenderContext(VkRenderCon
 		.drawIndexed = drawIndexed_,
 		.dispatch = dispatch_,
 		.getVertexBufferDeviceAddress = getVertexBufferDeviceAddress_,
+		.getBufferDeviceAddress = getBufferDeviceAddress_,
 		.createBuffer = createBuffer_,
 		.createTexture = createTexture_
 	};

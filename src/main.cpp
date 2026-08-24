@@ -55,6 +55,8 @@ int main(int argc, char* argv[])
 
     SK::VkRendererBackend::VkSceneResources vkSceneResources;
     SK::VkRendererBackend::uploadSceneResources(&vkRendererBackend, &scene, &vkSceneResources);
+    SK::Asset::discardCPUMeshData(&scene.assetRegistry);
+    SK::Asset::discardCPUTextureData(&scene.assetRegistry);
 
     SK::VkRendererBackend::VkRenderContext vkRenderContext;
     SK::VkRendererBackend::initVkRenderContext(&vkRenderContext, &vkRendererBackend, &vkSceneResources);

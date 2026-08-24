@@ -74,6 +74,15 @@ SK::Renderer::BufferDeviceAddress SK::Renderer::getVertexBufferDeviceAddress(Ren
 	return renderContext->api->getVertexBufferDeviceAddress(renderContext, meshIndex);
 }
 
+SK::Renderer::BufferDeviceAddress SK::Renderer::getBufferDeviceAddress(RenderContext* renderContext, BufferHandle bufferHandle)
+{
+	assert(renderContext != nullptr);
+	assert(renderContext->api != nullptr);
+	assert(renderContext->api->getBufferDeviceAddress != nullptr);
+
+	return renderContext->api->getBufferDeviceAddress(renderContext, bufferHandle);
+}
+
 SK::Renderer::BufferHandle SK::Renderer::createBuffer(RenderContext* renderContext, const BufferDesc& desc)
 {
 	assert(renderContext != nullptr);

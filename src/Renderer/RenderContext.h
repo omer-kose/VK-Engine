@@ -380,8 +380,8 @@ namespace SK::Renderer
 
 		void (*dispatch)(RenderContext* renderContext, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
 
-		// TODO: Also, implement a generic buffer device address getter.
 		BufferDeviceAddress (*getVertexBufferDeviceAddress)(RenderContext* renderContext, size_t meshIndex);
+		BufferDeviceAddress(*getBufferDeviceAddress)(RenderContext* renderContext, BufferHandle bufferHandle);
 
 		BufferHandle (*createBuffer)(RenderContext* renderContext, const BufferDesc& desc);
 		TextureHandle(*createTexture)(RenderContext* renderContext, const TextureDesc& desc);
@@ -422,6 +422,7 @@ namespace SK::Renderer
 	void dispatch(RenderContext* renderContext, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
 
 	BufferDeviceAddress getVertexBufferDeviceAddress(RenderContext* renderContext, size_t meshIndex);
+	BufferDeviceAddress getBufferDeviceAddress(RenderContext* renderContext, BufferHandle bufferHandle);
 
 	BufferHandle createBuffer(RenderContext* renderContext, const BufferDesc& desc);
 	TextureHandle createTexture(RenderContext* renderContext, const TextureDesc& desc);
