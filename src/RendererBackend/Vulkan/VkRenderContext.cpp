@@ -19,6 +19,21 @@ static SK::VkRendererBackend::VkRenderContext* fetchVkRenderContext(SK::Renderer
 	return static_cast<SK::VkRendererBackend::VkRenderContext*>(renderContext->backend);
 }
 
+static VkShaderStageFlagBits toVkShaderStageFlagBits(SK::Renderer::ShaderStageFlagBits stage)
+{
+	switch (stage)
+	{
+	case SK::Renderer::VertexShader:
+		return VK_SHADER_STAGE_VERTEX_BIT;
+	case SK::Renderer::FragmentShader:
+		return VK_SHADER_STAGE_FRAGMENT_BIT;
+	case SK::Renderer::ComputeShader:
+		return VK_SHADER_STAGE_COMPUTE_BIT;
+	default:
+		return static_cast<VkShaderStageFlagBits>(0);;
+	}
+}
+
 static VkShaderStageFlags toVkShaderStageFlags(SK::Renderer::ShaderStageFlags stages)
 {
 	VkShaderStageFlags vkStages = 0;
@@ -179,8 +194,12 @@ static size_t hashGraphicsPipelineDesc(const SK::Renderer::GraphicsPipelineDesc&
 	std::hash<uint64_t> integerHasher;
 
 	hashCombine(&hash, integerHasher(static_cast<uint64_t>(SK::Renderer::PipelineKind::Graphics)));
-	hashCombine(&hash, hashString(desc.vertexShaderPath));
-	hashCombine(&hash, hashString(desc.fragmentShaderPath));
+	
+	for (const SK::Renderer::ShaderDesc& shaderDesc : desc.shaders)
+	{
+		hashCombine(&hash, hashString(shaderDesc.path));
+		hashCombine(&hash, shaderDesc.stage);
+	}
 
 	hashCombine(&hash, integerHasher(static_cast<uint64_t>(desc.topology)));
 	hashCombine(&hash, integerHasher(static_cast<uint64_t>(desc.polygonMode)));
@@ -236,23 +255,20 @@ static SK::Renderer::PipelineHandle getGraphicsPipeline_(SK::Renderer::RenderCon
 		return SK::Renderer::PipelineHandle{ existing->second };
 	}
 
-	SK::VkRendererBackend::Shader vertexShader = SK::VkRendererBackend::getOrLoadShader(vkRendererBackend, desc.vertexShaderPath, VK_SHADER_STAGE_VERTEX_BIT);
-	if (vertexShader.module == VK_NULL_HANDLE)
-	{
-		fmt::println("Failed to load vertex shader: {}", desc.vertexShaderPath ? desc.vertexShaderPath : "<null>");
-		return SK::Renderer::PipelineHandle{};
-	}
-
-	SK::VkRendererBackend::Shader fragmentShader = SK::VkRendererBackend::getOrLoadShader(vkRendererBackend, desc.fragmentShaderPath, VK_SHADER_STAGE_FRAGMENT_BIT);
-	if (fragmentShader.module == VK_NULL_HANDLE)
-	{
-		fmt::println("Failed to load fragment shader: {}", desc.fragmentShaderPath ? desc.fragmentShaderPath : "<null>");
-		return SK::Renderer::PipelineHandle{};
-	}
-
 	SK::VkRendererBackend::PipelineKey pipelineKey{};
-	pipelineKey.shaders.push_back(vertexShader);
-	pipelineKey.shaders.push_back(fragmentShader);
+
+	for (const SK::Renderer::ShaderDesc& shaderDesc : desc.shaders)
+	{
+		SK::VkRendererBackend::Shader shader = SK::VkRendererBackend::getOrLoadShader(vkRendererBackend, shaderDesc.path, toVkShaderStageFlagBits(shaderDesc.stage));
+		if (shader.module == VK_NULL_HANDLE)
+		{
+			fmt::println("Failed to load vertex shader: {}", shaderDesc.path ? shaderDesc.path : "<null>");
+			return SK::Renderer::PipelineHandle{};
+		}
+	
+		pipelineKey.shaders.push_back(shader);
+	}
+
 	pipelineKey.topology = toVkPrimitiveTopology(desc.topology);
 	pipelineKey.polygonMode = toVkPolygonMode(desc.polygonMode);
 	pipelineKey.cullMode = toVkCullModeFlags(desc.cullMode);

@@ -34,6 +34,12 @@ namespace SK::Renderer
 		ComputeShader = 1 << 2,
 	};
 
+	struct ShaderDesc
+	{
+		const char* path;
+		ShaderStageFlagBits stage;
+	};
+
 	enum class PipelineKind : uint8_t
 	{
 		Graphics = 0,
@@ -115,9 +121,7 @@ namespace SK::Renderer
 	{
 		const char* debugName = nullptr;
 
-		// TODO: Generalize for more shaders
-		const char* vertexShaderPath = nullptr;
-		const char* fragmentShaderPath = nullptr;
+		std::vector<ShaderDesc> shaders;
 
 		PrimitiveTopology topology = PrimitiveTopology::TriangleList;
 		PolygonMode polygonMode = PolygonMode::Fill;
