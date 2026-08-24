@@ -47,6 +47,7 @@ static VkSamplerAddressMode mapAddressMode(SK::Asset::TextureAddressMode address
 void SK::VkRendererBackend::buildGPUAssets(State* vkRendererBackend, SK::Asset::AssetRegistry* assetRegistry, VkAssetRegistry* vkAssetRegistry)
 {
     // Meshes
+    vkAssetRegistry->meshes.reserve(assetRegistry->meshes.size());
     for (auto& mesh : assetRegistry->meshes)
     {
         VkAssetRegistry::GPUMesh gpuMesh{};
@@ -60,6 +61,7 @@ void SK::VkRendererBackend::buildGPUAssets(State* vkRendererBackend, SK::Asset::
     }
 
     // Textures
+    vkAssetRegistry->textures.reserve(assetRegistry->meshes.size());
     for (const auto& texture : assetRegistry->textures)
     {
         VkAssetRegistry::GPUTexture gpuTexture{};

@@ -38,6 +38,33 @@ uint32_t SK::Renderer::getFrameIndex(RenderContext* renderContext)
 	return renderContext->api->getFrameIndex(renderContext);
 }
 
+bool SK::Renderer::beginFrame(RenderContext* renderContext)
+{
+	assert(renderContext != nullptr);
+	assert(renderContext->api != nullptr);
+	assert(renderContext->api->beginFrame != nullptr);
+
+	return renderContext->api->beginFrame(renderContext);
+}
+
+void SK::Renderer::endFrame(RenderContext* renderContext)
+{
+	assert(renderContext != nullptr);
+	assert(renderContext->api != nullptr);
+	assert(renderContext->api->endFrame != nullptr);
+
+	renderContext->api->endFrame(renderContext);
+}
+
+void SK::Renderer::updateSceneBuffer(RenderContext* renderContext, const SK::Renderer::GPUSceneData& gpuSceneData)
+{
+	assert(renderContext != nullptr);
+	assert(renderContext->api != nullptr);
+	assert(renderContext->api->updateSceneBuffer != nullptr);
+
+	renderContext->api->updateSceneBuffer(renderContext, gpuSceneData);
+}
+
 SK::Renderer::BufferDeviceAddress SK::Renderer::getVertexBufferDeviceAddress(RenderContext* renderContext, size_t meshIndex)
 {
 	assert(renderContext != nullptr);
@@ -45,6 +72,15 @@ SK::Renderer::BufferDeviceAddress SK::Renderer::getVertexBufferDeviceAddress(Ren
 	assert(renderContext->api->getVertexBufferDeviceAddress != nullptr);
 
 	return renderContext->api->getVertexBufferDeviceAddress(renderContext, meshIndex);
+}
+
+SK::Renderer::BufferDeviceAddress SK::Renderer::getBufferDeviceAddress(RenderContext* renderContext, BufferHandle bufferHandle)
+{
+	assert(renderContext != nullptr);
+	assert(renderContext->api != nullptr);
+	assert(renderContext->api->getBufferDeviceAddress != nullptr);
+
+	return renderContext->api->getBufferDeviceAddress(renderContext, bufferHandle);
 }
 
 SK::Renderer::BufferHandle SK::Renderer::createBuffer(RenderContext* renderContext, const BufferDesc& desc)

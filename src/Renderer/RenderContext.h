@@ -4,6 +4,11 @@
 
 namespace SK::Renderer
 {
+	struct GPUSceneData;
+}
+
+namespace SK::Renderer
+{
 	static constexpr uint32_t INVALID_HANDLE = UINT32_MAX;
 
 	// Opaque handle types
@@ -32,6 +37,12 @@ namespace SK::Renderer
 		VertexShader = 1 << 0,
 		FragmentShader = 1 << 1,
 		ComputeShader = 1 << 2,
+	};
+
+	struct ShaderDesc
+	{
+		const char* path;
+		ShaderStageFlagBits stage;
 	};
 
 	enum class PipelineKind : uint8_t
@@ -115,9 +126,7 @@ namespace SK::Renderer
 	{
 		const char* debugName = nullptr;
 
-		// TODO: Generalize for more shaders
-		const char* vertexShaderPath = nullptr;
-		const char* fragmentShaderPath = nullptr;
+		std::vector<ShaderDesc> shaders;
 
 		PrimitiveTopology topology = PrimitiveTopology::TriangleList;
 		PolygonMode polygonMode = PolygonMode::Fill;
@@ -352,6 +361,10 @@ namespace SK::Renderer
 		uint32_t (*getFrameNumber)(RenderContext* renderContext);
 		uint32_t (*getFrameIndex)(RenderContext* renderContext);
 
+		bool (*beginFrame)(RenderContext* renderContext);
+		void (*endFrame)(RenderContext* renderContext);
+		void (*updateSceneBuffer)(RenderContext* renderContext, const SK::Renderer::GPUSceneData& gpuSceneData);
+
 		void (*beginMainRendering)(RenderContext* renderContext);
 		void (*endRendering)(RenderContext* renderContext);
 
@@ -367,8 +380,8 @@ namespace SK::Renderer
 
 		void (*dispatch)(RenderContext* renderContext, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
 
-		// TODO: Also, implement a generic buffer device address getter.
 		BufferDeviceAddress (*getVertexBufferDeviceAddress)(RenderContext* renderContext, size_t meshIndex);
+		BufferDeviceAddress(*getBufferDeviceAddress)(RenderContext* renderContext, BufferHandle bufferHandle);
 
 		BufferHandle (*createBuffer)(RenderContext* renderContext, const BufferDesc& desc);
 		TextureHandle(*createTexture)(RenderContext* renderContext, const TextureDesc& desc);
@@ -389,6 +402,10 @@ namespace SK::Renderer
 	uint32_t getFrameNumber(RenderContext* renderContext);
 	uint32_t getFrameIndex(RenderContext* renderContext);
 
+	bool beginFrame(RenderContext* renderContext);
+	void endFrame(RenderContext* renderContext);
+	void updateSceneBuffer(RenderContext* renderContext, const SK::Renderer::GPUSceneData& gpuSceneData);
+
 	void beginMainRendering(RenderContext* renderContext);
 	void endRendering(RenderContext* renderContext);
 
@@ -405,6 +422,7 @@ namespace SK::Renderer
 	void dispatch(RenderContext* renderContext, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
 
 	BufferDeviceAddress getVertexBufferDeviceAddress(RenderContext* renderContext, size_t meshIndex);
+	BufferDeviceAddress getBufferDeviceAddress(RenderContext* renderContext, BufferHandle bufferHandle);
 
 	BufferHandle createBuffer(RenderContext* renderContext, const BufferDesc& desc);
 	TextureHandle createTexture(RenderContext* renderContext, const TextureDesc& desc);
