@@ -325,6 +325,30 @@ static uint32_t getFrameIndex_(SK::Renderer::RenderContext* renderContext)
 	return vkRendererBackend->frameNumber % SK::VkRendererBackend::FRAME_OVERLAP;
 }
 
+static bool beginFrame_(SK::Renderer::RenderContext* renderContext)
+{
+	SK::VkRendererBackend::VkRenderContext* vkRenderContext = fetchVkRenderContext(renderContext);
+	SK::VkRendererBackend::State* vkRendererBackend = vkRenderContext->vkRendererBackend;
+
+	return SK::VkRendererBackend::beginFrame(vkRendererBackend);
+}
+
+static void endFrame_(SK::Renderer::RenderContext* renderContext)
+{
+	SK::VkRendererBackend::VkRenderContext* vkRenderContext = fetchVkRenderContext(renderContext);
+	SK::VkRendererBackend::State* vkRendererBackend = vkRenderContext->vkRendererBackend;
+
+	SK::VkRendererBackend::endFrame(vkRendererBackend);
+}
+
+static void updateSceneBuffer_(SK::Renderer::RenderContext* renderContext, const SK::Renderer::GPUSceneData& gpuSceneData)
+{
+	SK::VkRendererBackend::VkRenderContext* vkRenderContext = fetchVkRenderContext(renderContext);
+	SK::VkRendererBackend::State* vkRendererBackend = vkRenderContext->vkRendererBackend;
+
+	SK::VkRendererBackend::updateSceneBuffer(vkRendererBackend, gpuSceneData);
+}
+
 static SK::Renderer::BufferDeviceAddress getVertexBufferDeviceAddress_(SK::Renderer::RenderContext* renderContext, size_t meshIndex)
 {
 	SK::VkRendererBackend::VkRenderContext* vkRenderContext = fetchVkRenderContext(renderContext);
@@ -783,6 +807,9 @@ SK::Renderer::RenderContext SK::VkRendererBackend::makeRenderContext(VkRenderCon
 		.getComputePipeline = getComputePipeline_,
 		.getFrameNumber = getFrameNumber_,
 		.getFrameIndex = getFrameIndex_,
+		.beginFrame = beginFrame_,
+		.endFrame = endFrame_,
+		.updateSceneBuffer = updateSceneBuffer_,
 		.beginMainRendering = beginMainRendering_,
 		.endRendering = endRendering_,
 		.bindPipeline = bindPipeline_,

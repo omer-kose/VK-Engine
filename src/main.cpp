@@ -108,16 +108,16 @@ int main(int argc, char* argv[])
         SK::Scene::updateCamera(&scene);
         SK::Scene::updateGPUSceneData(&scene, vkRendererBackend.windowExtent.width, vkRendererBackend.windowExtent.height);
 
-        if(SK::VkRendererBackend::beginFrame(&vkRendererBackend))
+        if(SK::Renderer::beginFrame(&renderContext))
         {
-            SK::VkRendererBackend::updateSceneBuffer(&vkRendererBackend, scene.gpuSceneData);
+            SK::Renderer::updateSceneBuffer(&renderContext, scene.gpuSceneData);
 
             SK::ForwardRenderer::Input forwardInput{};
             forwardInput.drawContext = &scene.drawContext;
             SK::ForwardRenderer::draw(&renderContext, forwardRendererResources, forwardInput);
 
             SK::UI::draw(&vkRendererBackend);
-            SK::VkRendererBackend::endFrame(&vkRendererBackend);
+            SK::Renderer::endFrame(&renderContext);
         }
 
         auto end = std::chrono::system_clock::now();

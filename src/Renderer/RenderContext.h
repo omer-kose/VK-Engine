@@ -4,6 +4,11 @@
 
 namespace SK::Renderer
 {
+	struct GPUSceneData;
+}
+
+namespace SK::Renderer
+{
 	static constexpr uint32_t INVALID_HANDLE = UINT32_MAX;
 
 	// Opaque handle types
@@ -356,6 +361,10 @@ namespace SK::Renderer
 		uint32_t (*getFrameNumber)(RenderContext* renderContext);
 		uint32_t (*getFrameIndex)(RenderContext* renderContext);
 
+		bool (*beginFrame)(RenderContext* renderContext);
+		void (*endFrame)(RenderContext* renderContext);
+		void (*updateSceneBuffer)(RenderContext* renderContext, const SK::Renderer::GPUSceneData& gpuSceneData);
+
 		void (*beginMainRendering)(RenderContext* renderContext);
 		void (*endRendering)(RenderContext* renderContext);
 
@@ -392,6 +401,10 @@ namespace SK::Renderer
 
 	uint32_t getFrameNumber(RenderContext* renderContext);
 	uint32_t getFrameIndex(RenderContext* renderContext);
+
+	bool beginFrame(RenderContext* renderContext);
+	void endFrame(RenderContext* renderContext);
+	void updateSceneBuffer(RenderContext* renderContext, const SK::Renderer::GPUSceneData& gpuSceneData);
 
 	void beginMainRendering(RenderContext* renderContext);
 	void endRendering(RenderContext* renderContext);
